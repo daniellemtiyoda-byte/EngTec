@@ -1,0 +1,50 @@
+import { Aviso } from '../components/Estados';
+import { Badge } from '../components/Badge';
+import { StatCard } from '../components/Graficos';
+import { ListPage, type Coluna } from '../components/ListPage';
+import { useAsync } from '../hooks/useAsync';
+import { servicos } from '../services';
+import type { SaldoEstoque } from '../types/models';
+import { m3, mLineares, rotuloClasse, un } from '../utils/format';
+import { CATEGORIA_OPCOES, CLASSE_OPCOES } from './Lotes';
+
+const nz = (v: number, tom: 'verde' | 'azul' | 'cinza' | 'vermelho') => (v > 0 ? <Badge tom={tom}>{un(v)}</Badge> : <span className="mudo">—</span>);
+
+export default function Estoque() {
+  const ind = useAsync(() => servicos.dashboard.indicadores(), []);
+  const d = ind.dados;
+
+  const colunas: Coluna<SaldoEstoque>[] = [
+    { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true },
+    { chave: 'especieDocumental', titulo: 'Espécie (documento)', ordenavel: true },
+    { chave: 'classe', titulo: 'Classe / categoria', render: (s) => rotuloClasse(s.classe, s.categoria) },
+    { chave: 'disponivel', titulo: 'Disponível', alinhar: 'right', ordenavel: true, render: (s) => nz(s.disponivel, 'verde') },
+    { chave: 'emAnalise', titulo: 'Em análise', alinhar: 'right', ordenavel: true, render: (s) => nz(s.emAnalise, 'azul') },
+    { chave: 'bloqueado', titulo: 'Bloqueado', alinhar: 'right', ordenavel: true, render: (s) => nz(s.bloqueado, 'cinza') },
+    { chave: 'divergente', titulo: 'Com divergência', alinhar: 'right', ordenavel: true, render: (s) => nz(s.divergente, 'vermelho') },
+    { chave: 'metrosLineares', titulo: 'Metragem linear', alinhar: 'right', ordenavel: true, render: (s) => mLineares(s.metrosLineares) },
+    { chave: 'volumeM3', titulo: 'Volume calculado', alinhar: 'right', ordenavel: true, render: (s) => m3(s.volumeM3) },
+    { chave: 'local', titulo: 'Local', ordenavel: true },
+  ];
+
+  return (
+    <>
+      {d && (
+        <div className="grade-cards">
+          <StatCard rotulo="Disponível" valor={un(d.disponivel)} tom="verde" />
+          <StatCard rotulo="Em análise" valor={un(d.emAnalise)} tom="azul" />
+          <StatCard rotulo="Bloqueado" valor={un(d.bloqueado)} tom="cinza" />
+          <StatCard rotulo="Com divergência" valor={un(d.divergente)} tom="vermelho" />
+        </div>
+      )}
+      <ListPage<SaldoEstoque>
+        titulo="Estoque de dormentes"
+        descricao="Somente o saldo disponível pode ser considerado utilizável; pendentes, bloqueados e divergentes são exibidos à parte."
+        aviso={<Aviso>O saldo oficial é o informado pelo sistema responsável. Contagens estimadas por imagem não alteram este saldo.</Aviso>}
+        listar={(q) => servicos.estoque.listar(q)}
+        colunas={colunas}
+        filtros={[{ chave: 'classe', rotulo: 'Classe', opcoes: CLASSE_OPCOES }, { chave: 'categoria', rotulo: 'Categoria', opcoes: CATEGORIA_OPCOES }]}
+      />
+    </>
+  );
+}
