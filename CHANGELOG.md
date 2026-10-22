@@ -5,7 +5,28 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Corrigido
+- 2026-10-22: modo simulado só liga com `VITE_USE_MOCK=true` explícito; antes, variável ausente liberava o login de demonstração com perfil de administrador. `src/config/env.ts`, `src/services/index.ts`.
+- 2026-10-22: conversão de números unificada em `paraNumero()`: `1.000` era enviado como 1 e `5,0` como `NaN`. Validação e envio usam a mesma função. `src/utils/format.ts`, `FormModal`, Lotes, Movimentações, Recebimento.
+- 2026-10-22: links de alertas e notificações vindos da API passam por `linkInterno()` (bloqueia `//site` e `/\site`, open redirect). `Layout`, Dashboard.
+- 2026-10-22: Pátio não mostra mais `NaN%` com capacidade 0; login volta à tela anterior com os parâmetros (`?q=`).
+- 2026-10-22: `ListPage` fazia duas requisições ao mudar busca/filtro fora da página 1 e podia ficar numa página inexistente após recarregar.
+
+### Segurança
+- 2026-10-22: cabeçalho `X-Requested-With` em toda chamada HTTP (preflight de CORS também nos envios de arquivo, contra CSRF). Requisitos do back-end registrados em `docs/CONTRATOS-API.md`. `src/services/http.ts`.
+- 2026-10-22: dados fictícios gerados dentro de `criarDados()`; o build com API real não leva mais nenhum dado de demonstração. `src/services/mock/`.
+
+### Alterado
+- 2026-10-22: dicionário do domínio em `src/dominio/` (rótulos e cores dos estados, opções de filtro, permissões tipadas); páginas não importam mais constantes de outras páginas; novo `BadgeDe`.
+- 2026-10-22: `src/rotas.tsx` como lista única das telas, usada para gerar rotas (`App.tsx`) e menu (`Layout.tsx`).
+- 2026-10-22: `Coluna<T>` exige que colunas ordenáveis usem um campo real do modelo.
+- 2026-10-22: alertas buscados uma vez (`AlertasContext`) e compartilhados entre o sino e o Dashboard; formatadores numéricos reaproveitados; `useMemo` no `AuthContext`.
+- 2026-10-22: acessibilidade: foco preso no modal, IDs únicos (`useId`) em modais, formulários e buscas, notificações fecham com Esc/clique fora, toasts de erro com `role="alert"`.
+- 2026-10-22: README, `CLAUDE.md` e `docs/CONTRATOS-API.md` atualizados com as mudanças acima.
+
 ### Adicionado
+- 2026-10-22: `ErroTela` (Error Boundary): uma tela que quebra mostra um aviso sem derrubar o app. `src/components/ErroTela.tsx`.
+- 2026-10-22: `Estoque` avisa quando os totais não carregam (antes o erro era ignorado).
 - 2026-10-21: `CLAUDE.md` com comandos, arquitetura e regras do projeto, para orientar o Claude Code. Inclui a regra de registrar toda alteração neste arquivo e manter o `CLAUDE.md` atualizado.
 - 2026-10-21: `CHANGELOG.md` (este arquivo) para registrar as alterações do projeto.
 

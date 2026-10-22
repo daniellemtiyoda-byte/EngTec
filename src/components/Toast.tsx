@@ -18,7 +18,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toasts" aria-live="polite" role="status">
         {itens.map((t) => (
-          <div key={t.id} className={`toast toast-${t.tipo}`}>
+          // Erros são anunciados na hora por leitores de tela (role="alert"); os demais esperam a vez (aria-live polite).
+          <div key={t.id} className={`toast toast-${t.tipo}`} role={t.tipo === 'erro' ? 'alert' : undefined}>
             <span>{t.mensagem}</span>
             <button className="toast-fechar" onClick={() => fechar(t.id)} aria-label="Fechar notificação">×</button>
           </div>

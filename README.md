@@ -33,7 +33,7 @@ Confirme com a equipe/orientação a autorização de uso institucional da bande
 | Variável | Função |
 |---|---|
 | `VITE_API_URL` | URL base do back-end (sem barra final) |
-| `VITE_USE_MOCK` | `true` = serviços simulados; `false` = API real |
+| `VITE_USE_MOCK` | `true` = serviços simulados; ausente ou qualquer outro valor = API real (falha segura) |
 | `VITE_BANDEIRA_URL` | caminho do arquivo da bandeira |
 | `VITE_UPLOAD_MAX_MB` | limite de upload no navegador (o servidor valida de novo) |
 
@@ -44,6 +44,8 @@ Tudo com prefixo `VITE_` vai para o navegador: **nunca** coloque senhas, chaves 
 ```
 src/
   config/env.ts            variáveis de ambiente
+  rotas.tsx                lista única das telas: gera rotas e menu
+  dominio/                 rótulos/cores dos estados, opções de filtro, permissões
   types/models.ts          modelos de dados
   services/
     contracts.ts           interface única `Servicos`

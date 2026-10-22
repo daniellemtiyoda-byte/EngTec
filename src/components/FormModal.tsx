@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ApiError, mensagemSegura } from '../services/http';
+import { paraNumero } from '../utils/format';
 import { ConfirmModal, Modal } from './Modal';
 
 export interface Campo {
@@ -36,6 +37,7 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
   const [erroGeral, setErroGeral] = useState<string>();
   const [enviando, setEnviando] = useState(false);
   const [pendente, setPendente] = useState<Record<string, string> | null>(null);
+  const formId = useId();
 
   useEffect(() => {
     if (aberto) { setValores(vazio()); setErros({}); setErroGeral(undefined); setPendente(null); }
@@ -48,8 +50,9 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
       const v = (valores[c.nome] ?? '').trim();
       if (!v) { if (c.obrigatorio) e[c.nome] = 'Campo obrigatório.'; continue; }
       if (c.tipo === 'number') {
-        const n = Number(v.replace(',', '.'));
-        if (Number.isNaN(n)) e[c.nome] = 'Informe um número válido.';
+        // Mesma conversão que a tela usa no envio: o valor validado é o valor enviado.
+        const n = paraNumero(v, c.inteiro);
+        if (Number.isNaN(n)) e[c.nome] = c.inteiro ? 'Informe um número inteiro (ex.: 1000 ou 1.000).' : 'Informe um número válido (ex.: 2,8).';
         else if (c.inteiro && !Number.isInteger(n)) e[c.nome] = 'Informe um número inteiro.';
         else if (c.min !== undefined && n < c.min) e[c.nome] = `O valor mínimo é ${c.min}.`;
         else if (c.max !== undefined && n > c.max) e[c.nome] = `O valor máximo é ${c.max}.`;
@@ -90,13 +93,13 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
         titulo={titulo} aberto={aberto && !pendente} aoFechar={aoFechar}
         rodape={<>
           <button type="button" className="btn btn-sec" onClick={aoFechar} disabled={enviando}>Cancelar</button>
-          <button type="submit" form="form-modal" className="btn btn-pri" disabled={enviando}>{enviando ? 'Enviando…' : rotuloEnviar}</button>
+          <button type="submit" form={formId} className="btn btn-pri" disabled={enviando}>{enviando ? 'Enviando…' : rotuloEnviar}</button>
         </>}
       >
-        <form id="form-modal" onSubmit={aoSubmeter} noValidate>
+        <form id={formId} onSubmit={aoSubmeter} noValidate>
           {erroGeral && <div className="aviso aviso-critico" role="alert">{erroGeral}</div>}
           {campos.map((c) => {
-            const id = `campo-${c.nome}`;
+            const id = `${formId}-${c.nome}`;
             const comum = {
               id, name: c.nome, value: valores[c.nome] ?? '', 'aria-invalid': !!erros[c.nome], 'aria-describedby': erros[c.nome] ? `${id}-erro` : undefined,
               onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setValores((s) => ({ ...s, [c.nome]: e.target.value })),

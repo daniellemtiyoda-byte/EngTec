@@ -6,14 +6,11 @@ import { StatusEstoqueBadge, StatusRegistroBadge } from '../components/Badge';
 import { useToast } from '../components/Toast';
 import { SUFIXO_SIMULADO } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
+import { CATEGORIA_OPCOES, CLASSE_OPCOES, STATUS_OPCOES } from '../dominio/opcoes';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import type { Categoria, Classe, Lote } from '../types/models';
-import { data, m3, mLineares, metros, rotuloClasse, un } from '../utils/format';
-import { STATUS_OPCOES } from './Documentos';
-
-export const CLASSE_OPCOES = [{ valor: 'primeira', rotulo: '1ª classe' }, { valor: 'segunda', rotulo: '2ª classe' }];
-export const CATEGORIA_OPCOES = [{ valor: 'A', rotulo: 'Categoria A' }, { valor: 'B', rotulo: 'Categoria B' }];
+import { data, m3, mLineares, metros, paraNumero, rotuloClasse, un } from '../utils/format';
 
 export default function Lotes() {
   const { pode } = useAuth();
@@ -68,10 +65,9 @@ export default function Lotes() {
           { nome: 'espessuraM', rotulo: 'Espessura (m)', tipo: 'number', obrigatorio: true, min: 0.05, max: 1 },
         ]}
         aoEnviar={async (v) => {
-          const n = (s: string) => Number(s.replace(',', '.'));
           await servicos.lotes.cadastrar({
             codigo: v.codigo.trim(), fornecedorId: v.fornecedorId, especieId: v.especieId, classe: v.classe as Classe, categoria: v.categoria as Categoria,
-            quantidade: n(v.quantidade), comprimentoM: n(v.comprimentoM), larguraM: n(v.larguraM), espessuraM: n(v.espessuraM),
+            quantidade: paraNumero(v.quantidade, true), comprimentoM: paraNumero(v.comprimentoM), larguraM: paraNumero(v.larguraM), espessuraM: paraNumero(v.espessuraM),
           });
           notificar('sucesso', `Lote cadastrado; aguarda aprovação${SUFIXO_SIMULADO}.`);
           setRec((x) => x + 1);

@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import { Carregando, Erro, PageHeader, Vazio } from '../components/Estados';
 import { BarChart, StackBar, StatCard } from '../components/Graficos';
+import { useAlertas } from '../contexts/AlertasContext';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
-import { m3, mLineares, un } from '../utils/format';
+import { linkInterno, m3, mLineares, un } from '../utils/format';
 
 export default function Dashboard() {
   const ind = useAsync(() => servicos.dashboard.indicadores(), []);
-  const al = useAsync(() => servicos.dashboard.alertas(), []);
+  const al = useAlertas();
   const d = ind.dados;
 
   return (
@@ -52,7 +53,7 @@ export default function Dashboard() {
         {al.carregando && !al.dados ? <Carregando linhas={3} /> : al.erro ? <Erro erro={al.erro} aoTentar={al.recarregar} /> : al.dados?.length ? (
           <div className="lista-alertas">
             {al.dados.map((a) => (
-              <Link key={a.id} to={a.link ?? '/'} className={`alerta-item alerta-${a.nivel}`}>
+              <Link key={a.id} to={linkInterno(a.link)} className={`alerta-item alerta-${a.nivel}`}>
                 <div><strong>{a.titulo}</strong><br /><span className="mudo">{a.descricao}</span></div>
               </Link>
             ))}

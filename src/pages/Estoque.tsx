@@ -2,11 +2,11 @@ import { Aviso } from '../components/Estados';
 import { Badge } from '../components/Badge';
 import { StatCard } from '../components/Graficos';
 import { ListPage, type Coluna } from '../components/ListPage';
+import { CATEGORIA_OPCOES, CLASSE_OPCOES } from '../dominio/opcoes';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import type { SaldoEstoque } from '../types/models';
 import { m3, mLineares, rotuloClasse, un } from '../utils/format';
-import { CATEGORIA_OPCOES, CLASSE_OPCOES } from './Lotes';
 
 const nz = (v: number, tom: 'verde' | 'azul' | 'cinza' | 'vermelho') => (v > 0 ? <Badge tom={tom}>{un(v)}</Badge> : <span className="mudo">—</span>);
 
@@ -29,6 +29,7 @@ export default function Estoque() {
 
   return (
     <>
+      {ind.erro && <Aviso tom="alerta">Não foi possível carregar os totais do estoque. A lista abaixo continua disponível.</Aviso>}
       {d && (
         <div className="grade-cards">
           <StatCard rotulo="Disponível" valor={un(d.disponivel)} tom="verde" />

@@ -1,7 +1,7 @@
 import type { Servicos } from '../contracts';
 import type { Documento, Indicadores, Lote, Movimentacao, ProcessamentoImagem, Recebimento, SessaoInventario, Usuario } from '../../types/models';
 import { ApiError } from '../http';
-import * as D from './data';
+import { criarDados } from './data';
 import { atraso, paginar, simularRede } from './util';
 
 let sessao: Usuario | null = null; // apenas em memória: nada de credenciais no armazenamento do navegador
@@ -9,6 +9,7 @@ let seq = 1000;
 const novoId = (p: string) => `${p}${++seq}`;
 
 export function criarServicosSimulados(): Servicos {
+  const D = criarDados();
   return {
     auth: {
       entrar: async ({ usuario, senha }) => {

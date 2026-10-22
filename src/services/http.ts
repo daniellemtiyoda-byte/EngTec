@@ -42,7 +42,9 @@ export async function http<T>(caminho: string, op: Opcoes = {}): Promise<T> {
   for (const [k, v] of Object.entries(op.query ?? {})) {
     if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
   }
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  // X-Requested-With: cabeçalho próprio obriga o navegador a fazer a verificação prévia de CORS em TODA chamada,
+  // inclusive envios de arquivo (FormData), que sem ele seriam "requisições simples" e ficariam expostas a CSRF.
+  const headers: Record<string, string> = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
   let body: BodyInit | undefined;
   if (op.formulario) body = op.formulario;
   else if (op.corpo !== undefined) {

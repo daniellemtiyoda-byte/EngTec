@@ -1,16 +1,22 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAsync, useDebounced } from '../hooks/useAsync';
 import type { ListQuery, Paginado } from '../types/models';
 import { Carregando, Erro, PageHeader, Vazio } from './Estados';
 
-export interface Coluna<T> {
-  chave: string;
+interface ColunaBase<T> {
   titulo: string;
   render?: (l: T) => ReactNode;
-  ordenavel?: boolean;
   alinhar?: 'right' | 'center';
 }
+/**
+ * A chave de uma coluna ordenável vai como `sortBy` para o serviço, então precisa ser um campo real do modelo
+ * (o TypeScript acusa se o campo for renomeado). Colunas calculadas, como "Dimensões", usam chave livre e não ordenam.
+ */
+export type Coluna<T> = ColunaBase<T> & (
+  | { chave: Extract<keyof T, string>; ordenavel?: boolean }
+  | { chave: string; ordenavel?: false }
+);
 export interface Filtro { chave: string; rotulo: string; opcoes: { valor: string; rotulo: string }[] }
 export interface AcaoLinha<T> { rotulo: string; aoClicar: (l: T) => void; visivel?: (l: T) => boolean }
 
@@ -35,11 +41,17 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
   const [busca, setBusca] = useState(params.get('q') ?? '');
   const [filtros, setFiltros] = useState<Record<string, string>>({});
   const [ordem, setOrdem] = useState<{ chave: string; dir: 'asc' | 'desc' } | null>(null);
-  const [pagina, setPagina] = useState(1);
   const buscaAtraso = useDebounced(busca, 300);
+  const buscaId = useId();
+
+  // A página vale só para a busca/filtros em que foi escolhida: mudou a consulta, volta para a 1 já
+  // na mesma renderização (antes um efeito fazia isso depois, gerando uma requisição extra com a página antiga).
+  const consulta = JSON.stringify([buscaAtraso, filtros]);
+  const [pag, setPag] = useState({ consulta, n: 1 });
+  const pagina = pag.consulta === consulta ? pag.n : 1;
+  const irPara = (n: number) => setPag({ consulta, n });
 
   useEffect(() => { if (!p.secao) setBusca(params.get('q') ?? ''); }, [params, p.secao]);
-  useEffect(() => setPagina(1), [buscaAtraso, filtros]);
 
   const r = useAsync(
     () => p.listar({ page: pagina, pageSize: TAMANHO, search: buscaAtraso, sortBy: ordem?.chave, sortDir: ordem?.dir, filters: filtros }),
@@ -48,6 +60,11 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
 
   const total = r.dados?.total ?? 0;
   const paginas = Math.max(1, Math.ceil(total / TAMANHO));
+
+  // Se a lista encolheu (ex.: após recarregar), não fica presa numa página que não existe mais.
+  useEffect(() => {
+    if (r.dados && !r.carregando && pagina > paginas) setPag({ consulta, n: paginas });
+  }, [r.dados, r.carregando, pagina, paginas, consulta]);
   const colunas = p.colunas;
   const temAcoes = !!p.acoesLinha?.length;
 
@@ -62,8 +79,8 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
       <div className="toolbar">
         {!p.semBusca && (
           <div className="busca">
-            <label className="sr-only" htmlFor={`busca-${p.titulo}`}>Pesquisar em {p.titulo}</label>
-            <input id={`busca-${p.titulo}`} type="search" placeholder="Pesquisar…" value={busca} onChange={(e) => setBusca(e.target.value)} />
+            <label className="sr-only" htmlFor={buscaId}>Pesquisar em {p.titulo}</label>
+            <input id={buscaId} type="search" placeholder="Pesquisar…" value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
         )}
         {p.filtros?.map((f) => (
@@ -121,8 +138,8 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
           <div className="paginacao">
             <span className="mudo">{total} registro{total === 1 ? '' : 's'} · página {pagina} de {paginas}</span>
             <div>
-              <button className="btn btn-sec btn-peq" onClick={() => setPagina((x) => x - 1)} disabled={pagina <= 1}>Anterior</button>
-              <button className="btn btn-sec btn-peq" onClick={() => setPagina((x) => x + 1)} disabled={pagina >= paginas}>Próxima</button>
+              <button className="btn btn-sec btn-peq" onClick={() => irPara(pagina - 1)} disabled={pagina <= 1}>Anterior</button>
+              <button className="btn btn-sec btn-peq" onClick={() => irPara(pagina + 1)} disabled={pagina >= paginas}>Próxima</button>
             </div>
           </div>
         </>

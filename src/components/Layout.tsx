@@ -1,67 +1,50 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
+import { AlertasProvider, useAlertas } from '../contexts/AlertasContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useAsync } from '../hooks/useAsync';
-import { servicos } from '../services';
+import { GRUPOS_MENU, ROTAS } from '../rotas';
+import { linkInterno } from '../utils/format';
 import { BandeiraSP } from './BandeiraSP';
+import { ErroTela } from './ErroTela';
 import { BannerSimulado } from './Estados';
-import { Icone, type NomeIcone } from './Icone';
+import { Icone } from './Icone';
 
-interface ItemNav { to: string; rotulo: string; icone: NomeIcone; fim?: boolean }
-const GRUPOS: { titulo: string; itens: ItemNav[] }[] = [
-  { titulo: 'Visão geral', itens: [{ to: '/', rotulo: 'Dashboard', icone: 'grid', fim: true }] },
-  {
-    titulo: 'Operação',
-    itens: [
-      { to: '/documentos', rotulo: 'Importar documentos', icone: 'file' },
-      { to: '/recebimento', rotulo: 'Recebimento', icone: 'truck' },
-      { to: '/lotes', rotulo: 'Lotes', icone: 'layers' },
-      { to: '/estoque', rotulo: 'Estoque', icone: 'box' },
-      { to: '/movimentacoes', rotulo: 'Movimentações', icone: 'swap' },
-      { to: '/patio', rotulo: 'Pátio', icone: 'map' },
-      { to: '/inventario', rotulo: 'Inventário físico', icone: 'clipboard' },
-      { to: '/visao-computacional', rotulo: 'Visão computacional', icone: 'camera' },
-    ],
-  },
-  {
-    titulo: 'Cadastros e controle',
-    itens: [
-      { to: '/fornecedores', rotulo: 'Fornecedores', icone: 'building' },
-      { to: '/especies', rotulo: 'Espécies vegetais', icone: 'leaf' },
-      { to: '/volumetria', rotulo: 'Controle volumétrico', icone: 'ruler' },
-      { to: '/relatorios', rotulo: 'Relatórios', icone: 'chart' },
-    ],
-  },
-  {
-    titulo: 'Sistema',
-    itens: [
-      { to: '/administracao', rotulo: 'Usuários e auditoria', icone: 'shield' },
-      { to: '/configuracoes', rotulo: 'Configurações', icone: 'gear' },
-    ],
-  },
-];
+const GRUPOS = GRUPOS_MENU.map((titulo) => ({ titulo, itens: ROTAS.filter((r) => r.grupo === titulo) }));
 
 export function RotaProtegida() {
   const { usuario, carregando } = useAuth();
   const loc = useLocation();
   if (carregando) return <div className="tela-cheia" role="status">Carregando…</div>;
-  if (!usuario) return <Navigate to="/login" replace state={{ de: loc.pathname }} />;
-  return <Layout />;
+  // Guarda caminho + parâmetros (ex.: ?q=) para voltar exatamente à mesma tela depois do login.
+  if (!usuario) return <Navigate to="/login" replace state={{ de: loc.pathname + loc.search }} />;
+  return <AlertasProvider><Layout /></AlertasProvider>;
 }
 
 function Notificacoes() {
   const [aberto, setAberto] = useState(false);
-  const { dados } = useAsync(() => servicos.dashboard.alertas(), []);
+  const ref = useRef<HTMLDivElement>(null);
+  const { dados } = useAlertas();
   const n = dados?.length ?? 0;
+
+  // Fecha com Esc ou clique fora do painel.
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAberto(false); };
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false); };
+    document.addEventListener('mousedown', fora);
+    document.addEventListener('keydown', tecla);
+    return () => { document.removeEventListener('mousedown', fora); document.removeEventListener('keydown', tecla); };
+  }, [aberto]);
+
   return (
-    <div className="notif">
+    <div className="notif" ref={ref}>
       <button className="btn-icone btn-icone-claro" onClick={() => setAberto((v) => !v)} aria-expanded={aberto} aria-label={`Notificações (${n})`}>
         <Icone nome="bell" />{n > 0 && <span className="contador">{n}</span>}
       </button>
       {aberto && (
         <div className="notif-painel" role="region" aria-label="Notificações">
           {n === 0 ? <p className="mudo">Sem notificações.</p> : dados!.map((a) => (
-            <Link key={a.id} to={a.link ?? '/'} className={`notif-item notif-${a.nivel}`} onClick={() => setAberto(false)}>
+            <Link key={a.id} to={linkInterno(a.link)} className={`notif-item notif-${a.nivel}`} onClick={() => setAberto(false)}>
               <strong>{a.titulo}</strong><span>{a.descricao}</span>
             </Link>
           ))}
@@ -93,7 +76,7 @@ function Layout() {
             <div key={g.titulo} className="nav-grupo">
               <span className="nav-titulo">{g.titulo}</span>
               {g.itens.map((i) => (
-                <NavLink key={i.to} to={i.to} end={i.fim} className={({ isActive }) => `nav-item ${isActive ? 'ativo' : ''}`} title={i.rotulo}>
+                <NavLink key={i.caminho} to={i.caminho} end={i.fim} className={({ isActive }) => `nav-item ${isActive ? 'ativo' : ''}`} title={i.rotulo}>
                   <Icone nome={i.icone} /><span>{i.rotulo}</span>
                 </NavLink>
               ))}
@@ -121,7 +104,9 @@ function Layout() {
           </div>
         </header>
         <BannerSimulado />
-        <main id="conteudo" className="conteudo" tabIndex={-1}><Outlet /></main>
+        <main id="conteudo" className="conteudo" tabIndex={-1}>
+          <ErroTela key={loc.pathname}><Outlet /></ErroTela>
+        </main>
       </div>
     </div>
   );

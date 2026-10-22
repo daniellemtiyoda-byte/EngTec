@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { Badge, StatusRegistroBadge, type Tom } from '../components/Badge';
+import { BadgeDe, StatusRegistroBadge } from '../components/Badge';
 import { FormModal } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { useToast } from '../components/Toast';
 import { SUFIXO_SIMULADO } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
+import { opcoesDe, STATUS_OPCOES } from '../dominio/opcoes';
+import { TIPO_MOVIMENTACAO } from '../dominio/rotulos';
 import { servicos } from '../services';
 import type { Movimentacao, TipoMovimentacao } from '../types/models';
-import { dataHora, un } from '../utils/format';
-import { STATUS_OPCOES } from './Documentos';
+import { dataHora, paraNumero, un } from '../utils/format';
 
-const TIPO: Record<TipoMovimentacao, [Tom, string]> = { entrada: ['verde', 'Entrada'], saida: ['laranja', 'Saída'], transferencia: ['azul', 'Transferência'] };
+const TIPO_OPCOES = opcoesDe(TIPO_MOVIMENTACAO);
 
 export default function Movimentacoes() {
   const { pode } = useAuth();
@@ -20,7 +21,7 @@ export default function Movimentacoes() {
 
   const colunas: Coluna<Movimentacao>[] = [
     { chave: 'dataHora', titulo: 'Data/hora', ordenavel: true, render: (m) => dataHora(m.dataHora) },
-    { chave: 'tipo', titulo: 'Tipo', render: (m) => <Badge tom={TIPO[m.tipo][0]}>{TIPO[m.tipo][1]}</Badge> },
+    { chave: 'tipo', titulo: 'Tipo', render: (m) => <BadgeDe mapa={TIPO_MOVIMENTACAO} valor={m.tipo} /> },
     { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true },
     { chave: 'quantidade', titulo: 'Quantidade', alinhar: 'right', ordenavel: true, render: (m) => un(m.quantidade) },
     { chave: 'origem', titulo: 'Origem' }, { chave: 'destino', titulo: 'Destino' },
@@ -36,13 +37,13 @@ export default function Movimentacoes() {
         listar={(q) => servicos.movimentacoes.listar(q)}
         recarregar={rec}
         colunas={colunas}
-        filtros={[{ chave: 'tipo', rotulo: 'Tipo', opcoes: Object.entries(TIPO).map(([valor, [, rotulo]]) => ({ valor, rotulo })) }, { chave: 'status', rotulo: 'Situação', opcoes: STATUS_OPCOES }]}
+        filtros={[{ chave: 'tipo', rotulo: 'Tipo', opcoes: TIPO_OPCOES }, { chave: 'status', rotulo: 'Situação', opcoes: STATUS_OPCOES }]}
         acoes={pode('movimentacoes:registrar') ? <button className="btn btn-pri" onClick={() => setAberto(true)}>Registrar movimentação</button> : undefined}
       />
       <FormModal
         titulo="Registrar movimentação" aberto={aberto} aoFechar={() => setAberto(false)} rotuloEnviar="Registrar"
         campos={[
-          { nome: 'tipo', rotulo: 'Tipo', tipo: 'select', obrigatorio: true, opcoes: Object.entries(TIPO).map(([valor, [, rotulo]]) => ({ valor, rotulo })) },
+          { nome: 'tipo', rotulo: 'Tipo', tipo: 'select', obrigatorio: true, opcoes: TIPO_OPCOES },
           { nome: 'loteCodigo', rotulo: 'Código do lote', obrigatorio: true },
           { nome: 'quantidade', rotulo: 'Quantidade (un.)', tipo: 'number', obrigatorio: true, inteiro: true, min: 1 },
           { nome: 'origem', rotulo: 'Origem', ajuda: 'Obrigatória para saída e transferência.' },
@@ -56,10 +57,10 @@ export default function Movimentacoes() {
           if (v.tipo === 'transferencia' && v.origem.trim() && v.origem.trim() === v.destino.trim()) e.destino = 'Destino igual à origem.';
           return e;
         }}
-        confirmacao={(v) => v.tipo === 'entrada' ? undefined : `Confirma ${v.tipo === 'saida' ? 'a SAÍDA' : 'a TRANSFERÊNCIA'} de ${v.quantidade} un. do lote ${v.loteCodigo}? O saldo só muda após a confirmação do sistema responsável.`}
+        confirmacao={(v) => v.tipo === 'entrada' ? undefined : `Confirma ${v.tipo === 'saida' ? 'a SAÍDA' : 'a TRANSFERÊNCIA'} de ${un(paraNumero(v.quantidade, true))} do lote ${v.loteCodigo}? O saldo só muda após a confirmação do sistema responsável.`}
         aoEnviar={async (v) => {
           await servicos.movimentacoes.registrar({
-            tipo: v.tipo as TipoMovimentacao, loteCodigo: v.loteCodigo.trim(), quantidade: Number(v.quantidade),
+            tipo: v.tipo as TipoMovimentacao, loteCodigo: v.loteCodigo.trim(), quantidade: paraNumero(v.quantidade, true),
             origem: v.origem.trim() || undefined, destino: v.destino.trim() || undefined, motivo: v.motivo.trim() || undefined,
           });
           notificar('sucesso', `Movimentação registrada; aguarda confirmação${SUFIXO_SIMULADO}.`);

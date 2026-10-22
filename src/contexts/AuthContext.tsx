@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { Permissao } from '../dominio/permissoes';
 import { servicos } from '../services';
 import type { Usuario } from '../types/models';
 
@@ -8,7 +9,7 @@ interface AuthCtx {
   entrar: (usuario: string, senha: string) => Promise<void>;
   sair: () => Promise<void>;
   /** Apenas conveniência de UX. O servidor DEVE validar cada permissão. */
-  pode: (permissao: string) => boolean;
+  pode: (permissao: Permissao) => boolean;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -28,9 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sair = useCallback(async () => {
     try { await servicos.auth.sair(); } finally { setUsuario(null); }
   }, []);
-  const pode = useCallback((p: string) => !!usuario?.permissoes.includes(p), [usuario]);
+  const pode = useCallback((p: Permissao) => !!usuario?.permissoes.includes(p), [usuario]);
 
-  return <Ctx.Provider value={{ usuario, carregando, entrar, sair, pode }}>{children}</Ctx.Provider>;
+  // useMemo: sem ele, todo componente que usa useAuth renderiza de novo a cada renderização do provider.
+  const valor = useMemo(() => ({ usuario, carregando, entrar, sair, pode }), [usuario, carregando, entrar, sair, pode]);
+  return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {

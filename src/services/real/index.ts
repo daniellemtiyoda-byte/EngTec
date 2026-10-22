@@ -5,7 +5,7 @@ import { ApiError, http } from '../http';
 
 /**
  * Implementação REAL (HTTP). Os caminhos vêm de endpoints.ts e são PROVISÓRIOS.
- * Ao receber a documentação do back-end, ajuste endpoints.ts e os conversores (função `converter`) abaixo.
+ * Ao receber a documentação do back-end, ajuste endpoints.ts e, se os formatos divergirem, `consulta`/`lista` abaixo.
  */
 const caminho = (k: ChaveEndpoint, id?: string) => ENDPOINTS[k].caminho.replace('{id}', encodeURIComponent(id ?? ''));
 
@@ -34,7 +34,7 @@ export function criarServicosReais(): Servicos {
     auth: {
       entrar: (c) => post('auth.entrar', c),
       usuarioAtual: async () => {
-        try { return await http('/auth/me'.replace('/auth/me', ENDPOINTS['auth.usuarioAtual'].caminho)); }
+        try { return await http(caminho('auth.usuarioAtual')); }
         catch (e) { if (e instanceof ApiError && e.status === 401) return null; throw e; }
       },
       sair: () => post('auth.sair'),

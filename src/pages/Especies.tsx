@@ -3,7 +3,7 @@ import { Aviso } from '../components/Estados';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { servicos } from '../services';
 import type { Especie } from '../types/models';
-import { STATUS_OPCOES } from './Documentos';
+import { STATUS_OPCOES } from '../dominio/opcoes';
 
 export default function Especies() {
   const colunas: Coluna<Especie>[] = [

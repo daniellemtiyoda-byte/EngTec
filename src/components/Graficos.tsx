@@ -1,4 +1,5 @@
 import type { Serie } from '../types/models';
+import { numero } from '../utils/format';
 
 /** Gráfico de barras em SVG simples (sem dependências). */
 export function BarChart({ dados, unidade, titulo }: { dados: Serie[]; unidade?: string; titulo: string }) {
@@ -15,7 +16,7 @@ export function BarChart({ dados, unidade, titulo }: { dados: Serie[]; unidade?:
           return (
             <g key={d.rotulo}>
               <rect x={x} y={base - h} width={larg * 0.6} height={h} fill="var(--azul-600)" rx="2" />
-              <text x={x + larg * 0.3} y={base - h - 6} textAnchor="middle" fontSize="12" fill="var(--texto)">{new Intl.NumberFormat('pt-BR').format(d.valor)}</text>
+              <text x={x + larg * 0.3} y={base - h - 6} textAnchor="middle" fontSize="12" fill="var(--texto)">{numero(d.valor)}</text>
               <text x={x + larg * 0.3} y={base + 16} textAnchor="middle" fontSize="12" fill="var(--texto-mudo)">{d.rotulo}</text>
             </g>
           );
@@ -39,7 +40,7 @@ export function StackBar({ partes, titulo, unidade }: { partes: Parte[]; titulo:
       </div>
       <ul className="legenda">
         {partes.map((p) => (
-          <li key={p.rotulo}><span className="amostra" style={{ background: p.cor }} />{p.rotulo}: <strong>{new Intl.NumberFormat('pt-BR').format(p.valor)} {unidade}</strong> ({((p.valor / total) * 100).toFixed(0)}%)</li>
+          <li key={p.rotulo}><span className="amostra" style={{ background: p.cor }} />{p.rotulo}: <strong>{numero(p.valor)} {unidade}</strong> ({((p.valor / total) * 100).toFixed(0)}%)</li>
         ))}
       </ul>
     </figure>

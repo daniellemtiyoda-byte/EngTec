@@ -1,18 +1,18 @@
 import type { ReactNode } from 'react';
+import { STATUS_ESTOQUE, STATUS_REGISTRO, type Rotulos, type Tom } from '../dominio/rotulos';
 import type { StatusEstoque, StatusRegistro } from '../types/models';
 
-export type Tom = 'verde' | 'laranja' | 'vermelho' | 'azul' | 'cinza' | 'simulado';
+export type { Tom };
 
 export function Badge({ tom, children }: { tom: Tom; children: ReactNode }) {
   return <span className={`badge badge-${tom}`}>{children}</span>;
 }
 
-const REG: Record<StatusRegistro, [Tom, string]> = {
-  aprovado: ['verde', 'Aprovado'], pendente: ['laranja', 'Pendente'], bloqueado: ['vermelho', 'Bloqueado'], simulado: ['simulado', 'Simulado'],
-};
-export const StatusRegistroBadge = ({ s }: { s: StatusRegistro }) => <Badge tom={REG[s][0]}>{REG[s][1]}</Badge>;
+/** Badge de um estado do dicionário do domínio: `<BadgeDe mapa={ESTADO_INVENTARIO} valor={s.estado} />`. */
+export function BadgeDe<K extends string>({ mapa, valor }: { mapa: Rotulos<K>; valor: K }) {
+  const [tom, rotulo] = mapa[valor] ?? ['cinza', valor];
+  return <Badge tom={tom}>{rotulo}</Badge>;
+}
 
-const EST: Record<StatusEstoque, [Tom, string]> = {
-  disponivel: ['verde', 'Disponível'], bloqueado: ['cinza', 'Bloqueado'], em_analise: ['azul', 'Em análise'], divergente: ['vermelho', 'Com divergência'],
-};
-export const StatusEstoqueBadge = ({ s }: { s: StatusEstoque }) => <Badge tom={EST[s][0]}>{EST[s][1]}</Badge>;
+export const StatusRegistroBadge = ({ s }: { s: StatusRegistro }) => <BadgeDe mapa={STATUS_REGISTRO} valor={s} />;
+export const StatusEstoqueBadge = ({ s }: { s: StatusEstoque }) => <BadgeDe mapa={STATUS_ESTOQUE} valor={s} />;

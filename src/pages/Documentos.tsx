@@ -6,13 +6,10 @@ import { UploadModal } from '../components/UploadModal';
 import { useToast } from '../components/Toast';
 import { SUFIXO_SIMULADO } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
+import { STATUS_OPCOES, TIPO_DOCUMENTO_OPCOES } from '../dominio/opcoes';
 import { servicos } from '../services';
 import type { Documento } from '../types/models';
 import { data, m3, un, urlSegura } from '../utils/format';
-
-export const STATUS_OPCOES = [
-  { valor: 'aprovado', rotulo: 'Aprovado' }, { valor: 'pendente', rotulo: 'Pendente' }, { valor: 'bloqueado', rotulo: 'Bloqueado' },
-];
 
 /** Lista reutilizada em "Importação de documentos" e "Fornecedores e documentos". */
 export function DocumentosLista({ importar = false, secao = false }: { importar?: boolean; secao?: boolean }) {
@@ -43,7 +40,7 @@ export function DocumentosLista({ importar = false, secao = false }: { importar?
         listar={(q) => servicos.documentos.listar(q)}
         recarregar={rec}
         colunas={colunas}
-        filtros={[{ chave: 'status', rotulo: 'Situação', opcoes: STATUS_OPCOES }, { chave: 'tipo', rotulo: 'Tipo', opcoes: ['NF-e', 'DOF', 'Romaneio', 'Laudo'].map((t) => ({ valor: t, rotulo: t })) }]}
+        filtros={[{ chave: 'status', rotulo: 'Situação', opcoes: STATUS_OPCOES }, { chave: 'tipo', rotulo: 'Tipo', opcoes: TIPO_DOCUMENTO_OPCOES }]}
         acoes={importar && pode('documentos:importar') ? <button className="btn btn-pri" onClick={() => setUpload(true)}>Importar documento</button> : undefined}
         acoesLinha={[{ rotulo: 'Visualizar', aoClicar: setVer }]}
       />

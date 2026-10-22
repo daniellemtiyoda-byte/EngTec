@@ -1,21 +1,16 @@
 import { useState } from 'react';
 import { Aviso } from '../components/Estados';
-import { Badge, type Tom } from '../components/Badge';
+import { BadgeDe } from '../components/Badge';
 import { FormModal } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { useToast } from '../components/Toast';
 import { SUFIXO_SIMULADO } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
+import { opcoesDe } from '../dominio/opcoes';
+import { AJUSTE_INVENTARIO, ESTADO_INVENTARIO } from '../dominio/rotulos';
 import { servicos } from '../services';
 import type { SessaoInventario } from '../types/models';
 import { dataHora, un } from '../utils/format';
-
-const ESTADO: Record<SessaoInventario['estado'], [Tom, string]> = {
-  em_contagem: ['azul', 'Em contagem'], aguardando_aprovacao: ['laranja', 'Aguardando aprovação'], aprovado: ['verde', 'Aprovado'], rejeitado: ['vermelho', 'Rejeitado'],
-};
-const AJUSTE: Record<SessaoInventario['ajuste'], [Tom, string]> = {
-  nao_aplicavel: ['cinza', 'Sem ajuste'], pendente_aprovacao: ['laranja', 'Ajuste pendente de aprovação'], aprovado: ['verde', 'Ajuste aprovado e aplicado'],
-};
 
 export default function Inventario() {
   const { pode } = useAuth();
@@ -27,10 +22,10 @@ export default function Inventario() {
     { chave: 'descricao', titulo: 'Sessão', ordenavel: true },
     { chave: 'local', titulo: 'Local', ordenavel: true },
     { chave: 'abertaEm', titulo: 'Aberta em', ordenavel: true, render: (s) => dataHora(s.abertaEm) },
-    { chave: 'estado', titulo: 'Estado', render: (s) => <Badge tom={ESTADO[s.estado][0]}>{ESTADO[s.estado][1]}</Badge> },
+    { chave: 'estado', titulo: 'Estado', render: (s) => <BadgeDe mapa={ESTADO_INVENTARIO} valor={s.estado} /> },
     { chave: 'itensContados', titulo: 'Itens contados', alinhar: 'right', ordenavel: true, render: (s) => un(s.itensContados) },
     { chave: 'divergencias', titulo: 'Divergências', alinhar: 'right', ordenavel: true, render: (s) => s.divergencias > 0 ? <span className="val-erro">{s.divergencias}</span> : '0' },
-    { chave: 'ajuste', titulo: 'Ajuste de saldo', render: (s) => <Badge tom={AJUSTE[s.ajuste][0]}>{AJUSTE[s.ajuste][1]}</Badge> },
+    { chave: 'ajuste', titulo: 'Ajuste de saldo', render: (s) => <BadgeDe mapa={AJUSTE_INVENTARIO} valor={s.ajuste} /> },
   ];
 
   return (
@@ -42,7 +37,7 @@ export default function Inventario() {
         listar={(q) => servicos.inventario.listar(q)}
         recarregar={rec}
         colunas={colunas}
-        filtros={[{ chave: 'estado', rotulo: 'Estado', opcoes: Object.entries(ESTADO).map(([valor, [, rotulo]]) => ({ valor, rotulo })) }]}
+        filtros={[{ chave: 'estado', rotulo: 'Estado', opcoes: opcoesDe(ESTADO_INVENTARIO) }]}
         acoes={pode('inventario:criar') ? <button className="btn btn-pri" onClick={() => setAberto(true)}>Nova sessão de contagem</button> : undefined}
       />
       <FormModal

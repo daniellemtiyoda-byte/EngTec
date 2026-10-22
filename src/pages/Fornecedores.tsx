@@ -4,7 +4,8 @@ import { PageHeader } from '../components/Estados';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { servicos } from '../services';
 import type { Fornecedor } from '../types/models';
-import { DocumentosLista, STATUS_OPCOES } from './Documentos';
+import { STATUS_OPCOES } from '../dominio/opcoes';
+import { DocumentosLista } from './Documentos';
 
 export default function Fornecedores() {
   const [aba, setAba] = useState<'fornecedores' | 'documentos'>('fornecedores');
