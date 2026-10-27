@@ -2,3 +2,7 @@ node_modules
 dist
 .env.local
 .env.*.local
+# Executável do projeto de inspeção (binários grandes, distribuídos fora do Git)
+inspecao/
+# Documentos de referência do SENAC (PDFs grandes); o PRD fica em docs/PRD.md
+doc_senac/

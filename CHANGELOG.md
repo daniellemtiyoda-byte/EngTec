@@ -5,6 +5,13 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-10-27: `docs/PRD.md` com o PRD do sistema (glossário, regras, requisitos, telas e dados iniciais), que passa a ser a fonte de verdade do produto.
+
+### Alterado
+- 2026-10-27: `CLAUDE.md` alinhado ao PRD: termos do glossário (fardo), classe pela espécie e categoria numérica, lote e fardo automáticos, saída só por RME com FIFO e conferência, inspeção externa simulada. `.gitignore` passa a ignorar `inspecao/` e `doc_senac/` (binários e PDFs grandes).
+- 2026-10-27: `DocumentosLista` saiu de `pages/Documentos.tsx` para `components/DocumentosLista.tsx`, porque Fornecedores importava de outra página (contra a regra de organização). Sem mudança de comportamento. `src/components/DocumentosLista.tsx`, `src/pages/Documentos.tsx`, `src/pages/Fornecedores.tsx`.
+
 ### Corrigido
 - 2026-10-22: modo simulado só liga com `VITE_USE_MOCK=true` explícito; antes, variável ausente liberava o login de demonstração com perfil de administrador. `src/config/env.ts`, `src/services/index.ts`.
 - 2026-10-22: conversão de números unificada em `paraNumero()`: `1.000` era enviado como 1 e `5,0` como `NaN`. Validação e envio usam a mesma função. `src/utils/format.ts`, `FormModal`, Lotes, Movimentações, Recebimento.

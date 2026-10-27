@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Holz Trilho: front-end (React 18 + TypeScript + Vite, sem outras dependências de runtime além de react-router-dom) de um sistema de gestão de dormentes ferroviários de madeira. **Escopo é só front-end**: back-end, persistência, autenticação real e visão computacional são de outros integrantes e não existem neste repositório. Código, identificadores, comentários e textos de UI são em português.
 
+**O PRD em `docs/PRD.md` é a fonte de verdade do produto** (glossário, regras de negócio, requisitos RF01–RF34, telas com critérios de aceite e dados iniciais). Ideias da interface que já existia são aproveitadas quando não contradizem o PRD; em conflito, vale o PRD. Em dúvida sobre uma regra de negócio, pergunte antes de inventar. Construa primeiro os requisitos marcados como Essencial.
+
 ## Registro de alterações e manutenção deste arquivo (obrigatório)
 
 - **Toda alteração feita no projeto deve ser registrada em `CHANGELOG.md`**, na seção `## [Não publicado]` do topo, no mesmo commit da alteração: data (AAAA-MM-DD), o que mudou, por quê e os arquivos principais afetados. Use as categorias Adicionado / Alterado / Corrigido / Removido.
@@ -58,7 +60,13 @@ No modo simulado qualquer usuário/senha preenchidos entram. Para testar estados
 
 ## Regras de domínio e de interface a preservar
 
-- Classe (1ª/2ª) é separada da categoria visual (A/B); metragem linear, volume documental e volume calculado são colunas distintas.
+- Use exatamente os termos do glossário do PRD: **fardo** (nunca "pallet" ou "amarrado"), lote, RME, DOF, classe, categoria.
+- **Classe** depende da espécie (cadastro de espécies, ex. "1ª"); **categoria** é numérica (1, 2, 3...) e vem do estado do dormente. São campos diferentes e sempre aparecem com o nome do campo ("Classe 1ª", "Categoria 2"). As duas chegam do projeto de inspeção, mas também podem ser lançadas manualmente, registrando quem lançou.
+- Lote = NF + espécie + tamanho, criado **automaticamente** ao confirmar o recebimento (nunca digitado). Fardo tem código gerado a partir do lote (ex. `LT26-0042-F03`), só com dados que não mudam depois do recebimento; saída parcial deixa o fardo "aberto" com o saldo restante.
+- Volume em m³ é sempre calculado pelo sistema a partir de largura, altura e comprimento do tamanho; volume documental (NF/DOF) e volume calculado são colunas distintas, e divergência acima de 10% gera alerta (regra do IBAMA).
+- Saída de estoque só por RME: separação com sugestão FIFO (lote mais antigo, priorizando fardos abertos; pular exige justificativa) e baixa só após aprovação do supervisor.
+- Material aguardando inspeção, em quarentena ou reprovado não fica disponível para separação. O sistema de inspeção é externo: no front, simular o retorno dele com lançamento manual.
+- O MVP não usa QR Code nem modo offline; as entradas são manuais (exceto a importação do XML da NF-e).
 - Estoque distingue disponível × em análise × bloqueado × com divergência.
 - Ajustes de inventário aparecem como pendentes até a aprovação; movimentações só alteram saldo após confirmação do sistema responsável.
 - Contagem por imagem (visão computacional) é estimativa, mostra confiança/revisão e não altera saldo; espécie não é identificada por imagem.
