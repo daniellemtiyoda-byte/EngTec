@@ -6,9 +6,9 @@ import { StatusRegistroBadge } from '../components/Badge';
 import { useToast } from '../components/Toast';
 import { SUFIXO_SIMULADO } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
-import { CATEGORIA_OPCOES, CLASSE_OPCOES, STATUS_OPCOES } from '../dominio/opcoes';
+import { STATUS_OPCOES } from '../dominio/opcoes';
 import { servicos } from '../services';
-import type { Categoria, Classe, Recebimento } from '../types/models';
+import type { Recebimento } from '../types/models';
 import { data, mLineares, paraNumero, un } from '../utils/format';
 
 export default function RecebimentoPage() {
@@ -48,14 +48,11 @@ export default function RecebimentoPage() {
           { nome: 'loteCodigo', rotulo: 'Código do lote', obrigatorio: true, ajuda: 'Ex.: LT-2026-0001' },
           { nome: 'documentoNumero', rotulo: 'Número do documento', obrigatorio: true },
           { nome: 'quantidadeConferida', rotulo: 'Quantidade conferida (un.)', tipo: 'number', obrigatorio: true, inteiro: true, min: 0 },
-          { nome: 'classe', rotulo: 'Classe', tipo: 'select', obrigatorio: true, opcoes: CLASSE_OPCOES },
-          { nome: 'categoria', rotulo: 'Categoria visual', tipo: 'select', obrigatorio: true, opcoes: CATEGORIA_OPCOES },
           { nome: 'observacao', rotulo: 'Observação', tipo: 'textarea' },
         ]}
         aoEnviar={async (v) => {
           await servicos.recebimentos.registrarConferencia({
-            loteCodigo: v.loteCodigo.trim(), documentoNumero: v.documentoNumero.trim(), quantidadeConferida: paraNumero(v.quantidadeConferida, true),
-            classe: v.classe as Classe, categoria: v.categoria as Categoria, observacao: v.observacao.trim() || undefined,
+            loteCodigo: v.loteCodigo.trim(), documentoNumero: v.documentoNumero.trim(), quantidadeConferida: paraNumero(v.quantidadeConferida, true), observacao: v.observacao.trim() || undefined,
           });
           notificar('sucesso', `Conferência registrada; aguarda aprovação${SUFIXO_SIMULADO}.`);
           setRec((x) => x + 1);

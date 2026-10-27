@@ -1,6 +1,9 @@
 import type { ListQuery, Paginado } from '../../types/models';
 import { ApiError } from '../http';
 
+/** Volume de um dormente em m³ a partir das dimensões em cm. No modo real quem calcula é o servidor. */
+export const volumeDormenteM3 = (larguraCm: number, alturaCm: number, comprimentoCm: number) => (larguraCm * alturaCm * comprimentoCm) / 1_000_000;
+
 export const atraso = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**

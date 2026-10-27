@@ -1,4 +1,4 @@
-export type MetodoHttp = 'GET' | 'POST';
+export type MetodoHttp = 'GET' | 'POST' | 'PATCH';
 
 export interface EndpointProvisorio {
   modulo: string;
@@ -43,6 +43,10 @@ export const ENDPOINTS = {
   'relatorios.exportar': { modulo: 'Relatórios', operacao: 'Solicitar exportação', metodo: 'POST', caminho: '/relatorios/{id}/exportacoes', estado: P },
   'auditoria.listar': { modulo: 'Auditoria', operacao: 'Consultar histórico', metodo: 'GET', caminho: '/auditoria', estado: P },
   'especies.listar': { modulo: 'Espécies', operacao: 'Listar', metodo: 'GET', caminho: '/especies', estado: P },
+  'especies.atualizar': { modulo: 'Espécies', operacao: 'Atualizar classe e uso', metodo: 'PATCH', caminho: '/especies/{id}', estado: P },
+  'tamanhos.listar': { modulo: 'Tamanhos', operacao: 'Listar', metodo: 'GET', caminho: '/tamanhos', estado: P },
+  'tamanhos.cadastrar': { modulo: 'Tamanhos', operacao: 'Cadastrar', metodo: 'POST', caminho: '/tamanhos', estado: P },
+  'tamanhos.atualizar': { modulo: 'Tamanhos', operacao: 'Atualizar medidas', metodo: 'PATCH', caminho: '/tamanhos/{id}', estado: P },
   'volumetria.listar': { modulo: 'Controle volumétrico', operacao: 'Listar por lote', metodo: 'GET', caminho: '/volumetria/lotes', estado: P },
   'usuarios.listar': { modulo: 'Administração', operacao: 'Listar usuários', metodo: 'GET', caminho: '/usuarios', estado: P },
   'sistema.saude': { modulo: 'Sistema', operacao: 'Teste de conexão', metodo: 'GET', caminho: '/saude', estado: P },

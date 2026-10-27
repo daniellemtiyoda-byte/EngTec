@@ -6,7 +6,7 @@ import { CATEGORIA_OPCOES, CLASSE_OPCOES } from '../dominio/opcoes';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import type { SaldoEstoque } from '../types/models';
-import { m3, mLineares, rotuloClasse, un } from '../utils/format';
+import { m3, mLineares, rotuloCategoria, rotuloClasse, un } from '../utils/format';
 
 const nz = (v: number, tom: 'verde' | 'azul' | 'cinza' | 'vermelho') => (v > 0 ? <Badge tom={tom}>{un(v)}</Badge> : <span className="mudo">—</span>);
 
@@ -17,7 +17,8 @@ export default function Estoque() {
   const colunas: Coluna<SaldoEstoque>[] = [
     { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true },
     { chave: 'especieDocumental', titulo: 'Espécie (documento)', ordenavel: true },
-    { chave: 'classe', titulo: 'Classe / categoria', render: (s) => rotuloClasse(s.classe, s.categoria) },
+    { chave: 'classe', titulo: 'Classe', render: (s) => rotuloClasse(s.classe) },
+    { chave: 'categoria', titulo: 'Categoria', render: (s) => rotuloCategoria(s.categoria) },
     { chave: 'disponivel', titulo: 'Disponível', alinhar: 'right', ordenavel: true, render: (s) => nz(s.disponivel, 'verde') },
     { chave: 'emAnalise', titulo: 'Em análise', alinhar: 'right', ordenavel: true, render: (s) => nz(s.emAnalise, 'azul') },
     { chave: 'bloqueado', titulo: 'Bloqueado', alinhar: 'right', ordenavel: true, render: (s) => nz(s.bloqueado, 'cinza') },

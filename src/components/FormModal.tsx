@@ -24,14 +24,16 @@ interface Props {
   aoFechar: () => void;
   aoEnviar: (valores: Record<string, string>) => Promise<void>;
   rotuloEnviar?: string;
+  /** Valores com que o formulário abre (edição); campos ausentes começam vazios. */
+  iniciais?: Record<string, string>;
   /** Validação adicional entre campos; retorna { campo: mensagem }. */
   validar?: (v: Record<string, string>) => Record<string, string>;
   /** Se retornar texto, exibe modal de confirmação antes de enviar (operações críticas). */
   confirmacao?: (v: Record<string, string>) => string | undefined;
 }
 
-export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEnviar = 'Salvar', validar, confirmacao }: Props) {
-  const vazio = () => Object.fromEntries(campos.map((c) => [c.nome, '']));
+export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEnviar = 'Salvar', iniciais, validar, confirmacao }: Props) {
+  const vazio = () => Object.fromEntries(campos.map((c) => [c.nome, iniciais?.[c.nome] ?? '']));
   const [valores, setValores] = useState<Record<string, string>>(vazio);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string>();

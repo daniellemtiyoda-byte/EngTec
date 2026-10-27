@@ -1,8 +1,9 @@
 import type { Servicos } from '../contracts';
-import type { Documento, Indicadores, Lote, Movimentacao, ProcessamentoImagem, Recebimento, SessaoInventario, Usuario } from '../../types/models';
+import type { Documento, Indicadores, Lote, Movimentacao, NovoTamanho, ProcessamentoImagem, Recebimento, SessaoInventario, Tamanho, Usuario } from '../../types/models';
+import { rotuloClasse } from '../../utils/format';
 import { ApiError } from '../http';
 import { criarDados } from './data';
-import { atraso, paginar, simularRede } from './util';
+import { atraso, paginar, simularRede, volumeDormenteM3 } from './util';
 
 let sessao: Usuario | null = null; // apenas em memória: nada de credenciais no armazenamento do navegador
 let seq = 1000;
@@ -10,6 +11,14 @@ const novoId = (p: string) => `${p}${++seq}`;
 
 export function criarServicosSimulados(): Servicos {
   const D = criarDados();
+
+  function validarTamanho(n: NovoTamanho, id?: string) {
+    if (D.tamanhos.some((t) => t.id !== id && t.codigo.toLowerCase() === n.codigo.toLowerCase())) {
+      throw new ApiError(409, 'Já existe um tamanho com este código.', { codigo: 'Código já utilizado.' });
+    }
+  }
+  const comVolume = (id: string, n: NovoTamanho): Tamanho => ({ id, ...n, volumeM3: volumeDormenteM3(n.larguraCm, n.alturaCm, n.comprimentoCm) });
+
   return {
     auth: {
       entrar: async ({ usuario, senha }) => {
@@ -26,7 +35,8 @@ export function criarServicosSimulados(): Servicos {
         await simularRede();
         const s = D.saldos;
         const soma = (f: (x: (typeof s)[number]) => number) => s.reduce((a, x) => a + f(x), 0);
-        const porClasse = (c: 'primeira' | 'segunda') => D.saldos.filter((x) => x.classe === c).reduce((a, x) => a + x.disponivel, 0);
+        const porClasse = new Map<string, number>();
+        for (const x of s) porClasse.set(rotuloClasse(x.classe), (porClasse.get(rotuloClasse(x.classe)) ?? 0) + x.disponivel);
         const meses = ['Jun', 'Jul', 'Ago', 'Set', 'Out'];
         return {
           disponivel: soma((x) => x.disponivel), bloqueado: soma((x) => x.bloqueado), emAnalise: soma((x) => x.emAnalise), divergente: soma((x) => x.divergente),
@@ -34,7 +44,7 @@ export function criarServicosSimulados(): Servicos {
           recebimentosPendentes: D.recebimentos.filter((r) => r.status === 'pendente').length,
           inventariosAbertos: D.sessoesInventario.filter((x) => x.estado !== 'aprovado' && x.estado !== 'rejeitado').length,
           recebimentosPorMes: meses.map((m, i) => ({ rotulo: m, valor: [4, 6, 5, 7, 3][i] })),
-          estoquePorClasse: [{ rotulo: '1ª classe', valor: porClasse('primeira') }, { rotulo: '2ª classe', valor: porClasse('segunda') }],
+          estoquePorClasse: [...porClasse].map(([rotulo, valor]) => ({ rotulo, valor })),
           origem: 'simulado',
         };
       },
@@ -81,8 +91,9 @@ export function criarServicosSimulados(): Servicos {
         const f = D.fornecedores.find((x) => x.id === n.fornecedorId);
         const e = D.especies.find((x) => x.id === n.especieId);
         const calc = n.quantidade * n.comprimentoM * n.larguraM * n.espessuraM;
+        // Lote novo aguarda inspeção: a classe vem da espécie e a categoria só chega com a inspeção.
         const l: Lote = {
-          id: novoId('l'), codigo: n.codigo, fornecedor: f?.razaoSocial ?? '—', especieDocumental: e?.nomePopular ?? '—', classe: n.classe, categoria: n.categoria,
+          id: novoId('l'), codigo: n.codigo, fornecedor: f?.razaoSocial ?? '—', especieDocumental: e?.nomeCientifico ?? '—', classe: e?.classe, inspecao: 'aguardando',
           quantidade: n.quantidade, comprimentoM: n.comprimentoM, larguraM: n.larguraM, espessuraM: n.espessuraM, metrosLineares: n.quantidade * n.comprimentoM,
           volumeDocumentalM3: 0, volumeCalculadoM3: calc, recebidoEm: new Date().toISOString(), status: 'pendente', estoqueStatus: 'em_analise', local: 'A definir',
         };
@@ -135,7 +146,37 @@ export function criarServicosSimulados(): Servicos {
       solicitarExportacao: async (relatorioId, formato) => { await atraso(500); return { id: novoId('x'), relatorioId, formato, estado: 'solicitada' as const }; },
     },
     auditoria: { listar: (q) => paginar(D.auditoria, q) },
-    especies: { listar: (q) => paginar(D.especies, q) },
+    especies: {
+      listar: (q) => paginar(D.especies, q),
+      atualizar: async (id, d) => {
+        await atraso(500);
+        const e = D.especies.find((x) => x.id === id);
+        if (!e) throw new ApiError(404, 'Espécie não encontrada.');
+        e.classe = d.classe ?? undefined;
+        e.uso = d.uso;
+        // A classe exibida em lotes e saldos é a da espécie.
+        for (const x of [...D.lotes, ...D.saldos]) if (x.especieDocumental === e.nomeCientifico) x.classe = e.classe;
+        return e;
+      },
+    },
+    tamanhos: {
+      listar: (q) => paginar(D.tamanhos, q),
+      cadastrar: async (n) => {
+        await atraso(500);
+        validarTamanho(n);
+        const t = comVolume(novoId('t'), n);
+        D.tamanhos.push(t);
+        return t;
+      },
+      atualizar: async (id, n) => {
+        await atraso(500);
+        const i = D.tamanhos.findIndex((x) => x.id === id);
+        if (i < 0) throw new ApiError(404, 'Tamanho não encontrado.');
+        validarTamanho(n, id);
+        D.tamanhos[i] = comVolume(id, n);
+        return D.tamanhos[i];
+      },
+    },
     volumetria: { listar: (q) => paginar(D.volumetria, q) },
     usuarios: { listar: (q) => paginar(D.usuarios, q) },
     sistema: { testarConexao: async () => { await atraso(300); return { ok: true, mensagem: 'Modo simulado: nenhuma conexão real foi testada.', simulado: true }; } },

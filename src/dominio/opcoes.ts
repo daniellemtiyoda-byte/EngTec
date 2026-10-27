@@ -1,5 +1,5 @@
-import type { Categoria, Classe, Documento, StatusRegistro } from '../types/models';
-import { SITUACAO_VOLUMETRIA, type Rotulos } from './rotulos';
+import type { Documento, StatusRegistro } from '../types/models';
+import { RESULTADO_INSPECAO, SITUACAO_MEDIDAS, SITUACAO_VOLUMETRIA, USO_ESPECIE, type Rotulos } from './rotulos';
 
 export interface Opcao<V extends string = string> { valor: V; rotulo: string }
 
@@ -13,8 +13,15 @@ export const STATUS_OPCOES: Opcao<StatusRegistro>[] = [
   { valor: 'aprovado', rotulo: 'Aprovado' }, { valor: 'pendente', rotulo: 'Pendente' }, { valor: 'bloqueado', rotulo: 'Bloqueado' },
 ];
 
-export const CLASSE_OPCOES: Opcao<Classe>[] = [{ valor: 'primeira', rotulo: '1ª classe' }, { valor: 'segunda', rotulo: '2ª classe' }];
-export const CATEGORIA_OPCOES: Opcao<Categoria>[] = [{ valor: 'A', rotulo: 'Categoria A' }, { valor: 'B', rotulo: 'Categoria B' }];
+/** Classe é definida por espécie no cadastro de espécies. Lista PROVISÓRIA: o PRD só confirma a 1ª. */
+export const CLASSE_OPCOES: Opcao[] = ['1ª', '2ª', '3ª'].map((c) => ({ valor: c, rotulo: `Classe ${c}` }));
+
+/** Categoria numérica do estado do dormente. Número de níveis PROVISÓRIO: a combinar com o projeto de inspeção. */
+export const CATEGORIA_OPCOES: Opcao[] = [1, 2, 3].map((c) => ({ valor: String(c), rotulo: `Categoria ${c}` }));
+
+export const RESULTADO_INSPECAO_OPCOES = opcoesDe(RESULTADO_INSPECAO);
+export const USO_OPCOES = opcoesDe(USO_ESPECIE);
+export const SITUACAO_MEDIDAS_OPCOES = opcoesDe(SITUACAO_MEDIDAS);
 
 export const TIPO_DOCUMENTO_OPCOES: Opcao<Documento['tipo']>[] = (['NF-e', 'DOF', 'Romaneio', 'Laudo'] as const).map((t) => ({ valor: t, rotulo: t }));
 

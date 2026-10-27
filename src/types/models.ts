@@ -1,8 +1,12 @@
 export type Origem = 'simulado' | 'api';
 export type StatusRegistro = 'aprovado' | 'pendente' | 'bloqueado' | 'simulado';
 export type StatusEstoque = 'disponivel' | 'bloqueado' | 'em_analise' | 'divergente';
-export type Classe = 'primeira' | 'segunda';
-export type Categoria = 'A' | 'B';
+/** Classe vem do cadastro da espécie (ex. "1ª"); sem valor = "a definir". */
+export type Classe = string;
+/** Categoria numérica do estado do dormente (1, 2, 3...), vinda da inspeção; sem valor = "a definir". */
+export type Categoria = number;
+export type ResultadoInspecao = 'aguardando' | 'aprovado' | 'reprovado' | 'quarentena';
+export type UsoEspecie = 'via' | 'AMV';
 
 export interface Paginado<T> {
   items: T[];
@@ -54,10 +58,40 @@ export interface Documento {
 
 export interface Especie {
   id: string;
-  nomePopular: string;
+  /** Posição na lista de espécies da RME. */
+  numero: number;
   nomeCientifico: string;
+  observacao?: string;
+  classe?: Classe;
+  uso: UsoEspecie;
   lotesAtivos: number;
-  status: StatusRegistro;
+}
+
+/** `classe: null` volta a classe para "a definir". */
+export interface AtualizacaoEspecie {
+  classe: Classe | null;
+  uso: UsoEspecie;
+}
+
+export type SituacaoMedidas = 'provisorio' | 'confirmado';
+
+export interface Tamanho {
+  id: string;
+  codigo: string;
+  larguraCm: number;
+  alturaCm: number;
+  comprimentoCm: number;
+  /** Volume de um dormente, calculado pelo sistema a partir das três dimensões. */
+  volumeM3: number;
+  medidas: SituacaoMedidas;
+}
+
+export interface NovoTamanho {
+  codigo: string;
+  larguraCm: number;
+  alturaCm: number;
+  comprimentoCm: number;
+  medidas: SituacaoMedidas;
 }
 
 export interface Lote {
@@ -65,8 +99,9 @@ export interface Lote {
   codigo: string;
   fornecedor: string;
   especieDocumental: string;
-  classe: Classe;
-  categoria: Categoria;
+  classe?: Classe;
+  categoria?: Categoria;
+  inspecao: ResultadoInspecao;
   quantidade: number;
   comprimentoM: number;
   larguraM: number;
@@ -84,8 +119,6 @@ export interface NovoLote {
   codigo: string;
   fornecedorId: string;
   especieId: string;
-  classe: Classe;
-  categoria: Categoria;
   quantidade: number;
   comprimentoM: number;
   larguraM: number;
@@ -111,8 +144,6 @@ export interface NovaConferencia {
   loteCodigo: string;
   documentoNumero: string;
   quantidadeConferida: number;
-  classe: Classe;
-  categoria: Categoria;
   observacao?: string;
 }
 
@@ -120,8 +151,8 @@ export interface SaldoEstoque {
   id: string;
   loteCodigo: string;
   especieDocumental: string;
-  classe: Classe;
-  categoria: Categoria;
+  classe?: Classe;
+  categoria?: Categoria;
   disponivel: number;
   bloqueado: number;
   emAnalise: number;

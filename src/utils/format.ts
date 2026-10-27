@@ -33,7 +33,10 @@ export function dataHora(iso?: string): string {
   return d.toLocaleString('pt-BR', { timeZone: TZ, hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(', ', ' ');
 }
 
-export const rotuloClasse = (c: string, cat: string) => `${c === 'primeira' ? '1ª classe' : '2ª classe'} · Cat. ${cat}`;
+/** Classe e categoria são campos diferentes e sempre aparecem com o nome do campo (regra do PRD). */
+export const rotuloClasse = (c?: string) => (c ? `Classe ${c}` : 'Classe a definir');
+export const rotuloCategoria = (c?: number) => (c ? `Categoria ${c}` : 'Categoria a definir');
+export const cm = (v: number) => `${NUMERO.format(v)} cm`;
 
 /**
  * Converte número digitado no padrão brasileiro ou com ponto decimal. Única conversão usada por validação e envio.

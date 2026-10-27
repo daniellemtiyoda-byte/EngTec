@@ -1,8 +1,9 @@
 import type {
   DivergenciaInventario, Documento, Especie, Fornecedor, LocalPatio, Lote, Movimentacao, ProcessamentoImagem,
-  Recebimento, RegistroAuditoria, Relatorio, SaldoEstoque, SessaoInventario, StatusEstoque, StatusRegistro,
-  Transferencia, Usuario, VolumetriaLote,
+  Recebimento, RegistroAuditoria, Relatorio, ResultadoInspecao, SaldoEstoque, SessaoInventario, StatusEstoque, StatusRegistro,
+  Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../../types/models';
+import { volumeDormenteM3 } from './util';
 
 // DADOS FICTÍCIOS para desenvolvimento. Nenhum valor aqui representa estoque, fornecedores ou documentos reais.
 // Gerados dentro de uma função para o build com API real poder descartar este módulo inteiro.
@@ -10,7 +11,7 @@ export function criarDados() {
 
   const usuarioDemo: Usuario = {
     id: 'u1', nome: 'Usuário de Demonstração', email: 'demo@exemplo.invalid', perfil: 'Administrador (simulado)',
-    permissoes: ['lotes:cadastrar', 'recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'documentos:importar', 'visao:enviar', 'relatorios:exportar', 'admin'],
+    permissoes: ['lotes:cadastrar', 'recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'documentos:importar', 'visao:enviar', 'relatorios:exportar', 'admin'],
     ativo: true, ultimoAcesso: '2026-10-09T10:15:00-03:00',
   };
 
@@ -21,13 +22,23 @@ export function criarDados() {
     { id: 'f4', razaoSocial: 'Serraria Exemplo D ME', cnpj: '00.000.000/0001-04', cidadeUf: 'Cidade D/PR', documentosVigentes: 0, status: 'bloqueado' },
   ];
 
-  const especies: Especie[] = [
-    { id: 'e1', nomePopular: 'Eucalipto', nomeCientifico: 'Eucalyptus sp.', lotesAtivos: 0, status: 'aprovado' },
-    { id: 'e2', nomePopular: 'Aroeira', nomeCientifico: 'Myracrodruon urundeuva', lotesAtivos: 0, status: 'aprovado' },
-    { id: 'e3', nomePopular: 'Angico', nomeCientifico: 'Anadenanthera sp.', lotesAtivos: 0, status: 'aprovado' },
-    { id: 'e4', nomePopular: 'Maçaranduba', nomeCientifico: 'Manilkara sp.', lotesAtivos: 0, status: 'pendente' },
-    { id: 'e5', nomePopular: 'Ipê', nomeCientifico: 'Handroanthus sp.', lotesAtivos: 0, status: 'bloqueado' },
+  // Lista de espécies da RME atual (PRD, "Dados iniciais"). Classe "a definir" fica sem valor; 19 a 21 são de AMV.
+  const listaEspecies: [string, string?, string?][] = [
+    ['Apuleia leiocarpa'], ['Apuleia molaris'], ['Aspidosperma polyneuron'], ['Bowdichia brasiliensis ou Bowdichia spp'],
+    ['Bowdichia nitida'], ['Bowdichia racemosa'], ['Dialium guianense', '1ª', 'Classe conforme plaqueta'], ['Diplotropis purpurea'],
+    ['Dipteryx odorata'], ['Dipteryx spp.'], ['Enterolobium schomburgkii'], ['Goupia glabra'], ['Hymenaea courbaril'],
+    ['Hymenaea intermedia'], ['Hymenolobium petraeum ou Hymenolobium spp'], ['Mezilaurus itauba'], ['Ocotea neesiana'],
+    ['Tabebuia serratifolia'], ['Angelim Vermelho', undefined, 'Promap'], ['Coimal', undefined, 'Dormentes antigos'],
+    ['Veneer', undefined, 'Dormentes antigos'], ['Astronium graveolens'],
   ];
+  const especies: Especie[] = listaEspecies.map(([nomeCientifico, classe, observacao], i) => ({
+    id: `e${i + 1}`, numero: i + 1, nomeCientifico, classe, observacao, uso: i >= 18 && i <= 20 ? 'AMV' : 'via', lotesAtivos: 0,
+  }));
+
+  // Medidas PROVISÓRIAS (só o comprimento de 2,80 m foi visto na plaqueta); editáveis no cadastro de tamanhos.
+  const tamanhos: Tamanho[] = ([['T1', 24, 17, 280], ['T2', 22, 16, 200], ['T3', 24, 17, 400]] as const).map(([codigo, l, a, c], i) => ({
+    id: `t${i + 1}`, codigo, larguraCm: l, alturaCm: a, comprimentoCm: c, volumeM3: volumeDormenteM3(l, a, c), medidas: 'provisorio',
+  }));
 
   const locais = ['Quadra 1 / Baia 01', 'Quadra 1 / Baia 02', 'Quadra 2 / Baia 01', 'Quadra 2 / Baia 02', 'Quadra 3 / Baia 01'];
   const statusPorIdx: StatusRegistro[] = ['aprovado', 'aprovado', 'pendente', 'bloqueado', 'aprovado'];
@@ -41,15 +52,18 @@ export function criarDados() {
     const calc = quantidade * comprimentoM * larguraM * espessuraM;
     const doc = calc * (1 + deltas[i % 5]);
     const status = statusPorIdx[i % 5];
+    const inspecao: ResultadoInspecao = status === 'aprovado' ? 'aprovado' : status === 'pendente' ? 'aguardando' : i % 2 ? 'quarentena' : 'reprovado';
+    const especie = especies[(i * 5) % especies.length];
     const divergente = Math.abs(doc - calc) / calc > 0.05;
     const estoqueStatus: StatusEstoque = status === 'aprovado' ? (divergente ? 'divergente' : 'disponivel') : status === 'pendente' ? 'em_analise' : 'bloqueado';
     return {
       id: `l${i + 1}`,
       codigo: `LT-2026-${String(i + 1).padStart(4, '0')}`,
       fornecedor: fornecedores[i % 4].razaoSocial,
-      especieDocumental: especies[i % 5].nomePopular,
-      classe: i % 3 === 0 ? 'segunda' : 'primeira',
-      categoria: i % 2 ? 'A' : 'B',
+      especieDocumental: especie.nomeCientifico,
+      classe: especie.classe,
+      categoria: inspecao === 'aguardando' ? undefined : 1 + (i % 3),
+      inspecao,
       quantidade, comprimentoM, larguraM, espessuraM,
       metrosLineares: quantidade * comprimentoM,
       volumeDocumentalM3: doc,
@@ -59,7 +73,7 @@ export function criarDados() {
     };
   });
 
-  for (const e of especies) e.lotesAtivos = lotes.filter((l) => l.especieDocumental === e.nomePopular).length;
+  for (const e of especies) e.lotesAtivos = lotes.filter((l) => l.especieDocumental === e.nomeCientifico).length;
 
   const recebimentos: Recebimento[] = lotes.slice(0, 18).map((l, i) => {
     const falta = i % 6 === 3 ? 7 : 0;
@@ -152,7 +166,7 @@ export function criarDados() {
     { id: 'u4', nome: 'Usuário Inativo', email: 'inativo@exemplo.invalid', perfil: 'Consulta', permissoes: [], ativo: false },
   ];
 
-  return { usuarioDemo, fornecedores, especies, lotes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
+  return { usuarioDemo, fornecedores, especies, tamanhos, lotes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
 }
 
 export type DadosSimulados = ReturnType<typeof criarDados>;

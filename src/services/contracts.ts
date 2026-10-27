@@ -1,8 +1,8 @@
 import type {
-  Alerta, ContagemInventario, Documento, DivergenciaInventario, Especie, Fornecedor, Indicadores,
-  ListQuery, LocalPatio, Lote, Movimentacao, NovaConferencia, NovaMovimentacao, NovoLote, Paginado,
+  Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Especie, Fornecedor, Indicadores,
+  ListQuery, LocalPatio, Lote, Movimentacao, NovaConferencia, NovaMovimentacao, NovoLote, NovoTamanho, Paginado,
   ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, SaldoEstoque,
-  SessaoInventario, SolicitacaoExportacao, Transferencia, Usuario, VolumetriaLote,
+  SessaoInventario, SolicitacaoExportacao, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../types/models';
 
 /**
@@ -49,7 +49,11 @@ export interface Servicos {
     solicitarExportacao(relatorioId: string, formato: string): Promise<SolicitacaoExportacao>;
   };
   auditoria: ServicoLista<RegistroAuditoria>;
-  especies: ServicoLista<Especie>;
+  especies: ServicoLista<Especie> & { atualizar(id: string, d: AtualizacaoEspecie): Promise<Especie> };
+  tamanhos: ServicoLista<Tamanho> & {
+    cadastrar(d: NovoTamanho): Promise<Tamanho>;
+    atualizar(id: string, d: NovoTamanho): Promise<Tamanho>;
+  };
   volumetria: ServicoLista<VolumetriaLote>;
   usuarios: ServicoLista<Usuario>;
   sistema: { testarConexao(): Promise<ResultadoConexao> };

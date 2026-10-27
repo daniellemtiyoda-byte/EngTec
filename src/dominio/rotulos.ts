@@ -1,4 +1,6 @@
-import type { LocalPatio, ProcessamentoImagem, SessaoInventario, StatusEstoque, StatusRegistro, TipoMovimentacao } from '../types/models';
+import type {
+  LocalPatio, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, StatusEstoque, StatusRegistro, TipoMovimentacao, UsoEspecie,
+} from '../types/models';
 
 /**
  * Dicionário do domínio: rótulo e cor de cada estado exibido na interface.
@@ -13,6 +15,19 @@ export const STATUS_REGISTRO: Rotulos<StatusRegistro> = {
 
 export const STATUS_ESTOQUE: Rotulos<StatusEstoque> = {
   disponivel: ['verde', 'Disponível'], bloqueado: ['cinza', 'Bloqueado'], em_analise: ['azul', 'Em análise'], divergente: ['vermelho', 'Com divergência'],
+};
+
+export const RESULTADO_INSPECAO: Rotulos<ResultadoInspecao> = {
+  aguardando: ['azul', 'Aguardando inspeção'], aprovado: ['verde', 'Aprovado'], reprovado: ['vermelho', 'Reprovado'], quarentena: ['laranja', 'Quarentena'],
+};
+
+export const USO_ESPECIE: Rotulos<UsoEspecie> = {
+  via: ['azul', 'Via corrida'], AMV: ['laranja', 'AMV'],
+};
+
+/** Medidas de tamanho ainda não confirmadas pela CPTM aparecem como provisórias. */
+export const SITUACAO_MEDIDAS: Rotulos<SituacaoMedidas> = {
+  provisorio: ['laranja', 'Provisório'], confirmado: ['verde', 'Confirmado'],
 };
 
 export const TIPO_MOVIMENTACAO: Rotulos<TipoMovimentacao> = {

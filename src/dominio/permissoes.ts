@@ -8,6 +8,7 @@ export const PERMISSOES = [
   'recebimento:registrar',
   'movimentacoes:registrar',
   'inventario:criar',
+  'cadastros:editar', // classe e uso das espécies; medidas dos tamanhos
   'documentos:importar',
   'visao:enviar',
   'relatorios:exportar',

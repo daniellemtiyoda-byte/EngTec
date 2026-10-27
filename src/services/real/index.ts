@@ -22,6 +22,7 @@ async function lista<T>(k: ChaveEndpoint, q?: ListQuery, id?: string): Promise<P
 
 const servicoLista = <T,>(k: ChaveEndpoint): ServicoLista<T> => ({ listar: (q) => lista<T>(k, q) });
 const post = <T,>(k: ChaveEndpoint, corpo?: unknown, id?: string) => http<T>(caminho(k, id), { metodo: 'POST', corpo });
+const patch = <T,>(k: ChaveEndpoint, id: string, corpo: unknown) => http<T>(caminho(k, id), { metodo: 'PATCH', corpo });
 
 function enviarArquivo<T>(k: ChaveEndpoint, arquivo: File) {
   const f = new FormData();
@@ -62,7 +63,12 @@ export function criarServicosReais(): Servicos {
       solicitarExportacao: (id, formato) => post('relatorios.exportar', { formato }, id),
     },
     auditoria: servicoLista('auditoria.listar'),
-    especies: servicoLista('especies.listar'),
+    especies: { ...servicoLista('especies.listar'), atualizar: (id, d) => patch('especies.atualizar', id, d) },
+    tamanhos: {
+      ...servicoLista('tamanhos.listar'),
+      cadastrar: (d) => post('tamanhos.cadastrar', d),
+      atualizar: (id, d) => patch('tamanhos.atualizar', id, d),
+    },
     volumetria: servicoLista('volumetria.listar'),
     usuarios: servicoLista('usuarios.listar'),
     sistema: {

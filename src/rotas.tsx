@@ -13,6 +13,7 @@ import Movimentacoes from './pages/Movimentacoes';
 import Patio from './pages/Patio';
 import Recebimento from './pages/Recebimento';
 import Relatorios from './pages/Relatorios';
+import Tamanhos from './pages/Tamanhos';
 import VisaoComputacional from './pages/VisaoComputacional';
 import Volumetria from './pages/Volumetria';
 
@@ -43,7 +44,8 @@ export const ROTAS: Rota[] = [
   { caminho: '/inventario', tela: Inventario, rotulo: 'Inventário físico', icone: 'clipboard', grupo: 'Operação' },
   { caminho: '/visao-computacional', tela: VisaoComputacional, rotulo: 'Visão computacional', icone: 'camera', grupo: 'Operação' },
   { caminho: '/fornecedores', tela: Fornecedores, rotulo: 'Fornecedores', icone: 'building', grupo: 'Cadastros e controle' },
-  { caminho: '/especies', tela: Especies, rotulo: 'Espécies vegetais', icone: 'leaf', grupo: 'Cadastros e controle' },
+  { caminho: '/especies', tela: Especies, rotulo: 'Espécies', icone: 'leaf', grupo: 'Cadastros e controle' },
+  { caminho: '/tamanhos', tela: Tamanhos, rotulo: 'Tamanhos', icone: 'medida', grupo: 'Cadastros e controle' },
   { caminho: '/volumetria', tela: Volumetria, rotulo: 'Controle volumétrico', icone: 'ruler', grupo: 'Cadastros e controle' },
   { caminho: '/relatorios', tela: Relatorios, rotulo: 'Relatórios', icone: 'chart', grupo: 'Cadastros e controle' },
   { caminho: '/administracao', tela: Administracao, rotulo: 'Usuários e auditoria', icone: 'shield', grupo: 'Sistema' },

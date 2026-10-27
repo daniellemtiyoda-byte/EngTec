@@ -27,7 +27,7 @@ const MENSAGENS: Record<number, string> = {
 };
 
 interface Opcoes {
-  metodo?: 'GET' | 'POST';
+  metodo?: 'GET' | 'POST' | 'PATCH';
   query?: Record<string, string | number | undefined>;
   corpo?: unknown;
   formulario?: FormData;

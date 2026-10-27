@@ -42,6 +42,9 @@
 | Relatórios | Solicitar exportação | POST | /relatorios/{id}/exportacoes |
 | Auditoria | Consultar histórico | GET | /auditoria |
 | Espécies | Listar | GET | /especies |
+| Espécies | Atualizar classe e uso (`{ classe: string \| null, uso: 'via' \| 'AMV' }`) | PATCH | /especies/{id} |
+| Tamanhos | Listar / Cadastrar | GET / POST | /tamanhos |
+| Tamanhos | Atualizar medidas | PATCH | /tamanhos/{id} |
 | Controle volumétrico | Listar por lote | GET | /volumetria/lotes |
 | Administração | Listar usuários | GET | /usuarios |
 | Sistema | Teste de conexão | GET | /saude |
@@ -56,7 +59,7 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
    - O front envia `X-Requested-With: XMLHttpRequest` em **toda** chamada: o CORS precisa permitir esse cabeçalho (`Access-Control-Allow-Headers`).
    - Proteção contra CSRF no servidor: cookie com `SameSite=Lax` ou `Strict` e, de preferência, rejeitar requisições sem o cabeçalho acima ou usar token anti-CSRF.
    - O campo `mensagem` dos erros é exibido ao usuário como veio: deve ser texto seguro, sem detalhes internos (stack trace, SQL, caminhos).
-4. Permissões por operação (nomes das permissões usados em `pode('...')`: `lotes:cadastrar`, `recebimento:registrar`, `movimentacoes:registrar`, `inventario:criar`, `documentos:importar`, `visao:enviar`, `relatorios:exportar`, `admin`).
+4. Permissões por operação (nomes das permissões usados em `pode('...')`: `lotes:cadastrar`, `recebimento:registrar`, `movimentacoes:registrar`, `inventario:criar`, `cadastros:editar`, `documentos:importar`, `visao:enviar`, `relatorios:exportar`, `admin`).
 5. Códigos de resposta e formato dos erros (incluindo erros por campo).
 6. Exemplos de sucesso e de erro.
 7. Regras de negócio decididas no servidor: tolerância volumétrica, estados de aprovação, fluxo de aprovação de ajustes de inventário, formatos/tamanhos de upload.
@@ -64,6 +67,9 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
 9. Para relatórios: como o arquivo gerado é baixado (URL assinada, endpoint próprio?).
 
 ## Pontos em aberto
+
+- Tamanhos: o servidor calcula `volumeM3` (largura × altura × comprimento em cm ÷ 1.000.000) e o devolve em listar/cadastrar/atualizar; o front não envia volume. Medidas chegam com `medidas: 'provisorio' | 'confirmado'`.
+- Classe e categoria: `classe` (texto, ex. "1ª") vem da espécie; `categoria` (número) vem da inspeção. Ausentes = "a definir". Lote e saldo trazem os dois já resolvidos, mais `inspecao` (`aguardando`, `aprovado`, `reprovado`, `quarentena`).
 
 - Pesquisa global: hoje redireciona para a lista de lotes com `?q=`. Definir se existirá endpoint de busca global.
 - Administração de usuários/permissões: tela é só leitura até haver contrato.
