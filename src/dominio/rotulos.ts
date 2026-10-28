@@ -1,11 +1,13 @@
 import type {
-  DofPendente, EtapaEntrada, MotivoPerda, Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, SituacaoNf, StatusEstoque,
+  DofPendente, EtapaEntrada, MotivoPerda, Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoLote, SituacaoMedidas, SituacaoNf, StatusEstoque,
   StatusRegistro, StatusRme, TipoMovimentacao, UrgenciaRme, UsoEspecie,
 } from '../types/models';
 
 /**
  * Dicionário do domínio: rótulo e cor de cada estado exibido na interface.
  * Mudar um texto ou uma cor aqui muda em todas as telas, filtros e formulários.
+ * Paleta semântica (manter em todos os mapas): verde = disponível/concluído, azul = em andamento,
+ * laranja = atenção, vermelho = bloqueio ou prazo vencido, cinza = encerrado/neutro.
  */
 export type Tom = 'verde' | 'laranja' | 'vermelho' | 'azul' | 'cinza' | 'simulado';
 export type Rotulos<K extends string> = Record<K, [Tom, string]>;
@@ -15,11 +17,16 @@ export const STATUS_REGISTRO: Rotulos<StatusRegistro> = {
 };
 
 export const STATUS_ESTOQUE: Rotulos<StatusEstoque> = {
-  disponivel: ['verde', 'Disponível'], bloqueado: ['cinza', 'Bloqueado'], em_analise: ['azul', 'Em análise'], divergente: ['vermelho', 'Com divergência'],
+  disponivel: ['verde', 'Disponível'], bloqueado: ['vermelho', 'Bloqueado'], em_analise: ['azul', 'Em análise'], divergente: ['vermelho', 'Com divergência'],
 };
 
 export const RESULTADO_INSPECAO: Rotulos<ResultadoInspecao> = {
   aguardando: ['azul', 'Aguardando inspeção'], aprovado: ['verde', 'Aprovado'], reprovado: ['vermelho', 'Reprovado'], quarentena: ['laranja', 'Quarentena'],
+};
+
+export const SITUACAO_LOTE: Rotulos<SituacaoLote> = {
+  disponivel: ['verde', 'Disponível'], aguardando_inspecao: ['azul', 'Aguardando inspeção'], quarentena: ['laranja', 'Quarentena'],
+  reprovado: ['vermelho', 'Reprovado'], divergente: ['vermelho', 'Com divergência'], bloqueado: ['vermelho', 'Bloqueado'], sem_saldo: ['cinza', 'Sem saldo'],
 };
 
 export const USO_ESPECIE: Rotulos<UsoEspecie> = {
@@ -50,11 +57,11 @@ export const DECLARACAO_DOF: Rotulos<Dof['declaracao']> = {
 };
 
 export const ESTADO_FARDO: Rotulos<EstadoFardo> = {
-  fechado: ['verde', 'Fechado'], aberto: ['laranja', 'Aberto'], baixado: ['cinza', 'Baixado'],
+  fechado: ['verde', 'Fechado'], aberto: ['azul', 'Aberto'], baixado: ['cinza', 'Baixado'],
 };
 
 export const STATUS_RME: Rotulos<StatusRme> = {
-  aberta: ['azul', 'Aberta'], em_separacao: ['laranja', 'Em separação'], conferida: ['verde', 'Conferida'], entregue: ['cinza', 'Entregue'], cancelada: ['vermelho', 'Cancelada'],
+  aberta: ['azul', 'Aberta'], em_separacao: ['laranja', 'Em separação'], conferida: ['verde', 'Conferida'], entregue: ['cinza', 'Entregue'], cancelada: ['cinza', 'Cancelada'],
 };
 
 export const URGENCIA_RME: Rotulos<UrgenciaRme> = {

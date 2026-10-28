@@ -17,16 +17,17 @@ export default function Estoque() {
 
   const colunas: Coluna<SaldoEstoque>[] = [
     { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true, render: (s) => <CodigoLink codigo={s.loteCodigo} /> },
-    { chave: 'especieDocumental', titulo: 'Espécie (documento)', ordenavel: true },
-    { chave: 'classe', titulo: 'Classe', render: (s) => rotuloClasse(s.classe) },
-    { chave: 'categoria', titulo: 'Categoria', render: (s) => rotuloCategoria(s.categoria) },
+    {
+      chave: 'especieDocumental', titulo: 'Espécie', ordenavel: true,
+      render: (s) => <><em>{s.especieDocumental}</em><div className="mudo">{rotuloClasse(s.classe)} · {rotuloCategoria(s.categoria)}</div></>,
+    },
     { chave: 'disponivel', titulo: 'Disponível', alinhar: 'right', ordenavel: true, render: (s) => nz(s.disponivel, 'verde') },
     { chave: 'emAnalise', titulo: 'Em análise', alinhar: 'right', ordenavel: true, render: (s) => nz(s.emAnalise, 'azul') },
-    { chave: 'bloqueado', titulo: 'Bloqueado', alinhar: 'right', ordenavel: true, render: (s) => nz(s.bloqueado, 'cinza') },
+    { chave: 'bloqueado', titulo: 'Bloqueado', alinhar: 'right', ordenavel: true, render: (s) => nz(s.bloqueado, 'vermelho') },
     { chave: 'divergente', titulo: 'Com divergência', alinhar: 'right', ordenavel: true, render: (s) => nz(s.divergente, 'vermelho') },
-    { chave: 'metrosLineares', titulo: 'Metragem linear', alinhar: 'right', ordenavel: true, render: (s) => mLineares(s.metrosLineares) },
-    { chave: 'volumeM3', titulo: 'Volume calculado', alinhar: 'right', ordenavel: true, render: (s) => m3(s.volumeM3) },
     { chave: 'local', titulo: 'Local', ordenavel: true },
+    { chave: 'metrosLineares', titulo: 'Metragem linear', alinhar: 'right', ordenavel: true, opcional: true, render: (s) => mLineares(s.metrosLineares) },
+    { chave: 'volumeM3', titulo: 'Volume calculado', alinhar: 'right', ordenavel: true, opcional: true, render: (s) => m3(s.volumeM3) },
     { chave: 'idadeDias', titulo: 'Idade', alinhar: 'right', ordenavel: true, render: (s) => (s.acimaLimiteIdade ? <span className="val-erro" title="Acima do limite de dias definido em Configurações">{dias(s.idadeDias)}</span> : dias(s.idadeDias)) },
   ];
 

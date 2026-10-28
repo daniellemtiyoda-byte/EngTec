@@ -6,6 +6,8 @@ export type Classe = string;
 /** Categoria numérica do estado do dormente (1, 2, 3...), vinda da inspeção; sem valor = "a definir". */
 export type Categoria = number;
 export type ResultadoInspecao = 'aguardando' | 'aprovado' | 'reprovado' | 'quarentena';
+/** Situação única do lote para a tela (junta inspeção, estoque e saldo): diz o que se pode fazer com ele. */
+export type SituacaoLote = 'disponivel' | 'aguardando_inspecao' | 'quarentena' | 'reprovado' | 'divergente' | 'bloqueado' | 'sem_saldo';
 export type UsoEspecie = 'via' | 'AMV';
 
 export interface Paginado<T> {
@@ -229,6 +231,8 @@ export interface Lote {
   /** Dias desde o recebimento e se passou do limite (parâmetro), calculados pelo serviço na consulta. */
   idadeDias: number;
   acimaLimiteIdade: boolean;
+  /** Calculada pelo serviço na consulta. */
+  situacao: SituacaoLote;
   status: StatusRegistro;
   estoqueStatus: StatusEstoque;
   local: string;

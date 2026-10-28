@@ -90,7 +90,7 @@ button, input, select, textarea { font: inherit; }
 .tabela tbody tr:hover { background: var(--azul-100); }
 .al-right { text-align: right; font-variant-numeric: tabular-nums; } .al-center { text-align: center; }
 .th-botao { background: none; border: 0; cursor: pointer; font-weight: 700; padding: 0; color: inherit; }
-.celula-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+.celula-acoes { white-space: nowrap; width: 1%; }
 .paginacao { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .paginacao div { display: flex; gap: 6px; }
 .val-erro { color: var(--vermelho); font-weight: 700; }
@@ -325,3 +325,32 @@ a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
 .pendencia ul { margin: 0; padding-left: 18px; font-size: 13px; }
 .pendencia .btn { align-self: flex-start; margin-top: auto; }
 @media (max-width: 760px) { .pendencia .btn { align-self: stretch; text-align: center; padding: 12px; font-size: 15px; } }
+
+/* Listas (UX fase 3): ações com menu "⋯", colunas extras, filtros como chips, cartões no celular */
+.acoes-linha { display: flex; gap: 4px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; }
+.btn-menu { min-width: 32px; font-weight: 800; letter-spacing: 1px; }
+.menu-acoes { position: fixed; z-index: 70; list-style: none; margin: 0; padding: 4px; background: #fff; border: 1px solid var(--cinza-200); border-radius: var(--raio); box-shadow: 0 8px 24px rgba(0,0,0,.18); min-width: 180px; }
+.menu-acoes button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 4px; cursor: pointer; font: inherit; }
+.menu-acoes button:hover, .menu-acoes button:focus-visible { background: var(--azul-100); outline: none; }
+.menu-colunas { position: relative; }
+.menu-colunas summary { list-style: none; cursor: pointer; }
+.menu-colunas summary::-webkit-details-marker { display: none; }
+.menu-colunas-painel { position: absolute; z-index: 20; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid var(--cinza-200); border-radius: var(--raio); box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+.menu-colunas-painel .caixa { font-weight: 400; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--azul-600); background: var(--azul-100); color: var(--azul-800); border-radius: 14px; padding: 3px 10px; font-size: 13px; cursor: pointer; }
+.chip-limpar { border-color: var(--cinza-300); background: #fff; color: var(--texto-mudo); }
+.so-celular { display: none; }
+.lista-cartoes { display: none; list-style: none; margin: 0; padding: 0; flex-direction: column; gap: 8px; }
+.cartao-linha { background: #fff; border: 1px solid var(--cinza-200); border-radius: var(--raio); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.cartao-linha-titulo { font-size: 16px; font-weight: 700; }
+.cartao-linha dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 14px; }
+.cartao-linha dt { color: var(--texto-mudo); } .cartao-linha dd { margin: 0; }
+.cartao-linha .acoes-linha { justify-content: stretch; }
+.cartao-linha .acoes-linha > .btn:first-child { flex: 1; padding: 10px; font-size: 15px; }
+.cartao-linha .btn-menu { padding: 10px 14px; }
+@media (max-width: 760px) {
+  .lista-tabela { display: none; }
+  .lista-cartoes { display: flex; }
+  .so-celular { display: flex; }
+}

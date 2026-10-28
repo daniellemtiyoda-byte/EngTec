@@ -85,6 +85,7 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
 
 ## Pontos em aberto
 
+- Lote: `listar` e `obter` devolvem `situacao` (`disponivel`, `aguardando_inspecao`, `quarentena`, `reprovado`, `divergente`, `bloqueado`, `sem_saldo`), calculada na consulta nesta ordem de prioridade: sem saldo, divergência, inspeção pendente, quarentena, reprovado, bloqueado; filtrável por `situacao`.
 - Pendências (`GET /dashboard/pendencias`): lista `{ id, nivel, titulo, quantidade, descricao?, exemplos?: [{ codigo, texto }], acao: { rotulo, link } }` já filtrada pelas permissões do usuário da sessão (ex.: almoxarife recebe "RMEs para separar", supervisor "RMEs para conferir"). Os links usam filtros de lista no endereço (`/rme?status=aberta`).
 - NF: `listar` devolve `etapa` (`aguardando_dof`, `aguardando_recebimento`, `declarar`, `concluida`) e, na etapa `declarar`, `diasParaPrazo` e `nivelPrazo`, calculados na consulta; o filtro `etapa` alimenta as colunas do quadro de Entrada. Para não carregar listas inteiras só para os contadores das colunas, o front usa `total` de cada consulta paginada.
 

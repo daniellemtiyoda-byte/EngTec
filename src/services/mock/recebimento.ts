@@ -100,7 +100,7 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
       quantidade: c.quantidade, saldo: c.quantidade, fardos: c.fardos.length,
       comprimentoM: c.tamanho.comprimentoCm / 100, larguraM: c.tamanho.larguraCm / 100, alturaM: c.tamanho.alturaCm / 100,
       metrosLineares: (c.quantidade * c.tamanho.comprimentoCm) / 100, volumeDocumentalM3, volumeCalculadoM3: c.volumeM3,
-      recebidoEm: ctx.quando, idadeDias: 0, acimaLimiteIdade: false, status: 'pendente', estoqueStatus: acimaTolerancia ? 'divergente' : 'em_analise', local: 'A definir',
+      recebidoEm: ctx.quando, idadeDias: 0, acimaLimiteIdade: false, situacao: acimaTolerancia ? 'divergente' : 'aguardando_inspecao', status: 'pendente', estoqueStatus: acimaTolerancia ? 'divergente' : 'em_analise', local: 'A definir',
     };
     B.lotes.unshift(lote);
     lotes.push(lote);

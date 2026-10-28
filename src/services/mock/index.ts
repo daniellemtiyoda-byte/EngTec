@@ -8,6 +8,7 @@ import { data, pct, rotuloClasse } from '../../utils/format';
 import { chaveAcessoValida } from '../../utils/nfeXml';
 import { ApiError } from '../http';
 import { decidirMovimentacao, registrarPerdaAjuste } from './ajustes';
+import { situacaoDoLote } from './estoque';
 import { criarDados } from './data';
 import { receber } from './recebimento';
 import { abrirRme, cancelarRme, conferirRme, entregarRme, opcoesSeparacao, separarRme } from './rme';
@@ -36,7 +37,7 @@ export function criarServicosSimulados(): Servicos {
   /** Idade e limite calculados na consulta, com o parâmetro vigente (no modo real, pelo servidor). */
   function comIdade<T extends Lote>(l: T): T {
     const idadeDias = diasEntre(dataSP(l.recebidoEm), hojeSP());
-    return { ...l, idadeDias, acimaLimiteIdade: l.saldo > 0 && idadeDias > D.parametros.limiteIdadeDias };
+    return { ...l, idadeDias, acimaLimiteIdade: l.saldo > 0 && idadeDias > D.parametros.limiteIdadeDias, situacao: situacaoDoLote(l) };
   }
   /** Lote com NF e DOF de origem e todo o saldo que saiu explicado por movimentações aprovadas (histórico NF → destino). */
   function rastreavel(l: Lote) {
@@ -137,23 +138,23 @@ export function criarServicosSimulados(): Servicos {
         const lista: (Pendencia | false)[] = [
           pode('rme:separar') && abertas.length > 0 && {
             id: 'separar', nivel: critica(abertas) ? 'critico' : 'atencao', titulo: 'RMEs para separar', quantidade: abertas.length,
-            exemplos: exemplos(abertas, textoRme), acao: { rotulo: 'Separar', link: '/rme?status=aberta' },
+            exemplos: exemplos(abertas, textoRme), acao: { rotulo: 'Separar', link: '/rme?visao=lista&status=aberta' },
           },
           pode('rme:conferir') && emSep.length > 0 && {
             id: 'conferir', nivel: critica(emSep) ? 'critico' : 'atencao', titulo: 'RMEs para conferir', quantidade: emSep.length,
-            descricao: 'A entrega e a baixa só acontecem depois da sua conferência.', exemplos: exemplos(emSep, textoRme), acao: { rotulo: 'Conferir', link: '/rme?status=em_separacao' },
+            descricao: 'A entrega e a baixa só acontecem depois da sua conferência.', exemplos: exemplos(emSep, textoRme), acao: { rotulo: 'Conferir', link: '/rme?visao=lista&status=em_separacao' },
           },
           pode('rme:separar') && conferidas.length > 0 && {
             id: 'entregar', nivel: 'atencao', titulo: 'RMEs conferidas para entregar', quantidade: conferidas.length,
-            exemplos: exemplos(conferidas, textoRme), acao: { rotulo: 'Confirmar entrega', link: '/rme?status=conferida' },
+            exemplos: exemplos(conferidas, textoRme), acao: { rotulo: 'Confirmar entrega', link: '/rme?visao=lista&status=conferida' },
           },
           pode('recebimento:registrar') && aReceber.length > 0 && {
             id: 'receber', nivel: 'atencao', titulo: 'NFs com DOF prontas para receber', quantidade: aReceber.length,
-            exemplos: exemplos(aReceber, (n) => ({ codigo: `NF ${n.numero}`, texto: n.fornecedor })), acao: { rotulo: 'Receber', link: '/notas?etapa=aguardando_recebimento' },
+            exemplos: exemplos(aReceber, (n) => ({ codigo: `NF ${n.numero}`, texto: n.fornecedor })), acao: { rotulo: 'Receber', link: '/notas?visao=lista&etapa=aguardando_recebimento' },
           },
           pode('nf:cadastrar') && semDof.length > 0 && {
             id: 'dof', nivel: 'atencao', titulo: 'NFs aguardando DOF', quantidade: semDof.length, descricao: 'O recebimento não avança sem o DOF.',
-            exemplos: exemplos(semDof, (n) => ({ codigo: `NF ${n.numero}`, texto: n.fornecedor })), acao: { rotulo: 'Cadastrar DOF', link: '/notas?etapa=aguardando_dof' },
+            exemplos: exemplos(semDof, (n) => ({ codigo: `NF ${n.numero}`, texto: n.fornecedor })), acao: { rotulo: 'Cadastrar DOF', link: '/notas?visao=lista&etapa=aguardando_dof' },
           },
           pode('dof:declarar') && dofs.length > 0 && {
             id: 'declarar', nivel: dofs.some((d) => d.nivel === 'critico') ? 'critico' : dofs.some((d) => d.nivel === 'atencao') ? 'atencao' : 'info',
@@ -173,7 +174,7 @@ export function criarServicosSimulados(): Servicos {
           },
           pode('recebimento:registrar', 'admin') && aguardandoInsp.length > 0 && {
             id: 'inspecao', nivel: 'info', titulo: 'Lotes aguardando inspeção', quantidade: aguardandoInsp.length, descricao: 'Fora do estoque disponível até o resultado da inspeção.',
-            exemplos: exemplos(aguardandoInsp, (l) => ({ codigo: l.codigo, texto: l.especieDocumental })), acao: { rotulo: 'Ver lotes', link: '/lotes?inspecao=aguardando' },
+            exemplos: exemplos(aguardandoInsp, (l) => ({ codigo: l.codigo, texto: l.especieDocumental })), acao: { rotulo: 'Ver lotes', link: '/lotes?situacao=aguardando_inspecao' },
           },
         ];
         return lista.filter((x): x is Pendencia => !!x);

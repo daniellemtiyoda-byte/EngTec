@@ -31,11 +31,10 @@ export default function RecebimentoPage() {
 
   const colunas: Coluna<Recebimento>[] = [
     { chave: 'nfNumero', titulo: 'NF', ordenavel: true, render: (r) => <CodigoLink codigo={`NF ${r.nfNumero}`} /> },
-    { chave: 'dofNumero', titulo: 'DOF', ordenavel: true },
+    { chave: 'dofNumero', titulo: 'DOF', ordenavel: true, opcional: true },
     { chave: 'fornecedor', titulo: 'Fornecedor', ordenavel: true },
     { chave: 'recebidoEm', titulo: 'Recebido em', ordenavel: true, render: (r) => data(r.recebidoEm) },
-    { chave: 'quantidadeDocumental', titulo: 'Qtd. NF', alinhar: 'right', render: (r) => un(r.quantidadeDocumental) },
-    { chave: 'quantidadeConferida', titulo: 'Qtd. conferida', alinhar: 'right', render: (r) => un(r.quantidadeConferida) },
+    { chave: 'quantidadeConferida', titulo: 'Conferido', alinhar: 'right', render: (r) => <>{un(r.quantidadeConferida)}<div className="mudo">NF: {un(r.quantidadeDocumental)}</div></> },
     {
       chave: 'divergencia', titulo: 'Divergência', alinhar: 'right', ordenavel: true,
       render: (r) => (r.divergenciaQuantidade ? <span className="val-erro">{sinal(r.divergencia)}{un(r.divergencia)}</span> : <span>Sem divergência</span>),
@@ -45,8 +44,8 @@ export default function RecebimentoPage() {
       render: (r) => <Badge tom={r.acimaTolerancia ? 'vermelho' : 'verde'}>{sinal(r.divergenciaVolumePct)}{pct(r.divergenciaVolumePct)}</Badge>,
     },
     { chave: 'lotes', titulo: 'Lotes criados', render: (r) => <CodigosLink codigos={r.lotes} /> },
-    { chave: 'fardos', titulo: 'Fardos', alinhar: 'right', ordenavel: true },
-    { chave: 'conferente', titulo: 'Conferente', ordenavel: true },
+    { chave: 'fardos', titulo: 'Fardos', alinhar: 'right', ordenavel: true, opcional: true },
+    { chave: 'conferente', titulo: 'Conferente', ordenavel: true, opcional: true },
   ];
 
   return (

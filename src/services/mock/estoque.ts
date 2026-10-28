@@ -1,4 +1,4 @@
-import type { Fardo, Lote, SaldoEstoque, StatusEstoque } from '../../types/models';
+import type { Fardo, Lote, SaldoEstoque, SituacaoLote, StatusEstoque } from '../../types/models';
 import { ApiError } from '../http';
 
 /** O que uma alteração de saldo lê e altera nos dados simulados. */
@@ -11,6 +11,16 @@ export interface BaseSaldo {
 const BALDE: Record<StatusEstoque, 'disponivel' | 'emAnalise' | 'bloqueado' | 'divergente'> = {
   disponivel: 'disponivel', em_analise: 'emAnalise', bloqueado: 'bloqueado', divergente: 'divergente',
 };
+
+/** Situação única do lote para a tela, na ordem do que impede o uso: sem saldo, divergência, inspeção, bloqueio. */
+export function situacaoDoLote(l: Lote): SituacaoLote {
+  if (l.saldo <= 0) return 'sem_saldo';
+  if (l.estoqueStatus === 'divergente') return 'divergente';
+  if (l.inspecao === 'aguardando' || l.estoqueStatus === 'em_analise') return 'aguardando_inspecao';
+  if (l.inspecao === 'quarentena') return 'quarentena';
+  if (l.inspecao === 'reprovado') return 'reprovado';
+  return l.estoqueStatus === 'disponivel' ? 'disponivel' : 'bloqueado';
+}
 
 /**
  * Única forma de mudar saldo no mock (baixa de RME, perda e ajuste aprovados): fardo, lote e estoque juntos.

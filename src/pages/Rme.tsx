@@ -58,8 +58,8 @@ export default function RmePage() {
 
   const colunas: Coluna<Rme>[] = [
     { chave: 'numero', titulo: 'RME', ordenavel: true },
-    { chave: 'abertaEm', titulo: 'Aberta em', ordenavel: true, render: (r) => data(r.abertaEm) },
-    { chave: 'requisitante', titulo: 'Requisitante', ordenavel: true },
+    { chave: 'abertaEm', titulo: 'Aberta em', ordenavel: true, opcional: true, render: (r) => data(r.abertaEm) },
+    { chave: 'requisitante', titulo: 'Requisitante', ordenavel: true, opcional: true },
     { chave: 'destinatario', titulo: 'Destinatário', ordenavel: true },
     { chave: 'urgencia', titulo: 'Urgência', ordenavel: true, render: (r) => <BadgeDe mapa={URGENCIA_RME} valor={r.urgencia} /> },
     { chave: 'dataLimite', titulo: 'Data limite', ordenavel: true, render: (r) => (vencida(r) ? <span className="val-erro">{data(r.dataLimite)} (vencida)</span> : data(r.dataLimite)) },
@@ -142,9 +142,9 @@ export default function RmePage() {
           acoes={acoesTopo}
           acoesLinha={[
             { rotulo: 'Ver', aoClicar: (r) => verRme(r) },
-            { rotulo: 'Separar', aoClicar: setSeparar, visivel: (r) => r.status === 'aberta' && pode('rme:separar') },
-            { rotulo: 'Conferir', aoClicar: (r) => verRme(r, true), visivel: (r) => r.status === 'em_separacao' && pode('rme:conferir') },
-            { rotulo: 'Confirmar entrega', aoClicar: (r) => { setErro(undefined); setEntregar(r); }, visivel: (r) => r.status === 'conferida' && pode('rme:separar') },
+            { rotulo: 'Separar', principal: true, aoClicar: setSeparar, visivel: (r) => r.status === 'aberta' && pode('rme:separar') },
+            { rotulo: 'Conferir', principal: true, aoClicar: (r) => verRme(r, true), visivel: (r) => r.status === 'em_separacao' && pode('rme:conferir') },
+            { rotulo: 'Confirmar entrega', principal: true, aoClicar: (r) => { setErro(undefined); setEntregar(r); }, visivel: (r) => r.status === 'conferida' && pode('rme:separar') },
             { rotulo: 'Cancelar', aoClicar: setCancelar, visivel: (r) => emAndamento(r) && pode('rme:abrir') },
           ]}
         />

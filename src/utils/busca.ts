@@ -13,9 +13,9 @@ export function rotaDoCodigo(texto: string): string | null {
   const t = texto.trim();
   if (FARDO.test(t)) return `/lotes/${encodeURIComponent(loteDoFardo(t).toUpperCase())}?fardo=${encodeURIComponent(t.toUpperCase())}`;
   if (LOTE.test(t)) return `/lotes/${encodeURIComponent(t.toUpperCase())}`;
-  if (RME.test(t)) return `/rme?q=${encodeURIComponent(t.toUpperCase())}`;
+  if (RME.test(t)) return `/rme?visao=lista&q=${encodeURIComponent(t.toUpperCase())}`;
   const nf = NF.exec(t);
-  if (nf) return `/notas?q=${encodeURIComponent(nf[1])}`;
+  if (nf) return `/notas?visao=lista&q=${encodeURIComponent(nf[1])}`;
   return null;
 }
 

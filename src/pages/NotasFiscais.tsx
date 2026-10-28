@@ -43,7 +43,7 @@ export default function NotasFiscais() {
     { chave: 'fornecedor', titulo: 'Fornecedor', ordenavel: true },
     { chave: 'emissao', titulo: 'Emissão', ordenavel: true, render: (n) => data(n.emissao) },
     { chave: 'quantidadeTotal', titulo: 'Quantidade', alinhar: 'right', ordenavel: true, render: (n) => `${un(n.quantidadeTotal)} em ${n.itens.length} item(ns)` },
-    { chave: 'origem', titulo: 'Origem', render: (n) => <BadgeDe mapa={ORIGEM_NF} valor={n.origem} /> },
+    { chave: 'origem', titulo: 'Origem', opcional: true, render: (n) => <BadgeDe mapa={ORIGEM_NF} valor={n.origem} /> },
     { chave: 'dof', titulo: 'DOF', render: (n) => (n.dof ? n.dof.numero : <span className="mudo">Sem DOF</span>) },
     { chave: 'etapa', titulo: 'Etapa', render: (n) => <BadgeDe mapa={ETAPA_ENTRADA} valor={n.etapa} /> },
   ];
@@ -129,9 +129,9 @@ export default function NotasFiscais() {
           acoes={acoesTopo}
           acoesLinha={[
             { rotulo: 'Ver', aoClicar: setVer },
-            { rotulo: 'Cadastrar DOF', aoClicar: setDofDe, visivel: (n) => n.etapa === 'aguardando_dof' && pode('nf:cadastrar') },
-            { rotulo: 'Receber', aoClicar: setReceber, visivel: (n) => n.etapa === 'aguardando_recebimento' && pode('recebimento:registrar') },
-            { rotulo: 'Marcar como declarado', aoClicar: (n) => setDeclarar(alvoDeclaracao(n)), visivel: (n) => n.etapa === 'declarar' && pode('dof:declarar') },
+            { rotulo: 'Cadastrar DOF', principal: true, aoClicar: setDofDe, visivel: (n) => n.etapa === 'aguardando_dof' && pode('nf:cadastrar') },
+            { rotulo: 'Receber', principal: true, aoClicar: setReceber, visivel: (n) => n.etapa === 'aguardando_recebimento' && pode('recebimento:registrar') },
+            { rotulo: 'Marcar como declarado', principal: true, aoClicar: (n) => setDeclarar(alvoDeclaracao(n)), visivel: (n) => n.etapa === 'declarar' && pode('dof:declarar') },
           ]}
         />
       )}
