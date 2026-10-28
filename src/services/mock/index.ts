@@ -1,7 +1,7 @@
 import type { Servicos } from '../contracts';
 import { TOLERANCIA_VOLUME_PCT } from '../../dominio/parametros';
 import type {
-  DofPendente, EventoLote, Indicadores, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
+  DofPendente, EventoLote, Indicadores, Pendencia, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
   TipoMovimentacao, Usuario,
 } from '../../types/models';
 import { data, pct, rotuloClasse } from '../../utils/format';
@@ -44,19 +44,32 @@ export function criarServicosSimulados(): Servicos {
       .reduce((a, m) => a + (m.tipo === 'saida' || m.tipo === 'perda' ? m.quantidade : m.tipo === 'ajuste' ? -m.quantidade : 0), 0);
     return !!l.nfNumero && !!l.dofNumero && saiu === l.quantidade - l.saldo;
   }
-  function dofsPendentes(): DofPendente[] {
+  /** Dias até o prazo de declaração e nível, pelos parâmetros vigentes. */
+  function prazo(prazoDeclaracao: string) {
     const p = D.parametros;
-    const hoje = hojeSP();
+    const diasParaPrazo = diasEntre(hojeSP(), prazoDeclaracao);
+    const nivel: DofPendente['nivel'] = diasParaPrazo <= p.alertaDofCriticoDias ? 'critico' : diasParaPrazo <= p.alertaDofAtencaoDias ? 'atencao' : 'no_prazo';
+    return { diasParaPrazo, nivel };
+  }
+  function dofsPendentes(): DofPendente[] {
     return D.notas.filter((n) => n.situacao === 'recebida' && n.dof?.declaracao === 'pendente').map((n) => {
       const dof = n.dof!;
-      const diasParaPrazo = diasEntre(hoje, dof.prazoDeclaracao);
       return {
         id: n.id, nfId: n.id, nfNumero: n.numero, fornecedor: n.fornecedor, dofNumero: dof.numero, codigoControle: dof.codigoControle, validade: dof.validade,
-        prazoDeclaracao: dof.prazoDeclaracao, recebidoEm: D.recebimentos.find((r) => r.nfId === n.id)?.recebidoEm ?? '', diasParaPrazo,
-        nivel: diasParaPrazo <= p.alertaDofCriticoDias ? 'critico' as const : diasParaPrazo <= p.alertaDofAtencaoDias ? 'atencao' as const : 'no_prazo' as const,
+        prazoDeclaracao: dof.prazoDeclaracao, recebidoEm: D.recebimentos.find((r) => r.nfId === n.id)?.recebidoEm ?? '', ...prazo(dof.prazoDeclaracao),
       };
     }).sort((a, b) => a.diasParaPrazo - b.diasParaPrazo);
   }
+  /** Etapa do quadro de Entrada, calculada na consulta. */
+  function comEtapa(n: NotaFiscal): NotaFiscal {
+    if (n.situacao !== 'recebida') return { ...n, etapa: n.situacao, diasParaPrazo: undefined, nivelPrazo: undefined };
+    if (n.dof?.declaracao !== 'pendente') return { ...n, etapa: 'concluida', diasParaPrazo: undefined, nivelPrazo: undefined };
+    const p = prazo(n.dof.prazoDeclaracao);
+    return { ...n, etapa: 'declarar', diasParaPrazo: p.diasParaPrazo, nivelPrazo: p.nivel };
+  }
+  const permissoesAtuais = () => (sessao ?? D.usuarioDemo).permissoes;
+  /** Primeiros registros de uma fila, para a tela inicial. */
+  const exemplos = <T,>(l: T[], f: (x: T) => { codigo: string; texto: string }) => l.slice(0, 3).map(f);
   const comVolume = (id: string, n: NovoTamanho): Tamanho => ({ id, ...n, volumeM3: volumeDormenteM3(n.larguraCm, n.alturaCm, n.comprimentoCm) });
 
   return {
@@ -104,6 +117,67 @@ export function criarServicosSimulados(): Servicos {
           origem: 'simulado',
         };
       },
+      pendencias: async () => {
+        await simularRede();
+        const pode = (...ps: string[]) => ps.some((x) => permissoesAtuais().includes(x));
+        const hoje = hojeSP();
+        const urgencia = (r: { urgencia: string; dataLimite: string }) => (r.urgencia === 'urgente' ? 0 : 1) * 1e9 + Date.parse(r.dataLimite) / 1e5;
+        const rmes = (s: string) => D.rmes.filter((r) => r.status === s).sort((a, b) => urgencia(a) - urgencia(b));
+        const textoRme = (r: (typeof D.rmes)[number]) => ({
+          codigo: r.numero, texto: `${r.urgencia === 'urgente' ? 'URGENTE · ' : ''}${r.destinatario} · até ${data(r.dataLimite)}${r.dataLimite < hoje ? ' (vencida)' : ''}`,
+        });
+        const critica = (l: (typeof D.rmes)) => l.some((r) => r.urgencia === 'urgente' || r.dataLimite < hoje);
+        const semDof = D.notas.filter((n) => n.situacao === 'aguardando_dof');
+        const aReceber = D.notas.filter((n) => n.situacao === 'aguardando_recebimento');
+        const dofs = dofsPendentes();
+        const abertas = rmes('aberta'), emSep = rmes('em_separacao'), conferidas = rmes('conferida');
+        const minhas = D.rmes.filter((r) => r.requisitante === (sessao ?? D.usuarioDemo).nome && r.status !== 'entregue' && r.status !== 'cancelada');
+        const aprovar = D.movimentacoes.filter((m) => (m.tipo === 'perda' || m.tipo === 'ajuste') && m.status === 'pendente');
+        const aguardandoInsp = D.lotes.filter((l) => l.inspecao === 'aguardando');
+        const lista: (Pendencia | false)[] = [
+          pode('rme:separar') && abertas.length > 0 && {
+            id: 'separar', nivel: critica(abertas) ? 'critico' : 'atencao', titulo: 'RMEs para separar', quantidade: abertas.length,
+            exemplos: exemplos(abertas, textoRme), acao: { rotulo: 'Separar', link: '/rme?status=aberta' },
+          },
+          pode('rme:conferir') && emSep.length > 0 && {
+            id: 'conferir', nivel: critica(emSep) ? 'critico' : 'atencao', titulo: 'RMEs para conferir', quantidade: emSep.length,
+            descricao: 'A entrega e a baixa só acontecem depois da sua conferência.', exemplos: exemplos(emSep, textoRme), acao: { rotulo: 'Conferir', link: '/rme?status=em_separacao' },
+          },
+          pode('rme:separar') && conferidas.length > 0 && {
+            id: 'entregar', nivel: 'atencao', titulo: 'RMEs conferidas para entregar', quantidade: conferidas.length,
+            exemplos: exemplos(conferidas, textoRme), acao: { rotulo: 'Confirmar entrega', link: '/rme?status=conferida' },
+          },
+          pode('recebimento:registrar') && aReceber.length > 0 && {
+            id: 'receber', nivel: 'atencao', titulo: 'NFs com DOF prontas para receber', quantidade: aReceber.length,
+            exemplos: exemplos(aReceber, (n) => ({ codigo: `NF ${n.numero}`, texto: n.fornecedor })), acao: { rotulo: 'Receber', link: '/notas?etapa=aguardando_recebimento' },
+          },
+          pode('nf:cadastrar') && semDof.length > 0 && {
+            id: 'dof', nivel: 'atencao', titulo: 'NFs aguardando DOF', quantidade: semDof.length, descricao: 'O recebimento não avança sem o DOF.',
+            exemplos: exemplos(semDof, (n) => ({ codigo: `NF ${n.numero}`, texto: n.fornecedor })), acao: { rotulo: 'Cadastrar DOF', link: '/notas?etapa=aguardando_dof' },
+          },
+          pode('dof:declarar') && dofs.length > 0 && {
+            id: 'declarar', nivel: dofs.some((d) => d.nivel === 'critico') ? 'critico' : dofs.some((d) => d.nivel === 'atencao') ? 'atencao' : 'info',
+            titulo: 'DOFs para declarar no Sinaflor', quantidade: dofs.length,
+            exemplos: exemplos(dofs, (d) => ({ codigo: `NF ${d.nfNumero}`, texto: `DOF ${d.dofNumero} · ${d.diasParaPrazo < 0 ? `prazo vencido há ${-d.diasParaPrazo} dia(s)` : `prazo ${data(d.prazoDeclaracao)}`}` })),
+            acao: { rotulo: 'Declarar', link: '/relatorios?aba=dofs' },
+          },
+          pode('movimentacoes:aprovar') && aprovar.length > 0 && {
+            id: 'aprovar', nivel: 'atencao', titulo: 'Perdas e ajustes para aprovar', quantidade: aprovar.length, descricao: 'O saldo só muda depois da aprovação.',
+            exemplos: exemplos(aprovar, (m) => ({ codigo: m.fardoCodigo ?? m.loteCodigo, texto: `${m.tipo === 'perda' ? 'Perda' : 'Ajuste'} de ${m.quantidade} un. · ${m.usuario}` })),
+            acao: { rotulo: 'Revisar', link: '/movimentacoes?status=pendente' },
+          },
+          pode('rme:abrir') && {
+            id: 'minhas', nivel: 'info', titulo: minhas.length ? 'Minhas RMEs em andamento' : 'Nenhuma RME sua em andamento', quantidade: minhas.length,
+            exemplos: exemplos(minhas, (r) => ({ codigo: r.numero, texto: `${({ aberta: 'Aberta', em_separacao: 'Em separação', conferida: 'Conferida' } as Record<string, string>)[r.status] ?? r.status} · ${r.destinatario}` })),
+            acao: { rotulo: 'Abrir RME', link: '/rme' },
+          },
+          pode('recebimento:registrar', 'admin') && aguardandoInsp.length > 0 && {
+            id: 'inspecao', nivel: 'info', titulo: 'Lotes aguardando inspeção', quantidade: aguardandoInsp.length, descricao: 'Fora do estoque disponível até o resultado da inspeção.',
+            exemplos: exemplos(aguardandoInsp, (l) => ({ codigo: l.codigo, texto: l.especieDocumental })), acao: { rotulo: 'Ver lotes', link: '/lotes?inspecao=aguardando' },
+          },
+        ];
+        return lista.filter((x): x is Pendencia => !!x);
+      },
       alertas: async () => {
         await atraso(250);
         const p = D.parametros;
@@ -147,7 +221,7 @@ export function criarServicosSimulados(): Servicos {
     fornecedores: { listar: (q) => paginar(D.fornecedores, q) },
     documentos: { listar: (q) => paginar(D.documentos, q) },
     notas: {
-      listar: (q) => paginar(D.notas, q),
+      listar: (q) => paginar(D.notas.map(comEtapa), q),
       cadastrar: async (n, xml) => {
         await atraso(600);
         const f = D.fornecedores.find((x) => x.id === n.fornecedorId);
@@ -170,10 +244,10 @@ export function criarServicosSimulados(): Servicos {
         const nf: NotaFiscal = {
           id, numero: n.numero, serie: n.serie, chaveAcesso: chave, fornecedorId: f.id, fornecedor: f.razaoSocial, emissao: n.emissao,
           origem: xml ? 'xml' : 'manual', xmlAnexado: !!xml, dofSugerido: n.dofSugerido, itens, quantidadeTotal: itens.reduce((a, x) => a + x.quantidade, 0),
-          situacao: 'aguardando_dof',
+          situacao: 'aguardando_dof', etapa: 'aguardando_dof',
         };
         D.notas.unshift(nf);
-        return nf;
+        return comEtapa(nf);
       },
       cadastrarDof: async (nfId, d, pdf) => {
         await atraso(600);
@@ -194,7 +268,7 @@ export function criarServicosSimulados(): Servicos {
           arquivoPdf: pdf.name.slice(0, 80), declaracao: 'pendente', prazoDeclaracao: somarDias(d.validade, 1),
         };
         nf.situacao = 'aguardando_recebimento';
-        return nf;
+        return comEtapa(nf);
       },
       declararDof: async (nfId) => {
         await atraso(500);
@@ -203,7 +277,7 @@ export function criarServicosSimulados(): Servicos {
         if (nf.situacao !== 'recebida') throw new ApiError(409, 'O DOF só é declarado no Sinaflor depois do recebimento da NF.');
         if (nf.dof.declaracao === 'declarado') throw new ApiError(409, 'Este DOF já foi marcado como declarado.');
         Object.assign(nf.dof, { declaracao: 'declarado', declaradoPor: usuarioAtual(), declaradoEm: new Date().toISOString() });
-        return nf;
+        return comEtapa(nf);
       },
     },
     recebimentos: {

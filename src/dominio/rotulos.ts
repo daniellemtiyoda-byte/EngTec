@@ -1,5 +1,5 @@
 import type {
-  DofPendente, MotivoPerda, Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, SituacaoNf, StatusEstoque,
+  DofPendente, EtapaEntrada, MotivoPerda, Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, SituacaoNf, StatusEstoque,
   StatusRegistro, StatusRme, TipoMovimentacao, UrgenciaRme, UsoEspecie,
 } from '../types/models';
 
@@ -33,6 +33,12 @@ export const SITUACAO_MEDIDAS: Rotulos<SituacaoMedidas> = {
 
 export const SITUACAO_NF: Rotulos<SituacaoNf> = {
   aguardando_dof: ['vermelho', 'Aguardando DOF'], aguardando_recebimento: ['laranja', 'Aguardando recebimento'], recebida: ['verde', 'Recebida'],
+};
+
+/** Quadro de Entrada: da NF à declaração do DOF no Sinaflor. */
+export const ETAPA_ENTRADA: Rotulos<EtapaEntrada> = {
+  aguardando_dof: ['vermelho', 'Aguardando DOF'], aguardando_recebimento: ['laranja', 'Aguardando recebimento'],
+  declarar: ['azul', 'Declarar no Sinaflor'], concluida: ['verde', 'Concluída'],
 };
 
 export const ORIGEM_NF: Rotulos<NotaFiscal['origem']> = {

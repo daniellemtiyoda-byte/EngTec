@@ -1,22 +1,28 @@
 import { Fragment, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BadgeDe } from '../components/Badge';
 import { DeclararDofModal, type AlvoDeclaracao } from '../components/DeclararDofModal';
-import { Aviso } from '../components/Estados';
+import { Aviso, PageHeader } from '../components/Estados';
+import { Etapas } from '../components/Etapas';
 import { FormModal, type Campo } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { Modal } from '../components/Modal';
 import { NfModal } from '../components/NfModal';
+import { AlternarVisao, Cartao, Quadro, type ColunaQuadro } from '../components/Quadro';
 import { mensagemRecebimento, RecebimentoModal } from '../components/RecebimentoModal';
 import { useToast } from '../components/Toast';
 import { SUFIXO_SIMULADO } from '../config/env';
 import { useAlertas } from '../contexts/AlertasContext';
 import { useAuth } from '../contexts/AuthContext';
-import { SITUACAO_NF_OPCOES } from '../dominio/opcoes';
-import { DECLARACAO_DOF, ORIGEM_NF, SITUACAO_NF } from '../dominio/rotulos';
+import { ETAPA_ENTRADA_OPCOES } from '../dominio/opcoes';
+import { DECLARACAO_DOF, ETAPA_ENTRADA, NIVEL_PRAZO_DOF, ORIGEM_NF } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
-import type { NotaFiscal } from '../types/models';
-import { data, dataHora, m3, paraNumero, un } from '../utils/format';
+import type { EtapaEntrada, NotaFiscal } from '../types/models';
+import { data, dataHora, m3, paraNumero, prazoTexto, un } from '../utils/format';
+
+const ETAPAS_NF = ['NF', 'DOF', 'Recebimento', 'Declaração no Sinaflor'];
+const POSICAO: Record<EtapaEntrada, number> = { aguardando_dof: 1, aguardando_recebimento: 2, declarar: 3, concluida: 4 };
 
 export default function NotasFiscais() {
   const { pode } = useAuth();
@@ -39,9 +45,45 @@ export default function NotasFiscais() {
     { chave: 'quantidadeTotal', titulo: 'Quantidade', alinhar: 'right', ordenavel: true, render: (n) => `${un(n.quantidadeTotal)} em ${n.itens.length} item(ns)` },
     { chave: 'origem', titulo: 'Origem', render: (n) => <BadgeDe mapa={ORIGEM_NF} valor={n.origem} /> },
     { chave: 'dof', titulo: 'DOF', render: (n) => (n.dof ? n.dof.numero : <span className="mudo">Sem DOF</span>) },
-    { chave: 'sinaflor', titulo: 'Sinaflor', render: (n) => (n.dof && n.situacao === 'recebida' ? <BadgeDe mapa={DECLARACAO_DOF} valor={n.dof.declaracao} /> : <span className="mudo">—</span>) },
-    { chave: 'situacao', titulo: 'Situação', render: (n) => <BadgeDe mapa={SITUACAO_NF} valor={n.situacao} /> },
+    { chave: 'etapa', titulo: 'Etapa', render: (n) => <BadgeDe mapa={ETAPA_ENTRADA} valor={n.etapa} /> },
   ];
+
+  // Quadro por padrão; filtro ou busca no endereço (atalhos da tela inicial, busca global) abre a lista.
+  const [params, setParams] = useSearchParams();
+  const visao = params.get('visao') === 'lista' || (!params.get('visao') && (params.get('etapa') || params.get('q'))) ? 'lista' : 'quadro';
+  const mudarVisao = (v: 'quadro' | 'lista') => setParams(v === 'quadro' ? {} : { visao: 'lista' });
+  const alvoDeclaracao = (n: NotaFiscal): AlvoDeclaracao => ({ nfId: n.id, nfNumero: n.numero, dofNumero: n.dof!.numero, prazoDeclaracao: n.dof!.prazoDeclaracao });
+  const proximaAcao = (n: NotaFiscal) => (
+    n.etapa === 'aguardando_dof' && pode('nf:cadastrar') ? <button className="btn btn-pri btn-peq" onClick={() => setDofDe(n)}>Cadastrar DOF</button>
+      : n.etapa === 'aguardando_recebimento' && pode('recebimento:registrar') ? <button className="btn btn-pri btn-peq" onClick={() => setReceber(n)}>Receber</button>
+        : n.etapa === 'declarar' && pode('dof:declarar') ? <button className="btn btn-pri btn-peq" onClick={() => setDeclarar(alvoDeclaracao(n))}>Marcar como declarado</button>
+          : null
+  );
+  const coluna = (etapa: EtapaEntrada, tom: ColunaQuadro<NotaFiscal>['tom'], vazio: string, extra: Partial<ColunaQuadro<NotaFiscal>> = {}): ColunaQuadro<NotaFiscal> => ({
+    chave: etapa, titulo: ETAPA_ENTRADA[etapa][1], tom, vazio, carregar: () => servicos.notas.listar({ filters: { etapa }, sortBy: 'emissao', pageSize: 50 }), ...extra,
+  });
+  const colunasQuadro: ColunaQuadro<NotaFiscal>[] = [
+    coluna('aguardando_dof', 'vermelho', 'Nenhuma NF sem DOF.'),
+    coluna('aguardando_recebimento', 'laranja', 'Nenhuma NF esperando a carga.'),
+    coluna('declarar', 'azul', 'Nenhum DOF pendente no Sinaflor.', { ordenar: (a, b) => (a.diasParaPrazo ?? 0) - (b.diasParaPrazo ?? 0) }),
+    coluna('concluida', 'verde', 'Nenhuma entrada concluída ainda.', {
+      verTodas: '/notas?visao=lista&etapa=concluida', carregar: () => servicos.notas.listar({ filters: { etapa: 'concluida' }, sortBy: 'emissao', sortDir: 'desc', pageSize: 8 }),
+    }),
+  ];
+  const cartaoNf = (n: NotaFiscal) => (
+    <Cartao
+      destaque={n.etapa === 'declarar' ? (n.nivelPrazo === 'critico' ? 'critico' : n.nivelPrazo === 'atencao' ? 'atencao' : undefined) : undefined}
+      acoes={<>{proximaAcao(n)}<button className="btn btn-sec btn-peq" onClick={() => setVer(n)}>Ver</button></>}
+    >
+      <div className="cartao-topo"><strong>NF {n.numero}</strong><BadgeDe mapa={ORIGEM_NF} valor={n.origem} /></div>
+      <div>{n.fornecedor}</div>
+      <div className="mudo">{un(n.quantidadeTotal)} em {n.itens.length} item(ns) · emitida em {data(n.emissao)}</div>
+      {n.dof && <div className="mudo">DOF {n.dof.numero}</div>}
+      {n.etapa === 'declarar' && n.diasParaPrazo !== undefined && (
+        <div><BadgeDe mapa={NIVEL_PRAZO_DOF} valor={n.nivelPrazo ?? 'no_prazo'} /> <span className={n.nivelPrazo === 'critico' ? 'val-erro' : 'mudo'}>prazo {data(n.dof!.prazoDeclaracao)} · {prazoTexto(n.diasParaPrazo)}</span></div>
+      )}
+    </Cartao>
+  );
 
   // Um campo de volume por espécie da NF: o DOF traz o volume por espécie, não por tamanho.
   const especiesDe = (nf: NotaFiscal) => [...new Map(nf.itens.map((i) => [i.especieId, i.especie]))];
@@ -58,27 +100,41 @@ export default function NotasFiscais() {
     { nome: 'pdf', rotulo: 'PDF do DOF', tipo: 'arquivo', obrigatorio: true, extensoes: ['pdf'] },
   ];
 
+  const acoesTopo = (
+    <>
+      <AlternarVisao visao={visao} aoMudar={mudarVisao} />
+      {pode('nf:cadastrar') && <button className="btn btn-pri" onClick={() => setNovaNf(true)}>Cadastrar NF</button>}
+    </>
+  );
+  const titulo = 'Entrada: NF e DOF';
+  const descricao = 'Da nota fiscal (manual ou pelo XML da NF-e) à declaração do DOF no Sinaflor. O recebimento só avança com o DOF cadastrado.';
+  const aviso = <Aviso>Um DOF por NF. O volume do DOF é informado por espécie, como no documento, e comparado ao volume recebido.</Aviso>;
+
   return (
     <>
-      <ListPage<NotaFiscal>
-        titulo="NF e DOF"
-        descricao="Cadastro da nota fiscal (manual ou pelo XML da NF-e) e do DOF. O recebimento só avança com o DOF cadastrado."
-        aviso={<Aviso>Um DOF por NF. O volume do DOF é informado por espécie, como no documento, e comparado ao volume recebido.</Aviso>}
-        listar={(q) => servicos.notas.listar(q)}
-        recarregar={rec}
-        colunas={colunas}
-        filtros={[{ chave: 'situacao', rotulo: 'Situação', opcoes: SITUACAO_NF_OPCOES }]}
-        acoes={pode('nf:cadastrar') ? <button className="btn btn-pri" onClick={() => setNovaNf(true)}>Cadastrar NF</button> : undefined}
-        acoesLinha={[
-          { rotulo: 'Ver', aoClicar: setVer },
-          { rotulo: 'Cadastrar DOF', aoClicar: setDofDe, visivel: (n) => !n.dof && pode('nf:cadastrar') },
-          { rotulo: 'Receber', aoClicar: setReceber, visivel: (n) => n.situacao === 'aguardando_recebimento' && pode('recebimento:registrar') },
-          {
-            rotulo: 'Marcar como declarado', visivel: (n) => n.situacao === 'recebida' && n.dof?.declaracao === 'pendente' && pode('dof:declarar'),
-            aoClicar: (n) => setDeclarar({ nfId: n.id, nfNumero: n.numero, dofNumero: n.dof!.numero, prazoDeclaracao: n.dof!.prazoDeclaracao }),
-          },
-        ]}
-      />
+      {visao === 'quadro' ? (
+        <section className="painel">
+          <PageHeader titulo={titulo} descricao={descricao} acoes={acoesTopo} />
+          {aviso}
+          <Quadro rotulo="Etapas da entrada" colunas={colunasQuadro} cartao={cartaoNf} recarregar={rec} />
+          <p className="mudo">A etapa de inspeção dos lotes entra neste quadro junto com a tela de Inspeção.</p>
+        </section>
+      ) : (
+        <ListPage<NotaFiscal>
+          titulo={titulo} descricao={descricao} aviso={aviso}
+          listar={(q) => servicos.notas.listar(q)}
+          recarregar={rec}
+          colunas={colunas}
+          filtros={[{ chave: 'etapa', rotulo: 'Etapa', opcoes: ETAPA_ENTRADA_OPCOES }]}
+          acoes={acoesTopo}
+          acoesLinha={[
+            { rotulo: 'Ver', aoClicar: setVer },
+            { rotulo: 'Cadastrar DOF', aoClicar: setDofDe, visivel: (n) => n.etapa === 'aguardando_dof' && pode('nf:cadastrar') },
+            { rotulo: 'Receber', aoClicar: setReceber, visivel: (n) => n.etapa === 'aguardando_recebimento' && pode('recebimento:registrar') },
+            { rotulo: 'Marcar como declarado', aoClicar: (n) => setDeclarar(alvoDeclaracao(n)), visivel: (n) => n.etapa === 'declarar' && pode('dof:declarar') },
+          ]}
+        />
+      )}
       <NfModal
         aberto={novaNf} aoFechar={() => setNovaNf(false)}
         aoSalvar={(nf) => { notificar('sucesso', `NF ${nf.numero} cadastrada; cadastre o DOF para liberar o recebimento${SUFIXO_SIMULADO}.`); recarregar(); }}
@@ -101,11 +157,12 @@ export default function NotasFiscais() {
       <Modal titulo={ver ? `NF ${ver.numero} / ${ver.serie}` : 'NF'} aberto={!!ver} aoFechar={() => setVer(null)} largo rodape={<button className="btn btn-sec" onClick={() => setVer(null)}>Fechar</button>}>
         {ver && (
           <>
+            <Etapas etapas={ETAPAS_NF} atual={POSICAO[ver.etapa]} />
             <dl className="detalhes">
               <dt>Fornecedor</dt><dd>{ver.fornecedor}</dd><dt>Emissão</dt><dd>{data(ver.emissao)}</dd>
               <dt>Chave de acesso</dt><dd>{ver.chaveAcesso ?? '—'}</dd>
               <dt>Origem</dt><dd><BadgeDe mapa={ORIGEM_NF} valor={ver.origem} />{ver.xmlAnexado && ' · XML guardado'}</dd>
-              <dt>Situação</dt><dd><BadgeDe mapa={SITUACAO_NF} valor={ver.situacao} /></dd>
+              <dt>Etapa</dt><dd><BadgeDe mapa={ETAPA_ENTRADA} valor={ver.etapa} /></dd>
             </dl>
             <div className="tabela-wrap">
               <table className="tabela">

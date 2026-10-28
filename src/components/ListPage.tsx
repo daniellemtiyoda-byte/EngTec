@@ -39,7 +39,12 @@ const TAMANHO = 10;
 export function ListPage<T extends { id: string }>(p: Props<T>) {
   const [params] = useSearchParams();
   const [busca, setBusca] = useState(params.get('q') ?? '');
-  const [filtros, setFiltros] = useState<Record<string, string>>({});
+  // Filtros iniciais vindos do endereço (ex.: /rme?status=aberta, usado pelos atalhos da tela inicial); só valores conhecidos.
+  const filtrosDaUrl = () => (p.secao ? {} : Object.fromEntries((p.filtros ?? []).flatMap((f) => {
+    const v = params.get(f.chave);
+    return v && f.opcoes.some((o) => o.valor === v) ? [[f.chave, v]] : [];
+  })));
+  const [filtros, setFiltros] = useState<Record<string, string>>(filtrosDaUrl);
   const [ordem, setOrdem] = useState<{ chave: string; dir: 'asc' | 'desc' } | null>(null);
   const buscaAtraso = useDebounced(busca, 300);
   const buscaId = useId();
@@ -51,7 +56,7 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
   const pagina = pag.consulta === consulta ? pag.n : 1;
   const irPara = (n: number) => setPag({ consulta, n });
 
-  useEffect(() => { if (!p.secao) setBusca(params.get('q') ?? ''); }, [params, p.secao]);
+  useEffect(() => { if (!p.secao) { setBusca(params.get('q') ?? ''); setFiltros(filtrosDaUrl()); } }, [params, p.secao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const r = useAsync(
     () => p.listar({ page: pagina, pageSize: TAMANHO, search: buscaAtraso, sortBy: ordem?.chave, sortDir: ordem?.dir, filters: filtros }),

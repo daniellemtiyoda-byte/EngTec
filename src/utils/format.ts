@@ -28,6 +28,19 @@ export function data(iso?: string): string {
   return d.toLocaleDateString('pt-BR', { timeZone: iso.length === 10 ? 'UTC' : TZ, day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+const DIA_MS = 86_400_000;
+/** Hoje (AAAA-MM-DD) no fuso de São Paulo. */
+export const hojeSP = () => new Date().toLocaleDateString('sv-SE', { timeZone: TZ });
+/** Dias de hoje até a data AAAA-MM-DD (negativo = já passou). */
+export const diasAte = (aaaammdd: string) => Math.round((Date.parse(aaaammdd) - Date.parse(hojeSP())) / DIA_MS);
+/** Dias inteiros desde o instante ISO. */
+export const diasDesde = (iso: string) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / DIA_MS));
+/** "vence hoje", "vence em 3 dias", "venceu há 2 dias". */
+export function prazoTexto(dias: number) {
+  if (dias === 0) return 'vence hoje';
+  return dias > 0 ? `vence em ${dias} ${dias === 1 ? 'dia' : 'dias'}` : `venceu há ${-dias} ${dias === -1 ? 'dia' : 'dias'}`;
+}
+
 export function dataHora(iso?: string): string {
   if (!iso) return '—';
   const d = new Date(iso);

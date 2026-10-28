@@ -51,6 +51,7 @@ export function criarServicosReais(): Servicos {
     dashboard: {
       indicadores: async () => ({ ...(await http<any>(caminho('dashboard.indicadores'))), origem: 'api' as const }),
       alertas: () => http(caminho('dashboard.alertas')),
+      pendencias: () => http(caminho('dashboard.pendencias')),
     },
     fornecedores: servicoLista('fornecedores.listar'),
     documentos: servicoLista('documentos.listar'),

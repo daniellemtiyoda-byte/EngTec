@@ -278,3 +278,50 @@ a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
 .evento-perda .evento-marca { background: var(--vermelho-100); color: var(--vermelho); }
 .evento-recebimento .evento-marca, .evento-declaracao .evento-marca { background: #e6f4ea; color: #1e6b34; }
 .evento-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Quadro (Kanban): colunas por etapa; no celular, abas com contador */
+.quadro-abas { display: none; }
+.quadro-colunas { display: grid; gap: 12px; overflow-x: auto; align-items: start; }
+.quadro-coluna { background: var(--cinza-50, #f3f5f8); border: 1px solid var(--cinza-200); border-radius: var(--raio); display: flex; flex-direction: column; min-width: 0; }
+.quadro-topo { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-top: 4px solid var(--cinza-300); border-radius: var(--raio) var(--raio) 0 0; }
+.quadro-topo h3 { font-size: 14px; margin: 0; color: var(--azul-800); }
+.tom-verde.quadro-topo { border-top-color: var(--verde); } .tom-laranja.quadro-topo { border-top-color: var(--laranja); }
+.tom-vermelho.quadro-topo { border-top-color: var(--vermelho); } .tom-azul.quadro-topo { border-top-color: var(--azul-600); }
+.quadro-contador { background: var(--cinza-200); color: var(--texto); border-radius: 10px; min-width: 22px; padding: 0 7px; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+.quadro-cartoes { display: flex; flex-direction: column; gap: 8px; padding: 0 8px 8px; max-height: 70vh; overflow-y: auto; }
+.quadro-vazio { padding: 8px 4px; margin: 0; }
+.quadro-ver-todas { padding: 0 12px 10px; font-size: 13px; color: var(--azul-600); }
+.cartao { background: #fff; border: 1px solid var(--cinza-200); border-left: 4px solid var(--cinza-300); border-radius: var(--raio); padding: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.cartao-critico { border-left-color: var(--vermelho); } .cartao-atencao { border-left-color: var(--laranja); }
+.cartao-topo { display: flex; justify-content: space-between; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cartao-topo strong { font-size: 14px; }
+.cartao-acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.alternar-visao { display: inline-flex; gap: 4px; }
+@media (max-width: 760px) {
+  .quadro-abas { display: flex; overflow-x: auto; gap: 2px; border-bottom: 2px solid var(--cinza-200); margin-bottom: 8px; }
+  .quadro-aba { white-space: nowrap; padding: 8px 10px; }
+  .quadro-colunas { display: block; }
+  .quadro-coluna:not(.ativa) { display: none; }
+  .quadro-cartoes { max-height: none; }
+  .cartao-acoes .btn { flex: 1 1 auto; padding: 10px; font-size: 15px; }
+}
+
+/* Linha de etapas (RME, NF) */
+.etapas { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 0; font-size: 13px; }
+.etapa { display: flex; align-items: center; gap: 6px; color: var(--texto-mudo); }
+.etapa:not(:last-child)::after { content: ''; width: 24px; height: 2px; background: var(--cinza-300); margin: 0 6px; }
+.etapa-marca { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; background: var(--cinza-200); color: var(--texto); }
+.etapa-feita { color: var(--texto); } .etapa-feita .etapa-marca { background: var(--verde); color: #fff; }
+.etapa-atual { color: var(--azul-800); font-weight: 700; } .etapa-atual .etapa-marca { background: var(--azul-600); color: #fff; }
+.etapa-interrompida { color: var(--vermelho); font-weight: 700; } .etapa-interrompida .etapa-marca { background: var(--vermelho); color: #fff; }
+
+/* Tela inicial: "Para fazer agora" */
+.pendencias { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.pendencia { background: #fff; border: 1px solid var(--cinza-200); border-top: 4px solid var(--azul-600); border-radius: var(--raio); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.pendencia-critico { border-top-color: var(--vermelho); } .pendencia-atencao { border-top-color: var(--laranja); }
+.pendencia-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pendencia-topo h3 { margin: 0; font-size: 15px; color: var(--azul-800); }
+.pendencia-qtd { font-size: 28px; font-weight: 800; color: var(--azul-900); line-height: 1; }
+.pendencia ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.pendencia .btn { align-self: flex-start; margin-top: auto; }
+@media (max-width: 760px) { .pendencia .btn { align-self: stretch; text-align: center; padding: 12px; font-size: 15px; } }

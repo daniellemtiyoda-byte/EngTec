@@ -20,6 +20,7 @@ export const ENDPOINTS = {
   'auth.usuarioAtual': { modulo: 'Autenticação', operacao: 'Usuário conectado', metodo: 'GET', caminho: '/auth/me', estado: P },
   'auth.sair': { modulo: 'Autenticação', operacao: 'Encerrar sessão', metodo: 'POST', caminho: '/auth/logout', estado: P },
   'dashboard.indicadores': { modulo: 'Dashboard', operacao: 'Indicadores', metodo: 'GET', caminho: '/dashboard/indicadores', estado: P },
+  'dashboard.pendencias': { modulo: 'Dashboard', operacao: 'Pendências do usuário', metodo: 'GET', caminho: '/dashboard/pendencias', estado: P },
   'dashboard.alertas': { modulo: 'Dashboard', operacao: 'Alertas', metodo: 'GET', caminho: '/dashboard/alertas', estado: P },
   'fornecedores.listar': { modulo: 'Fornecedores', operacao: 'Listar', metodo: 'GET', caminho: '/fornecedores', estado: P },
   'documentos.listar': { modulo: 'Documentos', operacao: 'Listar', metodo: 'GET', caminho: '/documentos', estado: P },

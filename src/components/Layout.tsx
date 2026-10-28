@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { NavLink, Navigate, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { NavLink, Navigate, Outlet, matchPath, useLocation, useNavigate, Link } from 'react-router-dom';
 import { AlertasProvider, useAlertas } from '../contexts/AlertasContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { Permissao } from '../dominio/permissoes';
@@ -20,13 +20,22 @@ export function ExigePermissao({ rota, children }: { rota: Pick<Rota, 'permissoe
   return <section className="painel"><Vazio mensagem="Seu perfil não tem acesso a esta tela." dica="Use o menu para ver as funções do seu perfil. Se precisar deste acesso, fale com o administrador." /></section>;
 }
 
+/** O perfil pode abrir este link interno? Caminho desconhecido não é filtrado (cai no "*" do App). */
+function podeAbrir(pode: (p: Permissao) => boolean, link?: string) {
+  const caminho = linkInterno(link).split('?')[0];
+  const rota = ROTAS.find((r) => matchPath({ path: r.caminho, end: true }, caminho));
+  return !rota || permite(pode, rota);
+}
+
 export function RotaProtegida() {
-  const { usuario, carregando } = useAuth();
+  const { usuario, carregando, pode } = useAuth();
   const loc = useLocation();
+  // Sino e painel mostram só alertas que levam a telas do perfil.
+  const filtro = useCallback((a: { link?: string }) => podeAbrir(pode, a.link), [pode]);
   if (carregando) return <div className="tela-cheia" role="status">Carregando…</div>;
   // Guarda caminho + parâmetros (ex.: ?q=) para voltar exatamente à mesma tela depois do login.
   if (!usuario) return <Navigate to="/login" replace state={{ de: loc.pathname + loc.search }} />;
-  return <AlertasProvider><Layout /></AlertasProvider>;
+  return <AlertasProvider filtro={filtro}><Layout /></AlertasProvider>;
 }
 
 function Notificacoes() {

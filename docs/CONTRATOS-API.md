@@ -23,6 +23,7 @@
 | Autenticação | Encerrar sessão | POST | /auth/logout |
 | Dashboard | Indicadores | GET | /dashboard/indicadores |
 | Dashboard | Alertas | GET | /dashboard/alertas |
+| Dashboard | Pendências do usuário logado ("Para fazer agora") | GET | /dashboard/pendencias |
 | Fornecedores | Listar | GET | /fornecedores |
 | Documentos | Listar (só leitura) | GET | /documentos |
 | NF e DOF | Listar notas fiscais | GET | /notas-fiscais |
@@ -83,6 +84,9 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
 9. Para relatórios: como o arquivo gerado é baixado (URL assinada, endpoint próprio?).
 
 ## Pontos em aberto
+
+- Pendências (`GET /dashboard/pendencias`): lista `{ id, nivel, titulo, quantidade, descricao?, exemplos?: [{ codigo, texto }], acao: { rotulo, link } }` já filtrada pelas permissões do usuário da sessão (ex.: almoxarife recebe "RMEs para separar", supervisor "RMEs para conferir"). Os links usam filtros de lista no endereço (`/rme?status=aberta`).
+- NF: `listar` devolve `etapa` (`aguardando_dof`, `aguardando_recebimento`, `declarar`, `concluida`) e, na etapa `declarar`, `diasParaPrazo` e `nivelPrazo`, calculados na consulta; o filtro `etapa` alimenta as colunas do quadro de Entrada. Para não carregar listas inteiras só para os contadores das colunas, o front usa `total` de cada consulta paginada.
 
 - Detalhe do lote (`GET /lotes/{codigo}`): `historico` em ordem cronológica, com `tipo` (`nf`, `recebimento`, `declaracao` ou o tipo da movimentação), `titulo`, `detalhe`, `usuario`, `referencia` (ex. `NF 1000`, `RME26-0001`) e `status`. 404 quando o código não existe. Quando a inspeção (Etapa 3) e a armazenagem existirem, entram como eventos também.
 - Perfis: o menu de cada perfil é montado a partir de `permissoes` do usuário (`/auth/me`). Confirmar com o back-end a lista de permissões de cada perfil do PRD (almoxarife, operador de pátio, supervisor, requisitante, gestor, administrador).

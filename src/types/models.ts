@@ -95,6 +95,8 @@ export interface NovoTamanho {
 }
 
 export type SituacaoNf = 'aguardando_dof' | 'aguardando_recebimento' | 'recebida';
+/** Etapa da entrada de material (quadro de Entrada): a declaração do DOF no Sinaflor fecha o ciclo. */
+export type EtapaEntrada = 'aguardando_dof' | 'aguardando_recebimento' | 'declarar' | 'concluida';
 
 export interface ItemNf {
   id: string;
@@ -162,6 +164,10 @@ export interface NotaFiscal {
   quantidadeTotal: number;
   dof?: Dof;
   situacao: SituacaoNf;
+  /** Calculados pelo serviço na consulta: etapa do quadro de Entrada e, na etapa "declarar", o prazo do DOF. */
+  etapa: EtapaEntrada;
+  diasParaPrazo?: number;
+  nivelPrazo?: DofPendente['nivel'];
 }
 
 export interface NovaNf {
@@ -593,6 +599,18 @@ export interface Indicadores {
   lotesAguardandoInspecao: number;
   saldoM3PorEspecie: Serie[];
   origem: Origem;
+}
+
+/** Item da tela inicial "Para fazer agora": filtrado pelo servidor conforme as permissões do usuário. */
+export interface Pendencia {
+  id: string;
+  nivel: 'critico' | 'atencao' | 'info';
+  titulo: string;
+  quantidade: number;
+  descricao?: string;
+  /** Até 3 registros de exemplo (código clicável + texto curto). */
+  exemplos?: { codigo: string; texto: string }[];
+  acao: { rotulo: string; link: string };
 }
 
 export interface Alerta {

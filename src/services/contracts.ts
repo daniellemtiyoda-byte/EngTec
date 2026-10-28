@@ -1,7 +1,7 @@
 import type {
   Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Especie, Fardo, Fornecedor, Indicadores,
   ListQuery, LocalPatio, Lote, LoteDetalhe, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoRecebimento, NovoTamanho,
-  DofPendente, FiltroMovimentacoes, LinhaSaldoIbama, OpcaoSeparacao, Paginado, ParametrosNegocio, RelatorioMovimentacoes, Rme,
+  DofPendente, FiltroMovimentacoes, Pendencia, LinhaSaldoIbama, OpcaoSeparacao, Paginado, ParametrosNegocio, RelatorioMovimentacoes, Rme,
   ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, ResultadoRecebimento, SaldoEstoque,
   SessaoInventario, SolicitacaoExportacao, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../types/models';
@@ -24,6 +24,8 @@ export interface Servicos {
   dashboard: {
     indicadores(): Promise<Indicadores>;
     alertas(): Promise<Alerta[]>;
+    /** "Para fazer agora" do usuário logado (tela inicial por papel). */
+    pendencias(): Promise<Pendencia[]>;
   };
   fornecedores: ServicoLista<Fornecedor>;
   documentos: ServicoLista<Documento>;
