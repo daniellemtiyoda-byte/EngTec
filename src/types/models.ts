@@ -94,19 +94,106 @@ export interface NovoTamanho {
   medidas: SituacaoMedidas;
 }
 
+export type SituacaoNf = 'aguardando_dof' | 'aguardando_recebimento' | 'recebida';
+
+export interface ItemNf {
+  id: string;
+  /** Descrição do produto na NF (xProd do XML ou texto livre). */
+  descricao: string;
+  especieId: string;
+  especie: string;
+  tamanhoId: string;
+  tamanho: string;
+  quantidade: number;
+}
+
+/** O DOF traz o volume por espécie (não separa por tamanho). */
+export interface VolumeDofEspecie {
+  especieId: string;
+  especie: string;
+  volumeM3: number;
+}
+
+export interface Dof {
+  numero: string;
+  codigoControle: string;
+  /** AAAA-MM-DD */
+  validade: string;
+  volumes: VolumeDofEspecie[];
+  volumeTotalM3: number;
+  arquivoPdf: string;
+  declaracao: 'pendente' | 'declarado';
+}
+
+export interface NotaFiscal {
+  id: string;
+  numero: string;
+  serie: string;
+  chaveAcesso?: string;
+  fornecedorId: string;
+  fornecedor: string;
+  /** AAAA-MM-DD */
+  emissao: string;
+  origem: 'manual' | 'xml';
+  xmlAnexado: boolean;
+  /** Número do DOF encontrado nas informações complementares do XML, se houver. */
+  dofSugerido?: string;
+  itens: ItemNf[];
+  quantidadeTotal: number;
+  dof?: Dof;
+  situacao: SituacaoNf;
+}
+
+export interface NovaNf {
+  numero: string;
+  serie: string;
+  chaveAcesso?: string;
+  fornecedorId: string;
+  emissao: string;
+  dofSugerido?: string;
+  itens: { descricao: string; especieId: string; tamanhoId: string; quantidade: number }[];
+}
+
+export interface NovoDof {
+  numero: string;
+  codigoControle: string;
+  validade: string;
+  volumes: { especieId: string; volumeM3: number }[];
+}
+
+export type EstadoFardo = 'fechado' | 'aberto' | 'baixado';
+
+export interface Fardo {
+  id: string;
+  /** Lote + sequência, ex. LT26-0042-F03. Gerado pelo sistema. */
+  codigo: string;
+  loteCodigo: string;
+  sequencia: number;
+  quantidadeInicial: number;
+  saldo: number;
+  estado: EstadoFardo;
+  local: string;
+}
+
 export interface Lote {
   id: string;
+  /** Sequencial por ano, ex. LT26-0042. Gerado pelo sistema no recebimento. */
   codigo: string;
   fornecedor: string;
+  nfNumero: string;
+  dofNumero: string;
   especieDocumental: string;
   classe?: Classe;
   categoria?: Categoria;
   inspecao: ResultadoInspecao;
+  tamanho: string;
   quantidade: number;
+  fardos: number;
   comprimentoM: number;
   larguraM: number;
-  espessuraM: number;
+  alturaM: number;
   metrosLineares: number;
+  /** Parte do volume do DOF da espécie, distribuída entre os lotes da espécie pelo volume calculado. */
   volumeDocumentalM3: number;
   volumeCalculadoM3: number;
   recebidoEm: string;
@@ -115,36 +202,53 @@ export interface Lote {
   local: string;
 }
 
-export interface NovoLote {
-  codigo: string;
-  fornecedorId: string;
-  especieId: string;
-  quantidade: number;
-  comprimentoM: number;
-  larguraM: number;
-  espessuraM: number;
+/** Comparação de volume por espécie: soma dos lotes da espécie x volume do DOF da espécie. */
+export interface VolumeRecebidoEspecie {
+  especie: string;
+  volumeDofM3: number;
+  volumeRecebidoM3: number;
+  diferencaPct: number;
 }
 
 export interface Recebimento {
   id: string;
-  loteCodigo: string;
+  nfId: string;
+  nfNumero: string;
+  dofNumero: string;
   fornecedor: string;
-  documento: string;
   recebidoEm: string;
   quantidadeDocumental: number;
   quantidadeConferida: number;
   divergencia: number;
-  metrosLinearesDocumentais: number;
-  metrosLinearesConferidos: number;
-  status: StatusRegistro;
+  /** Algum item com quantidade conferida diferente da NF (mesmo que o total feche). */
+  divergenciaQuantidade: boolean;
+  volumes: VolumeRecebidoEspecie[];
+  /** Maior diferença de volume entre as espécies, em %. */
+  divergenciaVolumePct: number;
+  acimaTolerancia: boolean;
+  avaria: boolean;
+  fotos: number;
+  justificativa?: string;
+  observacao?: string;
+  lotes: string[];
+  fardos: number;
   conferente: string;
 }
 
-export interface NovaConferencia {
-  loteCodigo: string;
-  documentoNumero: string;
-  quantidadeConferida: number;
+export interface NovoRecebimento {
+  nfId: string;
+  /** Quantidade de cada fardo por item da NF; a quantidade conferida é a soma. */
+  itens: { itemId: string; fardos: number[] }[];
+  avaria: boolean;
   observacao?: string;
+  /** Obrigatória quando a divergência de volume passa da tolerância. */
+  justificativa?: string;
+}
+
+export interface ResultadoRecebimento {
+  recebimento: Recebimento;
+  lotes: Lote[];
+  fardos: Fardo[];
 }
 
 export interface SaldoEstoque {

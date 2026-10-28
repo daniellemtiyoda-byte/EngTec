@@ -3,13 +3,13 @@ import type { NomeIcone } from './components/Icone';
 import Administracao from './pages/Administracao';
 import Configuracoes from './pages/Configuracoes';
 import Dashboard from './pages/Dashboard';
-import Documentos from './pages/Documentos';
 import Especies from './pages/Especies';
 import Estoque from './pages/Estoque';
 import Fornecedores from './pages/Fornecedores';
 import Inventario from './pages/Inventario';
 import Lotes from './pages/Lotes';
 import Movimentacoes from './pages/Movimentacoes';
+import NotasFiscais from './pages/NotasFiscais';
 import Patio from './pages/Patio';
 import Recebimento from './pages/Recebimento';
 import Relatorios from './pages/Relatorios';
@@ -35,7 +35,7 @@ export interface Rota {
  */
 export const ROTAS: Rota[] = [
   { caminho: '/', tela: Dashboard, rotulo: 'Dashboard', icone: 'grid', grupo: 'Visão geral', fim: true },
-  { caminho: '/documentos', tela: Documentos, rotulo: 'Importar documentos', icone: 'file', grupo: 'Operação' },
+  { caminho: '/notas', tela: NotasFiscais, rotulo: 'NF e DOF', icone: 'file', grupo: 'Operação' },
   { caminho: '/recebimento', tela: Recebimento, rotulo: 'Recebimento', icone: 'truck', grupo: 'Operação' },
   { caminho: '/lotes', tela: Lotes, rotulo: 'Lotes', icone: 'layers', grupo: 'Operação' },
   { caminho: '/estoque', tela: Estoque, rotulo: 'Estoque', icone: 'box', grupo: 'Operação' },

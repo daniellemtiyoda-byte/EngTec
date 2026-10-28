@@ -1,7 +1,7 @@
 import type {
-  Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Especie, Fornecedor, Indicadores,
-  ListQuery, LocalPatio, Lote, Movimentacao, NovaConferencia, NovaMovimentacao, NovoLote, NovoTamanho, Paginado,
-  ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, SaldoEstoque,
+  Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Especie, Fardo, Fornecedor, Indicadores,
+  ListQuery, LocalPatio, Lote, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovoDof, NovoRecebimento, NovoTamanho, Paginado,
+  ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, ResultadoRecebimento, SaldoEstoque,
   SessaoInventario, SolicitacaoExportacao, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../types/models';
 
@@ -25,13 +25,20 @@ export interface Servicos {
     alertas(): Promise<Alerta[]>;
   };
   fornecedores: ServicoLista<Fornecedor>;
-  documentos: ServicoLista<Documento> & {
-    importar(arquivo: File): Promise<Documento>;
+  documentos: ServicoLista<Documento>;
+  notas: ServicoLista<NotaFiscal> & {
+    /** `xml`: arquivo da NF-e importada, guardado junto do registro (RF02). Chave de acesso repetida é recusada. */
+    cadastrar(d: NovaNf, xml?: File): Promise<NotaFiscal>;
+    /** Um DOF por NF no MVP, com o PDF anexo. Volume por espécie, como no documento. */
+    cadastrarDof(nfId: string, d: NovoDof, pdf: File): Promise<NotaFiscal>;
   };
   recebimentos: ServicoLista<Recebimento> & {
-    registrarConferencia(d: NovaConferencia): Promise<Recebimento>;
+    /** Recusado sem DOF. Cria um lote por espécie e tamanho e os fardos, todos aguardando inspeção. */
+    confirmar(d: NovoRecebimento, fotos: File[]): Promise<ResultadoRecebimento>;
   };
-  lotes: ServicoLista<Lote> & { cadastrar(d: NovoLote): Promise<Lote> };
+  /** Lotes só são criados pelo recebimento: não há cadastro manual. */
+  lotes: ServicoLista<Lote>;
+  fardos: ServicoLista<Fardo>;
   estoque: ServicoLista<SaldoEstoque>;
   movimentacoes: ServicoLista<Movimentacao> & {
     registrar(d: NovaMovimentacao): Promise<Movimentacao>;

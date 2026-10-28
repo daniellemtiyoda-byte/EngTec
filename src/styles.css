@@ -234,3 +234,23 @@ body { background: #f6f7f9; }
 .login-form .campo input { border-color: var(--cinza-300); }
 .login-form .erro-campo { color: var(--vermelho); }
 @media (max-width: 860px) { .login-lado-form { border-left: 0; border-top: 1px solid var(--cinza-200); } }
+
+/* Formulários com listas: itens da NF e fardos do recebimento */
+.modal-largo { max-width: 880px; }
+.linha-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 12px; }
+.bloco-item { border: 1px solid var(--cinza-200); border-radius: var(--raio); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.bloco-item-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.fardos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fardo { display: flex; align-items: center; gap: 2px; }
+.fardo input { width: 64px; border: 1px solid var(--cinza-300); border-radius: var(--raio); padding: 6px 8px; text-align: right; }
+.fardo input[aria-invalid='true'] { border-color: var(--vermelho); }
+.caixa { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 14px; }
+
+/* Etiquetas de fardo: só aparecem na impressão disparada pela tela de fardos */
+.etiquetas { display: none; }
+@media print {
+  body.imprimir-etiquetas > *:not(.etiquetas) { display: none !important; }
+  body.imprimir-etiquetas .etiquetas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8mm; padding: 8mm; }
+  .etiqueta { border: 1px dashed #000; padding: 4mm; break-inside: avoid; font-size: 11pt; color: #000; }
+  .etiqueta-codigo { font: 700 18pt/1.2 monospace; }
+}

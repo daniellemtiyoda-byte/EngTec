@@ -2,22 +2,14 @@ import { useState } from 'react';
 import { ListPage, type Coluna } from './ListPage';
 import { StatusRegistroBadge } from './Badge';
 import { Modal } from './Modal';
-import { UploadModal } from './UploadModal';
-import { useToast } from './Toast';
-import { SUFIXO_SIMULADO } from '../config/env';
-import { useAuth } from '../contexts/AuthContext';
 import { STATUS_OPCOES, TIPO_DOCUMENTO_OPCOES } from '../dominio/opcoes';
 import { servicos } from '../services';
 import type { Documento } from '../types/models';
 import { data, m3, un, urlSegura } from '../utils/format';
 
-/** Lista reutilizada em "Importação de documentos" e "Fornecedores e documentos". */
-export function DocumentosLista({ importar = false, secao = false }: { importar?: boolean; secao?: boolean }) {
-  const { pode } = useAuth();
-  const notificar = useToast();
-  const [upload, setUpload] = useState(false);
+/** Lista genérica de documentos (só leitura), na aba "Documentos" de Fornecedores. NF e DOF têm tela própria. */
+export function DocumentosLista() {
   const [ver, setVer] = useState<Documento | null>(null);
-  const [rec, setRec] = useState(0);
 
   const colunas: Coluna<Documento>[] = [
     { chave: 'tipo', titulo: 'Tipo', ordenavel: true },
@@ -34,20 +26,13 @@ export function DocumentosLista({ importar = false, secao = false }: { importar?
   return (
     <>
       <ListPage<Documento>
-        titulo={secao ? 'Documentos' : 'Integração e importação de documentos'}
-        descricao="Documentos fiscais e de origem. O volume documental é o declarado, não o calculado."
-        secao={secao}
+        titulo="Documentos"
+        descricao="Documentos fiscais e de origem. O volume documental é o declarado, não o calculado. NF e DOF são cadastrados na tela NF e DOF."
+        secao
         listar={(q) => servicos.documentos.listar(q)}
-        recarregar={rec}
         colunas={colunas}
         filtros={[{ chave: 'status', rotulo: 'Situação', opcoes: STATUS_OPCOES }, { chave: 'tipo', rotulo: 'Tipo', opcoes: TIPO_DOCUMENTO_OPCOES }]}
-        acoes={importar && pode('documentos:importar') ? <button className="btn btn-pri" onClick={() => setUpload(true)}>Importar documento</button> : undefined}
         acoesLinha={[{ rotulo: 'Visualizar', aoClicar: setVer }]}
-      />
-      <UploadModal
-        titulo="Importar documento" aberto={upload} aoFechar={() => setUpload(false)} extensoes={['pdf', 'xml']}
-        aviso="O documento é enviado ao serviço de integração, que valida e interpreta o conteúdo. Ele só aparece como aprovado após a confirmação do sistema responsável."
-        aoEnviar={async (f) => { await servicos.documentos.importar(f); notificar('sucesso', `Documento recebido para processamento${SUFIXO_SIMULADO}.`); setRec((x) => x + 1); }}
       />
       <Modal titulo="Documento" aberto={!!ver} aoFechar={() => setVer(null)} rodape={<button className="btn btn-sec" onClick={() => setVer(null)}>Fechar</button>}>
         {ver && (

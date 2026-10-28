@@ -27,7 +27,7 @@ export default function Fornecedores() {
       <div role="tabpanel">
         {aba === 'fornecedores' ? (
           <ListPage<Fornecedor> secao titulo="Fornecedores" listar={(q) => servicos.fornecedores.listar(q)} colunas={colunas} filtros={[{ chave: 'status', rotulo: 'Situação', opcoes: STATUS_OPCOES }]} />
-        ) : <DocumentosLista secao />}
+        ) : <DocumentosLista />}
       </div>
     </>
   );

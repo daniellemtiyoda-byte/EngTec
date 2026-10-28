@@ -1,3 +1,5 @@
+import { env } from '../config/env';
+
 const formatadores = new Map<number, Intl.NumberFormat>();
 /** Formatadores são caros de criar: guarda um por número de casas decimais. */
 function nf(d: number): Intl.NumberFormat {
@@ -50,6 +52,15 @@ export function paraNumero(texto: string, inteiro = false): number {
   }
   if (inteiro && /^-?\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
   return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+}
+
+/** Valida extensão, tamanho e arquivo vazio no navegador (o servidor valida de novo). Retorna a mensagem de erro ou undefined. */
+export function arquivoInvalido(f: File, extensoes: string[]): string | undefined {
+  const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
+  if (extensoes.length && !extensoes.includes(ext)) return `Formato não permitido em ${f.name}. Aceitos: ${extensoes.join(', ').toUpperCase()}.`;
+  if (f.size > env.UPLOAD_MAX_MB * 1024 * 1024) return `${f.name} é maior que o limite de ${env.UPLOAD_MAX_MB} MB.`;
+  if (f.size === 0) return `${f.name} está vazio.`;
+  return undefined;
 }
 
 /** Aceita só URLs http(s); evita javascript: e similares vindos da API. */

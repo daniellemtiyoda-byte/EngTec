@@ -1,8 +1,10 @@
 import type {
-  DivergenciaInventario, Documento, Especie, Fornecedor, LocalPatio, Lote, Movimentacao, ProcessamentoImagem,
-  Recebimento, RegistroAuditoria, Relatorio, ResultadoInspecao, SaldoEstoque, SessaoInventario, StatusEstoque, StatusRegistro,
-  Tamanho, Transferencia, Usuario, VolumetriaLote,
+  DivergenciaInventario, Documento, Especie, Fardo, Fornecedor, ItemNf, LocalPatio, Lote, Movimentacao, NotaFiscal, ProcessamentoImagem,
+  Recebimento, RegistroAuditoria, Relatorio, SaldoEstoque, SessaoInventario, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../../types/models';
+import { sugerirFardos } from '../../dominio/parametros';
+import { chaveComDigito } from '../../utils/nfeXml';
+import { receber } from './recebimento';
 import { volumeDormenteM3 } from './util';
 
 // DADOS FICTÍCIOS para desenvolvimento. Nenhum valor aqui representa estoque, fornecedores ou documentos reais.
@@ -11,7 +13,7 @@ export function criarDados() {
 
   const usuarioDemo: Usuario = {
     id: 'u1', nome: 'Usuário de Demonstração', email: 'demo@exemplo.invalid', perfil: 'Administrador (simulado)',
-    permissoes: ['lotes:cadastrar', 'recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'documentos:importar', 'visao:enviar', 'relatorios:exportar', 'admin'],
+    permissoes: ['recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'nf:cadastrar', 'visao:enviar', 'relatorios:exportar', 'admin'],
     ativo: true, ultimoAcesso: '2026-10-09T10:15:00-03:00',
   };
 
@@ -41,75 +43,97 @@ export function criarDados() {
   }));
 
   const locais = ['Quadra 1 / Baia 01', 'Quadra 1 / Baia 02', 'Quadra 2 / Baia 01', 'Quadra 2 / Baia 02', 'Quadra 3 / Baia 01'];
-  const statusPorIdx: StatusRegistro[] = ['aprovado', 'aprovado', 'pendente', 'bloqueado', 'aprovado'];
-  const deltas = [0, 0.01, -0.02, 0, 0.08];
+  const dia = (n: number) => new Date(Date.UTC(2026, 5, 1 + n, 15)).toISOString();
+  let seq = 0;
+  const novoId = (p: string) => `${p}${++seq}`;
 
-  const lotes: Lote[] = Array.from({ length: 30 }, (_, i) => {
-    const quantidade = 200 + ((i * 37) % 400);
-    const comprimentoM = i % 4 === 0 ? 2.0 : 2.8;
-    const larguraM = 0.24;
-    const espessuraM = 0.17;
-    const calc = quantidade * comprimentoM * larguraM * espessuraM;
-    const doc = calc * (1 + deltas[i % 5]);
-    const status = statusPorIdx[i % 5];
-    const inspecao: ResultadoInspecao = status === 'aprovado' ? 'aprovado' : status === 'pendente' ? 'aguardando' : i % 2 ? 'quarentena' : 'reprovado';
-    const especie = especies[(i * 5) % especies.length];
-    const divergente = Math.abs(doc - calc) / calc > 0.05;
-    const estoqueStatus: StatusEstoque = status === 'aprovado' ? (divergente ? 'divergente' : 'disponivel') : status === 'pendente' ? 'em_analise' : 'bloqueado';
-    return {
-      id: `l${i + 1}`,
-      codigo: `LT-2026-${String(i + 1).padStart(4, '0')}`,
-      fornecedor: fornecedores[i % 4].razaoSocial,
-      especieDocumental: especie.nomeCientifico,
-      classe: especie.classe,
-      categoria: inspecao === 'aguardando' ? undefined : 1 + (i % 3),
-      inspecao,
-      quantidade, comprimentoM, larguraM, espessuraM,
-      metrosLineares: quantidade * comprimentoM,
-      volumeDocumentalM3: doc,
-      volumeCalculadoM3: calc,
-      recebidoEm: new Date(Date.UTC(2026, 5 + (i % 4), 1 + ((i * 3) % 27), 12)).toISOString(),
-      status, estoqueStatus, local: locais[i % 5],
+  const lotes: Lote[] = [];
+  const fardos: Fardo[] = [];
+  const saldos: SaldoEstoque[] = [];
+  const volumetria: VolumetriaLote[] = [];
+  const recebimentos: Recebimento[] = [];
+  const movimentacoes: Movimentacao[] = [];
+
+  // NFs fictícias: as 12 primeiras já recebidas, a 13ª com DOF aguardando recebimento e a 14ª sem DOF.
+  // Desvio do volume do DOF em relação ao da NF: a 4ª passa da tolerância de 10%.
+  const desvios = [0, 0.03, -0.02, 0.14, 0.05, -0.04, 0.01, 0, 0.02, -0.06, 0.04, 0, 0.02, 0];
+  const notas: NotaFiscal[] = desvios.map((desvio, i) => {
+    const f = fornecedores[i % 3];
+    const numero = String(1000 + i);
+    const emissao = dia(i * 9).slice(0, 10);
+    const itens: ItemNf[] = Array.from({ length: 1 + (i % 3) }, (_, j) => {
+      const e = especies[(i * 3 + j * 7) % especies.length];
+      const t = tamanhos[(i + j) % tamanhos.length];
+      return {
+        id: `nf${i + 1}-i${j + 1}`, descricao: `Dormente de madeira ${t.codigo}`, especieId: e.id, especie: e.nomeCientifico,
+        tamanhoId: t.id, tamanho: t.codigo, quantidade: 14 * (4 + ((i + j) % 6)) + (j % 2 ? 6 : 0),
+      };
+    });
+    const xml = i % 2 === 0;
+    const nf: NotaFiscal = {
+      id: `nf${i + 1}`, numero, serie: '1', fornecedorId: f.id, fornecedor: f.razaoSocial, emissao, origem: xml ? 'xml' : 'manual', xmlAnexado: xml,
+      chaveAcesso: xml ? chaveComDigito(`35${emissao.slice(2, 4)}${emissao.slice(5, 7)}${f.cnpj.replace(/\D/g, '')}55001${numero.padStart(9, '0')}1${String(i + 1).padStart(8, '0')}`) : undefined,
+      itens, quantidadeTotal: itens.reduce((a, x) => a + x.quantidade, 0), situacao: 'aguardando_dof',
     };
+    if (i < 13) {
+      const porEspecie = new Map<string, number>();
+      for (const it of itens) porEspecie.set(it.especieId, (porEspecie.get(it.especieId) ?? 0) + it.quantidade * (tamanhos.find((t) => t.id === it.tamanhoId)?.volumeM3 ?? 0));
+      const volumes = [...porEspecie].map(([especieId, v]) => ({ especieId, especie: especies.find((e) => e.id === especieId)!.nomeCientifico, volumeM3: v * (1 + desvio) }));
+      const dofNumero = String(2600100 + i);
+      nf.dof = {
+        numero: dofNumero, codigoControle: `EX${String(i + 1).padStart(2, '0')}.0000.0000.0000`, validade: dia(i * 9 + 10).slice(0, 10), volumes,
+        volumeTotalM3: volumes.reduce((a, v) => a + v.volumeM3, 0), arquivoPdf: `dof_${dofNumero}.pdf`, declaracao: i < 8 ? 'declarado' : 'pendente',
+      };
+      nf.situacao = 'aguardando_recebimento';
+      if (xml) nf.dofSugerido = dofNumero;
+    }
+    return nf;
   });
 
-  for (const e of especies) e.lotesAtivos = lotes.filter((l) => l.especieDocumental === e.nomeCientifico).length;
-
-  const recebimentos: Recebimento[] = lotes.slice(0, 18).map((l, i) => {
-    const falta = i % 6 === 3 ? 7 : 0;
-    return {
-      id: `r${i + 1}`, loteCodigo: l.codigo, fornecedor: l.fornecedor, documento: `NF ${1000 + i}`,
-      recebidoEm: l.recebidoEm, quantidadeDocumental: l.quantidade, quantidadeConferida: l.quantidade - falta,
-      divergencia: -falta, metrosLinearesDocumentais: l.metrosLineares, metrosLinearesConferidos: (l.quantidade - falta) * l.comprimentoM,
-      status: l.status, conferente: ['Conferente 1', 'Conferente 2'][i % 2],
-    };
+  // As NFs recebidas passam pela mesma regra do serviço, que cria lotes, fardos, saldos, volumetria e movimentações.
+  const base = { especies, tamanhos, lotes, fardos, saldos, volumetria, recebimentos, movimentacoes };
+  notas.slice(0, 12).forEach((nf, i) => {
+    const itens = nf.itens.map((it, j) => {
+      const fs = sugerirFardos(it.quantidade);
+      if (i === 5 && j === 0) fs[fs.length - 1] -= 3; // falta de 3 dormentes: divergência com a NF, com fotos
+      return { itemId: it.id, fardos: fs };
+    });
+    receber(base, nf, {
+      nfId: nf.id, itens, avaria: i === 8, observacao: i === 8 ? 'Dois dormentes com a ponta lascada.' : undefined,
+      justificativa: i === 3 ? 'Carga conferida com o fornecedor; diferença comunicada ao órgão ambiental.' : undefined,
+    }, { quando: dia(i * 9 + 2), usuario: ['Conferente 1', 'Conferente 2'][i % 2], fotos: i === 5 || i === 8 ? 2 : 0, novoId });
   });
 
-  const saldos: SaldoEstoque[] = lotes.map((l) => ({
-    id: `s${l.id}`, loteCodigo: l.codigo, especieDocumental: l.especieDocumental, classe: l.classe, categoria: l.categoria,
-    disponivel: l.estoqueStatus === 'disponivel' ? l.quantidade : 0,
-    bloqueado: l.estoqueStatus === 'bloqueado' ? l.quantidade : 0,
-    emAnalise: l.estoqueStatus === 'em_analise' ? l.quantidade : 0,
-    divergente: l.estoqueStatus === 'divergente' ? l.quantidade : 0,
-    metrosLineares: l.metrosLineares, volumeM3: l.volumeCalculadoM3, local: l.local,
-  }));
+  // Resultado simulado da inspeção dos lotes mais antigos (os das duas últimas NFs recebidas seguem aguardando).
+  const ultimasNfs = new Set(notas.slice(10, 12).map((n) => n.numero));
+  lotes.forEach((l, k) => {
+    if (ultimasNfs.has(l.nfNumero)) return;
+    const resultado = k % 7 === 3 ? 'quarentena' : k % 7 === 5 ? 'reprovado' : 'aprovado';
+    l.inspecao = resultado;
+    l.categoria = 1 + (k % 3);
+    l.local = locais[k % locais.length];
+    const s = saldos.find((x) => x.loteCodigo === l.codigo)!;
+    Object.assign(s, { categoria: l.categoria, local: l.local });
+    for (const f of fardos) if (f.loteCodigo === l.codigo) f.local = l.local;
+    if (l.estoqueStatus === 'divergente') return; // fora da separação até ser liberado
+    l.status = resultado === 'aprovado' ? 'aprovado' : 'bloqueado';
+    l.estoqueStatus = resultado === 'aprovado' ? 'disponivel' : 'bloqueado';
+    Object.assign(s, { emAnalise: 0, disponivel: resultado === 'aprovado' ? l.quantidade : 0, bloqueado: resultado === 'aprovado' ? 0 : l.quantidade });
+  });
+
+  for (const [i, l] of lotes.filter((x) => x.inspecao === 'aprovado').slice(0, 8).entries()) {
+    movimentacoes.unshift({
+      id: novoId('m'), tipo: 'transferencia', loteCodigo: l.codigo, quantidade: 14 * (1 + (i % 3)), origem: l.local, destino: locais[(i + 1) % locais.length],
+      dataHora: dia(112 + i), usuario: 'Usuário de Demonstração', status: i % 4 === 0 ? 'pendente' : 'aprovado',
+    });
+  }
 
   const documentos: Documento[] = Array.from({ length: 20 }, (_, i) => {
-    const l = lotes[i];
+    const l = lotes[i % lotes.length];
     return {
       id: `d${i + 1}`, tipo: (['NF-e', 'DOF', 'Romaneio', 'Laudo'] as const)[i % 4], numero: `${2000 + i}`,
       fornecedor: l.fornecedor, emissao: l.recebidoEm, quantidade: l.quantidade, volumeDocumentalM3: l.volumeDocumentalM3,
-      status: statusPorIdx[i % 5],
-    };
-  });
-
-  const movimentacoes: Movimentacao[] = Array.from({ length: 25 }, (_, i) => {
-    const tipo = (['entrada', 'saida', 'transferencia'] as const)[i % 3];
-    return {
-      id: `m${i + 1}`, tipo, loteCodigo: lotes[i].codigo, quantidade: 20 + ((i * 13) % 120),
-      origem: tipo === 'entrada' ? 'Recebimento' : locais[i % 5], destino: tipo === 'saida' ? 'Expedição' : locais[(i + 1) % 5],
-      dataHora: new Date(Date.UTC(2026, 8, 1 + (i % 28), 13, (i * 7) % 60)).toISOString(),
-      usuario: 'Usuário de Demonstração', status: i % 7 === 0 ? 'pendente' : 'aprovado',
+      status: (['aprovado', 'aprovado', 'pendente', 'bloqueado', 'aprovado'] as const)[i % 5],
     };
   });
 
@@ -141,15 +165,9 @@ export function criarDados() {
     dataHora: new Date(Date.UTC(2026, 8, 10 + i, 15, 0)).toISOString(), status: i % 4 === 0 ? 'pendente' : 'aprovado',
   }));
 
-  const volumetria: VolumetriaLote[] = lotes.map((l) => {
-    const dif = l.volumeDocumentalM3 - l.volumeCalculadoM3;
-    const pct = (dif / l.volumeCalculadoM3) * 100;
-    return { id: `v${l.id}`, loteCodigo: l.codigo, volumeDocumentalM3: l.volumeDocumentalM3, volumeCalculadoM3: l.volumeCalculadoM3, diferencaM3: dif, diferencaPct: pct, situacao: Math.abs(pct) > 5 ? 'divergente' : 'conforme' };
-  });
-
   const relatorios: Relatorio[] = [
     { id: 'rel1', nome: 'Posição de estoque', descricao: 'Saldos por lote, classe e categoria', formatos: ['csv', 'xlsx', 'pdf'] },
-    { id: 'rel2', nome: 'Divergências de recebimento', descricao: 'Documento x conferência', formatos: ['csv', 'pdf'] },
+    { id: 'rel2', nome: 'Divergências de recebimento', descricao: 'NF e DOF x conferência', formatos: ['csv', 'pdf'] },
     { id: 'rel3', nome: 'Controle volumétrico', descricao: 'Volume documental x calculado', formatos: ['xlsx', 'pdf'] },
     { id: 'rel4', nome: 'Movimentações do período', descricao: 'Entradas, saídas e transferências', formatos: ['csv', 'xlsx'] },
   ];
@@ -166,7 +184,7 @@ export function criarDados() {
     { id: 'u4', nome: 'Usuário Inativo', email: 'inativo@exemplo.invalid', perfil: 'Consulta', permissoes: [], ativo: false },
   ];
 
-  return { usuarioDemo, fornecedores, especies, tamanhos, lotes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
+  return { usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
 }
 
 export type DadosSimulados = ReturnType<typeof criarDados>;

@@ -1,12 +1,12 @@
 import { useEffect, useId, useState } from 'react';
 import { ApiError, mensagemSegura } from '../services/http';
-import { paraNumero } from '../utils/format';
+import { arquivoInvalido, paraNumero } from '../utils/format';
 import { ConfirmModal, Modal } from './Modal';
 
 export interface Campo {
   nome: string;
   rotulo: string;
-  tipo?: 'text' | 'number' | 'select' | 'date' | 'textarea';
+  tipo?: 'text' | 'number' | 'select' | 'date' | 'textarea' | 'arquivo';
   obrigatorio?: boolean;
   opcoes?: { valor: string; rotulo: string }[];
   min?: number;
@@ -15,6 +15,9 @@ export interface Campo {
   inteiro?: boolean;
   maxLength?: number;
   ajuda?: string;
+  /** tipo 'arquivo': extensões aceitas (minúsculas, sem ponto) e se aceita vários arquivos. */
+  extensoes?: string[];
+  multiplo?: boolean;
 }
 
 interface Props {
@@ -22,7 +25,8 @@ interface Props {
   campos: Campo[];
   aberto: boolean;
   aoFechar: () => void;
-  aoEnviar: (valores: Record<string, string>) => Promise<void>;
+  /** Arquivos dos campos 'arquivo' chegam em `arquivos`; em `valores` fica só a lista de nomes (útil em `validar`). */
+  aoEnviar: (valores: Record<string, string>, arquivos: Record<string, File[]>) => Promise<void>;
   rotuloEnviar?: string;
   /** Valores com que o formulário abre (edição); campos ausentes começam vazios. */
   iniciais?: Record<string, string>;
@@ -35,6 +39,7 @@ interface Props {
 export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEnviar = 'Salvar', iniciais, validar, confirmacao }: Props) {
   const vazio = () => Object.fromEntries(campos.map((c) => [c.nome, iniciais?.[c.nome] ?? '']));
   const [valores, setValores] = useState<Record<string, string>>(vazio);
+  const [arquivos, setArquivos] = useState<Record<string, File[]>>({});
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string>();
   const [enviando, setEnviando] = useState(false);
@@ -42,9 +47,17 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
   const formId = useId();
 
   useEffect(() => {
-    if (aberto) { setValores(vazio()); setErros({}); setErroGeral(undefined); setPendente(null); }
+    if (aberto) { setValores(vazio()); setArquivos({}); setErros({}); setErroGeral(undefined); setPendente(null); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto]);
+
+  function escolherArquivos(c: Campo, lista: FileList | null) {
+    const fs = Array.from(lista ?? []);
+    const erro = fs.map((f) => arquivoInvalido(f, c.extensoes ?? [])).find(Boolean);
+    setErros((e) => { const n = { ...e }; if (erro) n[c.nome] = erro; else delete n[c.nome]; return n; });
+    setArquivos((a) => ({ ...a, [c.nome]: erro ? [] : fs }));
+    setValores((v) => ({ ...v, [c.nome]: erro ? '' : fs.map((f) => f.name).join(', ') }));
+  }
 
   function validarCampos(): Record<string, string> {
     const e: Record<string, string> = {};
@@ -67,7 +80,7 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
     setEnviando(true);
     setErroGeral(undefined);
     try {
-      await aoEnviar(v);
+      await aoEnviar(v, arquivos);
       setPendente(null);
       aoFechar();
     } catch (e) {
@@ -114,6 +127,11 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
                     <option value="">Selecione…</option>
                     {c.opcoes?.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
                   </select>
+                ) : c.tipo === 'arquivo' ? (
+                  <input
+                    id={id} name={c.nome} type="file" multiple={c.multiplo} accept={c.extensoes?.map((e) => `.${e}`).join(',')}
+                    aria-invalid={!!erros[c.nome]} aria-describedby={erros[c.nome] ? `${id}-erro` : undefined} onChange={(e) => escolherArquivos(c, e.target.files)}
+                  />
                 ) : c.tipo === 'textarea' ? (
                   <textarea {...comum} rows={3} maxLength={c.maxLength ?? 500} />
                 ) : (

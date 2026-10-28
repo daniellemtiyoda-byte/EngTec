@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
-interface ModalProps { titulo: string; aberto: boolean; aoFechar: () => void; children: ReactNode; rodape?: ReactNode }
+interface ModalProps { titulo: string; aberto: boolean; aoFechar: () => void; children: ReactNode; rodape?: ReactNode; /** Formulários com listas (itens da NF, fardos). */ largo?: boolean }
 
 const FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Modal({ titulo, aberto, aoFechar, children, rodape }: ModalProps) {
+export function Modal({ titulo, aberto, aoFechar, children, rodape, largo }: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
   const tituloId = useId();
   // Guarda sempre o aoFechar mais recente: o efeito abaixo só roda ao abrir/fechar.
@@ -31,7 +31,7 @@ export function Modal({ titulo, aberto, aoFechar, children, rodape }: ModalProps
   if (!aberto) return null;
   return (
     <div className="modal-fundo" onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={tituloId} tabIndex={-1} ref={ref}>
+      <div className={largo ? 'modal modal-largo' : 'modal'} role="dialog" aria-modal="true" aria-labelledby={tituloId} tabIndex={-1} ref={ref}>
         <div className="modal-topo">
           <h2 id={tituloId}>{titulo}</h2>
           <button className="btn-icone" onClick={aoFechar} aria-label="Fechar">×</button>

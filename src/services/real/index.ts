@@ -30,6 +30,14 @@ function enviarArquivo<T>(k: ChaveEndpoint, arquivo: File) {
   return http<T>(caminho(k), { metodo: 'POST', formulario: f });
 }
 
+/** Multipart com os dados em JSON no campo `dados` e os arquivos nos campos indicados (formato provisório). */
+function enviarComArquivos<T>(k: ChaveEndpoint, dados: unknown, arquivos: Record<string, File[]>, id?: string) {
+  const f = new FormData();
+  f.append('dados', JSON.stringify(dados));
+  for (const [campo, lista] of Object.entries(arquivos)) for (const a of lista) f.append(campo, a);
+  return http<T>(caminho(k, id), { metodo: 'POST', formulario: f });
+}
+
 export function criarServicosReais(): Servicos {
   return {
     auth: {
@@ -45,9 +53,15 @@ export function criarServicosReais(): Servicos {
       alertas: () => http(caminho('dashboard.alertas')),
     },
     fornecedores: servicoLista('fornecedores.listar'),
-    documentos: { ...servicoLista('documentos.listar'), importar: (a) => enviarArquivo('documentos.importar', a) },
-    recebimentos: { ...servicoLista('recebimentos.listar'), registrarConferencia: (d) => post('recebimentos.registrar', d) },
-    lotes: { ...servicoLista('lotes.listar'), cadastrar: (d) => post('lotes.cadastrar', d) },
+    documentos: servicoLista('documentos.listar'),
+    notas: {
+      ...servicoLista('notas.listar'),
+      cadastrar: (d, xml) => enviarComArquivos('notas.cadastrar', d, { xml: xml ? [xml] : [] }),
+      cadastrarDof: (nfId, d, pdf) => enviarComArquivos('notas.cadastrarDof', d, { pdf: [pdf] }, nfId),
+    },
+    recebimentos: { ...servicoLista('recebimentos.listar'), confirmar: (d, fotos) => enviarComArquivos('recebimentos.confirmar', d, { fotos }) },
+    lotes: servicoLista('lotes.listar'),
+    fardos: servicoLista('fardos.listar'),
     estoque: servicoLista('estoque.listar'),
     movimentacoes: { ...servicoLista('movimentacoes.listar'), registrar: (d) => post('movimentacoes.registrar', d) },
     inventario: {

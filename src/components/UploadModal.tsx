@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { env } from '../config/env';
 import { mensagemSegura } from '../services/http';
+import { arquivoInvalido } from '../utils/format';
 import { Modal } from './Modal';
 
 interface Props {
@@ -31,10 +32,8 @@ export function UploadModal({ titulo, aberto, aoFechar, extensoes, aoEnviar, avi
   function escolher(f: File | undefined) {
     setErro(undefined);
     if (!f) return setArquivo(null);
-    const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
-    if (!extensoes.includes(ext)) { setArquivo(null); return setErro(`Formato não permitido. Aceitos: ${extensoes.join(', ').toUpperCase()}.`); }
-    if (f.size > env.UPLOAD_MAX_MB * 1024 * 1024) { setArquivo(null); return setErro(`Arquivo maior que o limite de ${env.UPLOAD_MAX_MB} MB.`); }
-    if (f.size === 0) { setArquivo(null); return setErro('O arquivo está vazio.'); }
+    const erro = arquivoInvalido(f, extensoes);
+    if (erro) { setArquivo(null); return setErro(erro); }
     setArquivo(f);
   }
 

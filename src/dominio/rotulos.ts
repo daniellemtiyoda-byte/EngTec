@@ -1,5 +1,6 @@
 import type {
-  LocalPatio, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, StatusEstoque, StatusRegistro, TipoMovimentacao, UsoEspecie,
+  Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, SituacaoNf, StatusEstoque,
+  StatusRegistro, TipoMovimentacao, UsoEspecie,
 } from '../types/models';
 
 /**
@@ -28,6 +29,22 @@ export const USO_ESPECIE: Rotulos<UsoEspecie> = {
 /** Medidas de tamanho ainda não confirmadas pela CPTM aparecem como provisórias. */
 export const SITUACAO_MEDIDAS: Rotulos<SituacaoMedidas> = {
   provisorio: ['laranja', 'Provisório'], confirmado: ['verde', 'Confirmado'],
+};
+
+export const SITUACAO_NF: Rotulos<SituacaoNf> = {
+  aguardando_dof: ['vermelho', 'Aguardando DOF'], aguardando_recebimento: ['laranja', 'Aguardando recebimento'], recebida: ['verde', 'Recebida'],
+};
+
+export const ORIGEM_NF: Rotulos<NotaFiscal['origem']> = {
+  manual: ['cinza', 'Manual'], xml: ['azul', 'XML da NF-e'],
+};
+
+export const DECLARACAO_DOF: Rotulos<Dof['declaracao']> = {
+  pendente: ['laranja', 'Pendente no Sinaflor'], declarado: ['verde', 'Declarado no Sinaflor'],
+};
+
+export const ESTADO_FARDO: Rotulos<EstadoFardo> = {
+  fechado: ['verde', 'Fechado'], aberto: ['laranja', 'Aberto'], baixado: ['cinza', 'Baixado'],
 };
 
 export const TIPO_MOVIMENTACAO: Rotulos<TipoMovimentacao> = {

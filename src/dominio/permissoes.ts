@@ -4,12 +4,11 @@
  * Os nomes ainda são provisórios (ver docs/CONTRATOS-API.md); o servidor valida cada operação.
  */
 export const PERMISSOES = [
-  'lotes:cadastrar',
   'recebimento:registrar',
   'movimentacoes:registrar',
   'inventario:criar',
   'cadastros:editar', // classe e uso das espécies; medidas dos tamanhos
-  'documentos:importar',
+  'nf:cadastrar', // NF (manual ou XML) e DOF
   'visao:enviar',
   'relatorios:exportar',
   'admin',

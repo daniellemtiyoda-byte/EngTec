@@ -1,5 +1,5 @@
 import type { Documento, StatusRegistro } from '../types/models';
-import { RESULTADO_INSPECAO, SITUACAO_MEDIDAS, SITUACAO_VOLUMETRIA, USO_ESPECIE, type Rotulos } from './rotulos';
+import { RESULTADO_INSPECAO, SITUACAO_MEDIDAS, SITUACAO_NF, SITUACAO_VOLUMETRIA, USO_ESPECIE, type Rotulos } from './rotulos';
 
 export interface Opcao<V extends string = string> { valor: V; rotulo: string }
 
@@ -22,6 +22,7 @@ export const CATEGORIA_OPCOES: Opcao[] = [1, 2, 3].map((c) => ({ valor: String(c
 export const RESULTADO_INSPECAO_OPCOES = opcoesDe(RESULTADO_INSPECAO);
 export const USO_OPCOES = opcoesDe(USO_ESPECIE);
 export const SITUACAO_MEDIDAS_OPCOES = opcoesDe(SITUACAO_MEDIDAS);
+export const SITUACAO_NF_OPCOES = opcoesDe(SITUACAO_NF);
 
 export const TIPO_DOCUMENTO_OPCOES: Opcao<Documento['tipo']>[] = (['NF-e', 'DOF', 'Romaneio', 'Laudo'] as const).map((t) => ({ valor: t, rotulo: t }));
 

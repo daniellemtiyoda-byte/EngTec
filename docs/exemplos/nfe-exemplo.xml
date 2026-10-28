@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- NF-e FICTÍCIA para testar a importação no modo simulado. Não representa nenhuma nota real.
+     O CNPJ do emitente é o do fornecedor fictício "Madeireira Exemplo A Ltda." e a chave tem dígito verificador válido. -->
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe>
+    <infNFe Id="NFe35261000000000000101550010000045211000045213" versao="4.00">
+      <ide>
+        <cUF>35</cUF>
+        <natOp>Venda de mercadoria</natOp>
+        <mod>55</mod>
+        <serie>1</serie>
+        <nNF>4521</nNF>
+        <dhEmi>2026-10-20T09:30:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>00000000000101</CNPJ>
+        <xNome>Madeireira Exemplo A Ltda.</xNome>
+      </emit>
+      <det nItem="1">
+        <prod>
+          <cProd>DRM-280</cProd>
+          <xProd>DORMENTE DE MADEIRA 24X17X280 CM</xProd>
+          <uCom>UN</uCom>
+          <qCom>98.0000</qCom>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>DRM-400</cProd>
+          <xProd>DORMENTE DE MADEIRA PARA AMV 24X17X400 CM</xProd>
+          <uCom>UN</uCom>
+          <qCom>28.0000</qCom>
+        </prod>
+      </det>
+      <infAdic>
+        <infCpl>Produto florestal acompanhado do DOF n. 26009991 conforme IN Ibama 21/2014.</infCpl>
+      </infAdic>
+    </infNFe>
+  </NFe>
+  <protNFe versao="4.00">
+    <infProt>
+      <chNFe>35261000000000000101550010000045211000045213</chNFe>
+    </infProt>
+  </protNFe>
+</nfeProc>

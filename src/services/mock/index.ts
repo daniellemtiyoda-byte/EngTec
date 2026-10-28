@@ -1,12 +1,15 @@
 import type { Servicos } from '../contracts';
-import type { Documento, Indicadores, Lote, Movimentacao, NovoTamanho, ProcessamentoImagem, Recebimento, SessaoInventario, Tamanho, Usuario } from '../../types/models';
-import { rotuloClasse } from '../../utils/format';
+import { TOLERANCIA_VOLUME_PCT } from '../../dominio/parametros';
+import type { Indicadores, ItemNf, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho, Usuario } from '../../types/models';
+import { pct, rotuloClasse } from '../../utils/format';
+import { chaveAcessoValida } from '../../utils/nfeXml';
 import { ApiError } from '../http';
 import { criarDados } from './data';
+import { receber } from './recebimento';
 import { atraso, paginar, simularRede, volumeDormenteM3 } from './util';
 
 let sessao: Usuario | null = null; // apenas em memória: nada de credenciais no armazenamento do navegador
-let seq = 1000;
+let seq = 100_000; // acima dos ids gerados em data.ts
 const novoId = (p: string) => `${p}${++seq}`;
 
 export function criarServicosSimulados(): Servicos {
@@ -41,7 +44,7 @@ export function criarServicosSimulados(): Servicos {
         return {
           disponivel: soma((x) => x.disponivel), bloqueado: soma((x) => x.bloqueado), emAnalise: soma((x) => x.emAnalise), divergente: soma((x) => x.divergente),
           metrosLineares: soma((x) => x.metrosLineares), volumeDocumentalM3: D.lotes.reduce((a, l) => a + l.volumeDocumentalM3, 0), volumeCalculadoM3: soma((x) => x.volumeM3),
-          recebimentosPendentes: D.recebimentos.filter((r) => r.status === 'pendente').length,
+          recebimentosPendentes: D.notas.filter((n) => n.situacao !== 'recebida').length,
           inventariosAbertos: D.sessoesInventario.filter((x) => x.estado !== 'aprovado' && x.estado !== 'rejeitado').length,
           recebimentosPorMes: meses.map((m, i) => ({ rotulo: m, valor: [4, 6, 5, 7, 3][i] })),
           estoquePorClasse: [...porClasse].map(([rotulo, valor]) => ({ rotulo, valor })),
@@ -50,57 +53,86 @@ export function criarServicosSimulados(): Servicos {
       },
       alertas: async () => {
         await atraso(250);
+        const divergentes = D.recebimentos.filter((r) => r.acimaTolerancia).map((r) => ({
+          id: `al-vol-${r.id}`, nivel: 'critico' as const, titulo: `Divergência de volume acima de ${TOLERANCIA_VOLUME_PCT}% na NF ${r.nfNumero}`,
+          descricao: `DOF ${r.dofNumero}: ${r.divergenciaVolumePct > 0 ? '+' : ''}${pct(r.divergenciaVolumePct)}. A norma manda recusar a carga e comunicar o órgão; os lotes ficam com divergência até serem liberados.`,
+          link: '/recebimento',
+        }));
+        const semDof = D.notas.filter((n) => n.situacao === 'aguardando_dof').length;
+        const aReceber = D.notas.filter((n) => n.situacao === 'aguardando_recebimento').length;
         return [
-          { id: 'al1', nivel: 'critico' as const, titulo: 'Divergência volumétrica acima de 5%', descricao: 'Lotes com volume documental diferente do calculado.', link: '/volumetria' },
-          { id: 'al2', nivel: 'atencao' as const, titulo: 'Recebimentos aguardando aprovação', descricao: 'Conferências pendentes de decisão.', link: '/recebimento' },
+          ...divergentes,
+          ...(semDof ? [{ id: 'al-sem-dof', nivel: 'atencao' as const, titulo: `${semDof} NF aguardando DOF`, descricao: 'O recebimento não avança sem o DOF cadastrado.', link: '/notas' }] : []),
+          ...(aReceber ? [{ id: 'al-receber', nivel: 'atencao' as const, titulo: `${aReceber} NF aguardando recebimento`, descricao: 'NF com DOF pronta para conferência.', link: '/recebimento' }] : []),
           { id: 'al3', nivel: 'atencao' as const, titulo: 'Ajuste de inventário pendente de aprovação', descricao: 'O saldo oficial só muda após a aprovação.', link: '/inventario' },
           { id: 'al4', nivel: 'info' as const, titulo: 'Dados simulados em uso', descricao: 'Esta instalação está em modo de demonstração.', link: '/configuracoes' },
         ];
       },
     },
     fornecedores: { listar: (q) => paginar(D.fornecedores, q) },
-    documentos: {
-      listar: (q) => paginar(D.documentos, q),
-      importar: async (arquivo) => {
-        await atraso(700);
-        const d: Documento = { id: novoId('d'), tipo: 'NF-e', numero: arquivo.name.slice(0, 20), fornecedor: '(a identificar na importação)', emissao: new Date().toISOString(), quantidade: 0, volumeDocumentalM3: 0, status: 'pendente' };
-        D.documentos.unshift(d);
-        return d;
+    documentos: { listar: (q) => paginar(D.documentos, q) },
+    notas: {
+      listar: (q) => paginar(D.notas, q),
+      cadastrar: async (n, xml) => {
+        await atraso(600);
+        const f = D.fornecedores.find((x) => x.id === n.fornecedorId);
+        if (!f) throw new ApiError(422, 'Fornecedor não encontrado.', { fornecedorId: 'Selecione um fornecedor cadastrado.' });
+        if (f.status === 'bloqueado') throw new ApiError(422, 'Fornecedor bloqueado.', { fornecedorId: 'Fornecedor bloqueado não pode emitir NF para recebimento.' });
+        const chave = n.chaveAcesso?.replace(/\D/g, '') || undefined;
+        if (chave && !chaveAcessoValida(chave)) throw new ApiError(422, 'Chave de acesso inválida.', { chaveAcesso: 'Confira os 44 dígitos da chave.' });
+        if (chave && D.notas.some((x) => x.chaveAcesso === chave)) throw new ApiError(409, 'Já existe uma NF com esta chave de acesso.', { chaveAcesso: 'Chave de acesso já cadastrada.' });
+        if (D.notas.some((x) => x.fornecedorId === f.id && x.numero === n.numero && x.serie === n.serie)) {
+          throw new ApiError(409, 'Esta NF já foi cadastrada para o fornecedor.', { numero: 'NF já cadastrada (mesmo número e série).' });
+        }
+        if (!n.itens.length) throw new ApiError(422, 'Informe ao menos um item.');
+        const id = novoId('nf');
+        const itens: ItemNf[] = n.itens.map((it, i) => {
+          const e = D.especies.find((x) => x.id === it.especieId);
+          const t = D.tamanhos.find((x) => x.id === it.tamanhoId);
+          if (!e || !t) throw new ApiError(422, 'Espécie ou tamanho do item não encontrado no cadastro.');
+          return { id: `${id}-i${i + 1}`, descricao: it.descricao, especieId: e.id, especie: e.nomeCientifico, tamanhoId: t.id, tamanho: t.codigo, quantidade: it.quantidade };
+        });
+        const nf: NotaFiscal = {
+          id, numero: n.numero, serie: n.serie, chaveAcesso: chave, fornecedorId: f.id, fornecedor: f.razaoSocial, emissao: n.emissao,
+          origem: xml ? 'xml' : 'manual', xmlAnexado: !!xml, dofSugerido: n.dofSugerido, itens, quantidadeTotal: itens.reduce((a, x) => a + x.quantidade, 0),
+          situacao: 'aguardando_dof',
+        };
+        D.notas.unshift(nf);
+        return nf;
+      },
+      cadastrarDof: async (nfId, d, pdf) => {
+        await atraso(600);
+        const nf = D.notas.find((x) => x.id === nfId);
+        if (!nf) throw new ApiError(404, 'NF não encontrada.');
+        if (nf.dof) throw new ApiError(409, 'Esta NF já tem DOF (um DOF por NF).');
+        if (!pdf.name.toLowerCase().endsWith('.pdf')) throw new ApiError(422, 'O DOF deve ser anexado em PDF.', { pdf: 'Anexe o PDF do DOF.' });
+        if (D.notas.some((x) => x.dof?.codigoControle.toLowerCase() === d.codigoControle.toLowerCase())) {
+          throw new ApiError(409, 'Código de controle já usado em outro DOF.', { codigoControle: 'Código de controle já cadastrado.' });
+        }
+        const volumes = [...new Map(nf.itens.map((i) => [i.especieId, i.especie]))].map(([especieId, especie]) => {
+          const v = d.volumes.find((x) => x.especieId === especieId)?.volumeM3;
+          if (!v || v <= 0) throw new ApiError(422, `Informe o volume do DOF para ${especie}.`, { [`vol_${especieId}`]: 'Informe o volume em m³.' });
+          return { especieId, especie, volumeM3: v };
+        });
+        nf.dof = {
+          numero: d.numero, codigoControle: d.codigoControle, validade: d.validade, volumes, volumeTotalM3: volumes.reduce((a, v) => a + v.volumeM3, 0),
+          arquivoPdf: pdf.name.slice(0, 80), declaracao: 'pendente',
+        };
+        nf.situacao = 'aguardando_recebimento';
+        return nf;
       },
     },
     recebimentos: {
       listar: (q) => paginar(D.recebimentos, q),
-      registrarConferencia: async (c) => {
-        await atraso(600);
-        const lote = D.lotes.find((l) => l.codigo.toLowerCase() === c.loteCodigo.trim().toLowerCase());
-        if (!lote) throw new ApiError(404, 'Lote não encontrado.', { loteCodigo: 'Lote inexistente.' });
-        const r: Recebimento = {
-          id: novoId('r'), loteCodigo: lote.codigo, fornecedor: lote.fornecedor, documento: c.documentoNumero, recebidoEm: new Date().toISOString(),
-          quantidadeDocumental: lote.quantidade, quantidadeConferida: c.quantidadeConferida, divergencia: c.quantidadeConferida - lote.quantidade,
-          metrosLinearesDocumentais: lote.metrosLineares, metrosLinearesConferidos: c.quantidadeConferida * lote.comprimentoM, status: 'pendente', conferente: D.usuarioDemo.nome,
-        };
-        D.recebimentos.unshift(r);
-        return r;
+      confirmar: async (d, fotos) => {
+        await atraso(700);
+        const nf = D.notas.find((x) => x.id === d.nfId);
+        if (!nf) throw new ApiError(404, 'NF não encontrada.');
+        return receber(D, nf, d, { quando: new Date().toISOString(), usuario: D.usuarioDemo.nome, fotos: fotos.length, novoId });
       },
     },
-    lotes: {
-      listar: (q) => paginar(D.lotes, q),
-      cadastrar: async (n) => {
-        await atraso(600);
-        if (D.lotes.some((l) => l.codigo === n.codigo)) throw new ApiError(409, 'Já existe um lote com este código.', { codigo: 'Código já utilizado.' });
-        const f = D.fornecedores.find((x) => x.id === n.fornecedorId);
-        const e = D.especies.find((x) => x.id === n.especieId);
-        const calc = n.quantidade * n.comprimentoM * n.larguraM * n.espessuraM;
-        // Lote novo aguarda inspeção: a classe vem da espécie e a categoria só chega com a inspeção.
-        const l: Lote = {
-          id: novoId('l'), codigo: n.codigo, fornecedor: f?.razaoSocial ?? '—', especieDocumental: e?.nomeCientifico ?? '—', classe: e?.classe, inspecao: 'aguardando',
-          quantidade: n.quantidade, comprimentoM: n.comprimentoM, larguraM: n.larguraM, espessuraM: n.espessuraM, metrosLineares: n.quantidade * n.comprimentoM,
-          volumeDocumentalM3: 0, volumeCalculadoM3: calc, recebidoEm: new Date().toISOString(), status: 'pendente', estoqueStatus: 'em_analise', local: 'A definir',
-        };
-        D.lotes.unshift(l);
-        return l;
-      },
-    },
+    lotes: { listar: (q) => paginar(D.lotes, q) },
+    fardos: { listar: (q) => paginar(D.fardos, q) },
     estoque: { listar: (q) => paginar(D.saldos, q) },
     movimentacoes: {
       listar: (q) => paginar(D.movimentacoes, q),

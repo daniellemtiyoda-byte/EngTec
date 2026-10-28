@@ -24,11 +24,14 @@
 | Dashboard | Indicadores | GET | /dashboard/indicadores |
 | Dashboard | Alertas | GET | /dashboard/alertas |
 | Fornecedores | Listar | GET | /fornecedores |
-| Documentos | Listar | GET | /documentos |
-| Documentos | Importar (multipart, campo `arquivo`) | POST | /documentos/importacoes |
-| Recebimento | Listar conferências | GET | /recebimentos |
-| Recebimento | Registrar conferência | POST | /recebimentos/conferencias |
-| Lotes | Listar / Cadastrar | GET / POST | /lotes |
+| Documentos | Listar (só leitura) | GET | /documentos |
+| NF e DOF | Listar notas fiscais | GET | /notas-fiscais |
+| NF e DOF | Cadastrar NF (multipart: `dados` em JSON + `xml` opcional) | POST | /notas-fiscais |
+| NF e DOF | Cadastrar DOF da NF (multipart: `dados` em JSON + `pdf`) | POST | /notas-fiscais/{id}/dof |
+| Recebimento | Listar | GET | /recebimentos |
+| Recebimento | Confirmar (multipart: `dados` em JSON + `fotos`, várias) → `{ recebimento, lotes, fardos }` | POST | /recebimentos |
+| Lotes | Listar (lotes só nascem do recebimento) | GET | /lotes |
+| Fardos | Listar (filtro `loteCodigo`) | GET | /fardos |
 | Estoque | Consultar saldos | GET | /estoque/saldos |
 | Movimentações | Listar / Registrar | GET / POST | /movimentacoes |
 | Inventário | Listar sessões / Criar sessão | GET / POST | /inventarios |
@@ -59,7 +62,7 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
    - O front envia `X-Requested-With: XMLHttpRequest` em **toda** chamada: o CORS precisa permitir esse cabeçalho (`Access-Control-Allow-Headers`).
    - Proteção contra CSRF no servidor: cookie com `SameSite=Lax` ou `Strict` e, de preferência, rejeitar requisições sem o cabeçalho acima ou usar token anti-CSRF.
    - O campo `mensagem` dos erros é exibido ao usuário como veio: deve ser texto seguro, sem detalhes internos (stack trace, SQL, caminhos).
-4. Permissões por operação (nomes das permissões usados em `pode('...')`: `lotes:cadastrar`, `recebimento:registrar`, `movimentacoes:registrar`, `inventario:criar`, `cadastros:editar`, `documentos:importar`, `visao:enviar`, `relatorios:exportar`, `admin`).
+4. Permissões por operação (nomes das permissões usados em `pode('...')`: `nf:cadastrar`, `recebimento:registrar`, `movimentacoes:registrar`, `inventario:criar`, `cadastros:editar`, `visao:enviar`, `relatorios:exportar`, `admin`).
 5. Códigos de resposta e formato dos erros (incluindo erros por campo).
 6. Exemplos de sucesso e de erro.
 7. Regras de negócio decididas no servidor: tolerância volumétrica, estados de aprovação, fluxo de aprovação de ajustes de inventário, formatos/tamanhos de upload.
@@ -67,6 +70,10 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
 9. Para relatórios: como o arquivo gerado é baixado (URL assinada, endpoint próprio?).
 
 ## Pontos em aberto
+
+- NF: o servidor recusa chave de acesso repetida (409, campo `chaveAcesso`) e NF repetida do mesmo fornecedor (mesmo número e série, 409, campo `numero`). Confirmar se o XML é validado (assinatura, schema) e guardado no servidor.
+- DOF: um por NF no MVP; volumes por espécie (`[{ especieId, volumeM3 }]`). Erros por campo usam `vol_<especieId>`.
+- Recebimento: `dados` = `{ nfId, itens: [{ itemId, fardos: number[] }], avaria, observacao?, justificativa? }`. O servidor cria um lote por espécie + tamanho (código `LTaa-NNNN` sequencial por ano) e os fardos (`<lote>-Fnn`), aplica as regras de fotos (divergência de quantidade ou avaria) e de justificativa (divergência de volume por espécie acima de 10%) e devolve erros por campo `item-<itemId>`, `fotos`, `justificativa`. Lotes de recebimento acima da tolerância ficam `estoqueStatus: 'divergente'`. Falta combinar como o lote é liberado depois.
 
 - Tamanhos: o servidor calcula `volumeM3` (largura × altura × comprimento em cm ÷ 1.000.000) e o devolve em listar/cadastrar/atualizar; o front não envia volume. Medidas chegam com `medidas: 'provisorio' | 'confirmado'`.
 - Classe e categoria: `classe` (texto, ex. "1ª") vem da espécie; `categoria` (número) vem da inspeção. Ausentes = "a definir". Lote e saldo trazem os dois já resolvidos, mais `inspecao` (`aguardando`, `aprovado`, `reprovado`, `quarentena`).
