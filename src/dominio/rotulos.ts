@@ -1,5 +1,5 @@
 import type {
-  Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, SituacaoNf, StatusEstoque,
+  DofPendente, MotivoPerda, Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, SituacaoNf, StatusEstoque,
   StatusRegistro, StatusRme, TipoMovimentacao, UrgenciaRme, UsoEspecie,
 } from '../types/models';
 
@@ -11,7 +11,7 @@ export type Tom = 'verde' | 'laranja' | 'vermelho' | 'azul' | 'cinza' | 'simulad
 export type Rotulos<K extends string> = Record<K, [Tom, string]>;
 
 export const STATUS_REGISTRO: Rotulos<StatusRegistro> = {
-  aprovado: ['verde', 'Aprovado'], pendente: ['laranja', 'Pendente'], bloqueado: ['vermelho', 'Bloqueado'], simulado: ['simulado', 'Simulado'],
+  aprovado: ['verde', 'Aprovado'], pendente: ['laranja', 'Pendente'], bloqueado: ['vermelho', 'Bloqueado'], rejeitado: ['vermelho', 'Rejeitado'], simulado: ['simulado', 'Simulado'],
 };
 
 export const STATUS_ESTOQUE: Rotulos<StatusEstoque> = {
@@ -55,8 +55,17 @@ export const URGENCIA_RME: Rotulos<UrgenciaRme> = {
   normal: ['cinza', 'Normal'], urgente: ['vermelho', 'Urgente'],
 };
 
+export const MOTIVO_PERDA: Rotulos<MotivoPerda> = {
+  avaria: ['laranja', 'Avaria'], incendio: ['vermelho', 'Incêndio'], intemperie: ['azul', 'Intempérie'], furto: ['vermelho', 'Furto'], outro: ['cinza', 'Outro'],
+};
+
+/** Prazo de declaração do DOF no Sinaflor. */
+export const NIVEL_PRAZO_DOF: Rotulos<DofPendente['nivel']> = {
+  critico: ['vermelho', 'Prazo crítico'], atencao: ['laranja', 'Vence em breve'], no_prazo: ['verde', 'No prazo'],
+};
+
 export const TIPO_MOVIMENTACAO: Rotulos<TipoMovimentacao> = {
-  entrada: ['verde', 'Entrada'], saida: ['laranja', 'Saída'], transferencia: ['azul', 'Transferência'],
+  entrada: ['verde', 'Entrada'], saida: ['laranja', 'Saída'], transferencia: ['azul', 'Transferência'], perda: ['vermelho', 'Perda'], ajuste: ['cinza', 'Ajuste'],
 };
 
 export const ESTADO_PROCESSAMENTO: Rotulos<ProcessamentoImagem['estado']> = {

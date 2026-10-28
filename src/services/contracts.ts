@@ -1,7 +1,7 @@
 import type {
   Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Especie, Fardo, Fornecedor, Indicadores,
   ListQuery, LocalPatio, Lote, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoRecebimento, NovoTamanho,
-  OpcaoSeparacao, Paginado, Rme,
+  DofPendente, FiltroMovimentacoes, LinhaSaldoIbama, OpcaoSeparacao, Paginado, ParametrosNegocio, RelatorioMovimentacoes, Rme,
   ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, ResultadoRecebimento, SaldoEstoque,
   SessaoInventario, SolicitacaoExportacao, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../types/models';
@@ -32,6 +32,8 @@ export interface Servicos {
     cadastrar(d: NovaNf, xml?: File): Promise<NotaFiscal>;
     /** Um DOF por NF no MVP, com o PDF anexo. Volume por espécie, como no documento. */
     cadastrarDof(nfId: string, d: NovoDof, pdf: File): Promise<NotaFiscal>;
+    /** Registra a declaração do recebimento no Sinaflor (feita no sistema do IBAMA). Só depois do recebimento da NF. */
+    declararDof(nfId: string): Promise<NotaFiscal>;
   };
   recebimentos: ServicoLista<Recebimento> & {
     /** Recusado sem DOF. Cria um lote por espécie e tamanho e os fardos, todos aguardando inspeção. */
@@ -42,8 +44,10 @@ export interface Servicos {
   fardos: ServicoLista<Fardo>;
   estoque: ServicoLista<SaldoEstoque>;
   movimentacoes: ServicoLista<Movimentacao> & {
-    /** Só transferência: entrada vem do recebimento e saída da RME. */
+    /** Transferência, perda ou ajuste. Perda e ajuste ficam pendentes e não alteram o saldo até a aprovação. */
     registrar(d: NovaMovimentacao): Promise<Movimentacao>;
+    /** Aprovação de perda ou ajuste (supervisor/gestor); rejeitar exige motivo. Nada é apagado. */
+    decidir(id: string, d: { aprovada: boolean; motivo?: string }): Promise<Movimentacao>;
   };
   /** RME: única forma de saída do estoque. Quem confere não pode ser quem separou (validado no servidor). */
   rme: ServicoLista<Rme> & {
@@ -68,6 +72,15 @@ export interface Servicos {
   patio: ServicoLista<LocalPatio> & { transferencias: ServicoLista<Transferencia> };
   relatorios: ServicoLista<Relatorio> & {
     solicitarExportacao(relatorioId: string, formato: string): Promise<SolicitacaoExportacao>;
+    /** Saldo físico em m³ por espécie (nome científico) e dimensão, para conferir com o DOF (RF32). */
+    saldoIbama(): Promise<LinhaSaldoIbama[]>;
+    /** DOFs de NFs recebidas pendentes de declaração no Sinaflor, com o prazo (RF30). */
+    dofsPendentes(): Promise<DofPendente[]>;
+    movimentacoesPeriodo(f: FiltroMovimentacoes): Promise<RelatorioMovimentacoes>;
+  };
+  parametros: {
+    obter(): Promise<ParametrosNegocio>;
+    atualizar(d: Omit<ParametrosNegocio, 'provisorio'>): Promise<ParametrosNegocio>;
   };
   auditoria: ServicoLista<RegistroAuditoria>;
   especies: ServicoLista<Especie> & { atualizar(id: string, d: AtualizacaoEspecie): Promise<Especie> };

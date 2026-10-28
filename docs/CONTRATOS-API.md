@@ -28,12 +28,14 @@
 | NF e DOF | Listar notas fiscais | GET | /notas-fiscais |
 | NF e DOF | Cadastrar NF (multipart: `dados` em JSON + `xml` opcional) | POST | /notas-fiscais |
 | NF e DOF | Cadastrar DOF da NF (multipart: `dados` em JSON + `pdf`) | POST | /notas-fiscais/{id}/dof |
+| NF e DOF | Marcar DOF como declarado no Sinaflor | POST | /notas-fiscais/{id}/dof/declaracao |
 | Recebimento | Listar | GET | /recebimentos |
 | Recebimento | Confirmar (multipart: `dados` em JSON + `fotos`, várias) → `{ recebimento, lotes, fardos }` | POST | /recebimentos |
 | Lotes | Listar (lotes só nascem do recebimento) | GET | /lotes |
 | Fardos | Listar (filtro `loteCodigo`) | GET | /fardos |
 | Estoque | Consultar saldos | GET | /estoque/saldos |
-| Movimentações | Listar / Registrar (só `tipo: 'transferencia'`) | GET / POST | /movimentacoes |
+| Movimentações | Listar / Registrar (`transferencia`, `perda` ou `ajuste`; perda e ajuste por `fardoCodigo`, com `motivo`) | GET / POST | /movimentacoes |
+| Movimentações | Aprovar ou rejeitar perda/ajuste (`{ aprovada, motivo? }`) | POST | /movimentacoes/{id}/decisao |
 | RME | Listar / Abrir | GET / POST | /rmes |
 | RME | Fardos elegíveis e sugestão FIFO | GET | /rmes/{id}/opcoes-separacao |
 | RME | Registrar separação (`{ itens: [{ itemId, fardoCodigo, quantidade }], justificativa? }`) | POST | /rmes/{id}/separacao |
@@ -49,6 +51,10 @@
 | Pátio | Transferências | GET | /patio/transferencias |
 | Relatórios | Listar | GET | /relatorios |
 | Relatórios | Solicitar exportação | POST | /relatorios/{id}/exportacoes |
+| Relatórios | Saldo em m³ por espécie e dimensão (IBAMA) | GET | /relatorios/ibama/saldo |
+| Relatórios | DOFs pendentes de declaração, com prazo e nível | GET | /relatorios/ibama/dofs-pendentes |
+| Relatórios | Movimentações do período (`de`, `ate`, `especie`, `tipo`, `usuario`) → `{ linhas, totais }` | GET | /relatorios/movimentacoes |
+| Configurações | Parâmetros de negócio / atualizar | GET / PATCH | /parametros |
 | Auditoria | Consultar histórico | GET | /auditoria |
 | Espécies | Listar | GET | /especies |
 | Espécies | Atualizar classe e uso (`{ classe: string \| null, uso: 'via' \| 'AMV' }`) | PATCH | /especies/{id} |
@@ -68,7 +74,7 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
    - O front envia `X-Requested-With: XMLHttpRequest` em **toda** chamada: o CORS precisa permitir esse cabeçalho (`Access-Control-Allow-Headers`).
    - Proteção contra CSRF no servidor: cookie com `SameSite=Lax` ou `Strict` e, de preferência, rejeitar requisições sem o cabeçalho acima ou usar token anti-CSRF.
    - O campo `mensagem` dos erros é exibido ao usuário como veio: deve ser texto seguro, sem detalhes internos (stack trace, SQL, caminhos).
-4. Permissões por operação (nomes das permissões usados em `pode('...')`: `nf:cadastrar`, `rme:abrir`, `rme:separar`, `rme:conferir`, `recebimento:registrar`, `movimentacoes:registrar`, `inventario:criar`, `cadastros:editar`, `visao:enviar`, `relatorios:exportar`, `admin`).
+4. Permissões por operação (nomes das permissões usados em `pode('...')`: `nf:cadastrar`, `dof:declarar`, `movimentacoes:aprovar`, `rme:abrir`, `rme:separar`, `rme:conferir`, `recebimento:registrar`, `movimentacoes:registrar`, `inventario:criar`, `cadastros:editar`, `visao:enviar`, `relatorios:exportar`, `admin`).
 5. Códigos de resposta e formato dos erros (incluindo erros por campo).
 6. Exemplos de sucesso e de erro.
 7. Regras de negócio decididas no servidor: tolerância volumétrica, estados de aprovação, fluxo de aprovação de ajustes de inventário, formatos/tamanhos de upload.
@@ -76,6 +82,11 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
 9. Para relatórios: como o arquivo gerado é baixado (URL assinada, endpoint próprio?).
 
 ## Pontos em aberto
+
+- Parâmetros (`GET/PATCH /parametros`): `{ limiteIdadeDias, alertaDofCriticoDias, alertaDofAtencaoDias, provisorio }`. O servidor usa os valores para calcular `idadeDias`/`acimaLimiteIdade` de lotes e saldos, o `nivel` dos DOFs pendentes, os alertas e os indicadores. Definir quem pode editar (o front exige `admin`).
+- DOF: `prazoDeclaracao` = validade + 1 dia (IN Ibama 21/2014, art. 51). A declaração só é aceita para NF recebida; o servidor grava `declaradoPor` e `declaradoEm`.
+- Perda e ajuste: ficam `pendente` até a decisão; aprovar altera o saldo do fardo (zerado → `baixado`, com sobra → `aberto`), do lote e do estoque; rejeitar exige motivo e deixa `status: 'rejeitado'`. O servidor deve recusar quem registrou e a retirada de dormentes reservados em RME.
+- Indicadores do dashboard: `fifoPct`, `idadeMediaDias` (ponderada pelo saldo), `lotesAcimaLimite`, `divergenciaInventarioPct`, `rastreabilidadePct` (lotes com NF, DOF e todas as saídas registradas), `rmesNoSistema`, `dofsPendentes`, `lotesAguardandoInspecao`, `saldoM3PorEspecie`.
 
 - RME: o servidor deve recusar a conferência feita pelo mesmo usuário que separou (regra das duas pessoas; o mock aceita para demonstração). Reserva: o que está separado em RME `em_separacao` ou `conferida` não aparece como disponível em outra RME. Sugestão: fardos abertos primeiro (do mais antigo), depois fechados por FIFO de lote; só lotes `inspecao: 'aprovado'` e `estoqueStatus: 'disponivel'`. Separação fora da sugestão exige `justificativa` (erro por campo). A entrega gera uma movimentação `saida` por fardo, com `referencia` = número da RME. Confirmação de recebimento pelo requisitante fica para depois.
 

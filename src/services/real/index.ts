@@ -58,12 +58,17 @@ export function criarServicosReais(): Servicos {
       ...servicoLista('notas.listar'),
       cadastrar: (d, xml) => enviarComArquivos('notas.cadastrar', d, { xml: xml ? [xml] : [] }),
       cadastrarDof: (nfId, d, pdf) => enviarComArquivos('notas.cadastrarDof', d, { pdf: [pdf] }, nfId),
+      declararDof: (nfId) => post('notas.declararDof', undefined, nfId),
     },
     recebimentos: { ...servicoLista('recebimentos.listar'), confirmar: (d, fotos) => enviarComArquivos('recebimentos.confirmar', d, { fotos }) },
     lotes: servicoLista('lotes.listar'),
     fardos: servicoLista('fardos.listar'),
     estoque: servicoLista('estoque.listar'),
-    movimentacoes: { ...servicoLista('movimentacoes.listar'), registrar: (d) => post('movimentacoes.registrar', d) },
+    movimentacoes: {
+      ...servicoLista('movimentacoes.listar'),
+      registrar: (d) => post('movimentacoes.registrar', d),
+      decidir: (id, d) => post('movimentacoes.decidir', d, id),
+    },
     rme: {
       ...servicoLista('rme.listar'),
       abrir: (d) => post('rme.abrir', d),
@@ -84,6 +89,13 @@ export function criarServicosReais(): Servicos {
     relatorios: {
       ...servicoLista('relatorios.listar'),
       solicitarExportacao: (id, formato) => post('relatorios.exportar', { formato }, id),
+      saldoIbama: () => http(caminho('relatorios.saldoIbama')),
+      dofsPendentes: () => http(caminho('relatorios.dofsPendentes')),
+      movimentacoesPeriodo: (f) => http(caminho('relatorios.movimentacoes'), { query: { ...f } }),
+    },
+    parametros: {
+      obter: () => http(caminho('parametros.obter')),
+      atualizar: (d) => http(caminho('parametros.atualizar'), { metodo: 'PATCH', corpo: d }),
     },
     auditoria: servicoLista('auditoria.listar'),
     especies: { ...servicoLista('especies.listar'), atualizar: (id, d) => patch('especies.atualizar', id, d) },

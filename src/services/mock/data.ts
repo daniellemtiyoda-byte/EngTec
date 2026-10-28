@@ -1,12 +1,13 @@
 import type {
   DivergenciaInventario, Documento, Especie, Fardo, Fornecedor, ItemNf, LocalPatio, Lote, Movimentacao, NotaFiscal, ProcessamentoImagem,
-  Recebimento, RegistroAuditoria, Relatorio, Rme, SaldoEstoque, SessaoInventario, Tamanho, Transferencia, Usuario, VolumetriaLote,
+  ParametrosNegocio, Recebimento, RegistroAuditoria, Relatorio, Rme, SaldoEstoque, SessaoInventario, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../../types/models';
 import { sugerirFardos } from '../../dominio/parametros';
 import { chaveComDigito } from '../../utils/nfeXml';
 import { receber } from './recebimento';
 import { abrirRme, cancelarRme, conferirRme, entregarRme, opcoesSeparacao, separarRme } from './rme';
-import { volumeDormenteM3 } from './util';
+import { decidirMovimentacao, registrarPerdaAjuste } from './ajustes';
+import { hojeSP, somarDias, volumeDormenteM3 } from './util';
 
 // DADOS FICTÍCIOS para desenvolvimento. Nenhum valor aqui representa estoque, fornecedores ou documentos reais.
 // Gerados dentro de uma função para o build com API real poder descartar este módulo inteiro.
@@ -14,7 +15,7 @@ export function criarDados() {
 
   const usuarioDemo: Usuario = {
     id: 'u1', nome: 'Usuário de Demonstração', email: 'demo@exemplo.invalid', perfil: 'Administrador (simulado)',
-    permissoes: ['recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'nf:cadastrar', 'rme:abrir', 'rme:separar', 'rme:conferir', 'visao:enviar', 'relatorios:exportar', 'admin'],
+    permissoes: ['recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'nf:cadastrar', 'dof:declarar', 'movimentacoes:aprovar', 'rme:abrir', 'rme:separar', 'rme:conferir', 'visao:enviar', 'relatorios:exportar', 'admin'],
     ativo: true, ultimoAcesso: '2026-10-09T10:15:00-03:00',
   };
 
@@ -42,6 +43,9 @@ export function criarDados() {
   const tamanhos: Tamanho[] = ([['T1', 24, 17, 280], ['T2', 22, 16, 200], ['T3', 24, 17, 400]] as const).map(([codigo, l, a, c], i) => ({
     id: `t${i + 1}`, codigo, larguraCm: l, alturaCm: a, comprimentoCm: c, volumeM3: volumeDormenteM3(l, a, c), medidas: 'provisorio',
   }));
+
+  // Parâmetros de negócio como ficam guardados no servidor. Valores PROVISÓRIOS, editáveis em Configurações.
+  const parametros: ParametrosNegocio = { limiteIdadeDias: 120, alertaDofCriticoDias: 1, alertaDofAtencaoDias: 3, provisorio: true };
 
   const locais = ['Quadra 1 / Baia 01', 'Quadra 1 / Baia 02', 'Quadra 2 / Baia 01', 'Quadra 2 / Baia 02', 'Quadra 3 / Baia 01'];
   const dia = (n: number) => new Date(Date.UTC(2026, 5, 1 + n, 15)).toISOString();
@@ -81,9 +85,13 @@ export function criarDados() {
       for (const it of itens) porEspecie.set(it.especieId, (porEspecie.get(it.especieId) ?? 0) + it.quantidade * (tamanhos.find((t) => t.id === it.tamanhoId)?.volumeM3 ?? 0));
       const volumes = [...porEspecie].map(([especieId, v]) => ({ especieId, especie: especies.find((e) => e.id === especieId)!.nomeCientifico, volumeM3: v * (1 + desvio) }));
       const dofNumero = String(2600100 + i);
+      // As recebidas 9 a 12 seguem pendentes no Sinaflor, com prazos variados em relação a hoje (vencido, 1, 3 e 10 dias).
+      const validade = i >= 8 && i < 12 ? somarDias(hojeSP(), [-3, 0, 2, 9][i - 8]) : dia(i * 9 + 10).slice(0, 10);
       nf.dof = {
-        numero: dofNumero, codigoControle: `EX${String(i + 1).padStart(2, '0')}.0000.0000.0000`, validade: dia(i * 9 + 10).slice(0, 10), volumes,
-        volumeTotalM3: volumes.reduce((a, v) => a + v.volumeM3, 0), arquivoPdf: `dof_${dofNumero}.pdf`, declaracao: i < 8 ? 'declarado' : 'pendente',
+        numero: dofNumero, codigoControle: `EX${String(i + 1).padStart(2, '0')}.0000.0000.0000`, validade, volumes,
+        volumeTotalM3: volumes.reduce((a, v) => a + v.volumeM3, 0), arquivoPdf: `dof_${dofNumero}.pdf`,
+        declaracao: i < 8 ? 'declarado' : 'pendente', prazoDeclaracao: somarDias(validade, 1),
+        ...(i < 8 ? { declaradoPor: 'Almoxarife 1', declaradoEm: dia(i * 9 + 3) } : {}),
       };
       nf.situacao = 'aguardando_recebimento';
       if (xml) nf.dofSugerido = dofNumero;
@@ -124,7 +132,7 @@ export function criarDados() {
 
   for (const [i, l] of lotes.filter((x) => x.inspecao === 'aprovado').slice(0, 8).entries()) {
     movimentacoes.unshift({
-      id: novoId('m'), tipo: 'transferencia', loteCodigo: l.codigo, quantidade: 14 * (1 + (i % 3)), origem: l.local, destino: locais[(i + 1) % locais.length],
+      id: novoId('m'), tipo: 'transferencia', loteCodigo: l.codigo, especie: l.especieDocumental, quantidade: 14 * (1 + (i % 3)), origem: l.local, destino: locais[(i + 1) % locais.length],
       dataHora: dia(112 + i), usuario: 'Usuário de Demonstração', status: i % 4 === 0 ? 'pendente' : 'aprovado',
     });
   }
@@ -159,6 +167,18 @@ export function criarDados() {
   // Abertas: uma urgente com dois itens e uma com data limite vencida.
   nova(140, 'Manutenção da Via Permanente – Linha 13', [[2, 30], [3, 14]], 'urgente', 160);
   nova(130, 'Manutenção da Via Permanente – Linha 10', [[3, 6]], 'normal', 140);
+
+  // Perdas e ajustes fictícios em fardos fechados fora de RME: um aprovado, dois pendentes e um rejeitado.
+  const reservados = new Set(rmes.flatMap((r) => r.separacao?.itens.map((s) => s.fardoCodigo) ?? []));
+  const livres = fardos.filter((f) => f.estado === 'fechado' && !reservados.has(f.codigo) && lotes.find((l) => l.codigo === f.loteCodigo)?.estoqueStatus === 'disponivel');
+  const baseAjustes = { ...baseRme };
+  const operador = 'Operador de Pátio 1';
+  const p1 = registrarPerdaAjuste(baseAjustes, { tipo: 'perda', fardoCodigo: livres[0].codigo, quantidade: 2, motivoPerda: 'avaria', motivo: 'Dois dormentes quebrados na movimentação com a empilhadeira.' }, ctx(131, operador));
+  decidirMovimentacao(baseAjustes, p1, { aprovada: true }, ctx(132, pessoa.supervisor));
+  registrarPerdaAjuste(baseAjustes, { tipo: 'perda', fardoCodigo: livres[1].codigo, quantidade: 3, motivoPerda: 'intemperie', motivo: 'Dormentes rachados após temporal; aguardam vistoria.' }, ctx(141, operador));
+  registrarPerdaAjuste(baseAjustes, { tipo: 'ajuste', fardoCodigo: livres[2].codigo, quantidade: 1, motivo: 'Contagem física encontrou um dormente a mais no fardo.' }, ctx(142, operador));
+  const a2 = registrarPerdaAjuste(baseAjustes, { tipo: 'ajuste', fardoCodigo: livres[3].codigo, quantidade: -2, motivo: 'Contagem física com dois dormentes a menos.' }, ctx(135, operador));
+  decidirMovimentacao(baseAjustes, a2, { aprovada: false, motivo: 'Recontagem confirmou o saldo do sistema.' }, ctx(136, pessoa.supervisor));
 
   const documentos: Documento[] = Array.from({ length: 20 }, (_, i) => {
     const l = lotes[i % lotes.length];
@@ -216,7 +236,7 @@ export function criarDados() {
     { id: 'u4', nome: 'Usuário Inativo', email: 'inativo@exemplo.invalid', perfil: 'Consulta', permissoes: [], ativo: false },
   ];
 
-  return { usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, rmes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
+  return { parametros, usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, rmes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
 }
 
 export type DadosSimulados = ReturnType<typeof criarDados>;

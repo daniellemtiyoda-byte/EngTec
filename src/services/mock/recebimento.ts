@@ -100,7 +100,7 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
       quantidade: c.quantidade, saldo: c.quantidade, fardos: c.fardos.length,
       comprimentoM: c.tamanho.comprimentoCm / 100, larguraM: c.tamanho.larguraCm / 100, alturaM: c.tamanho.alturaCm / 100,
       metrosLineares: (c.quantidade * c.tamanho.comprimentoCm) / 100, volumeDocumentalM3, volumeCalculadoM3: c.volumeM3,
-      recebidoEm: ctx.quando, status: 'pendente', estoqueStatus: acimaTolerancia ? 'divergente' : 'em_analise', local: 'A definir',
+      recebidoEm: ctx.quando, idadeDias: 0, acimaLimiteIdade: false, status: 'pendente', estoqueStatus: acimaTolerancia ? 'divergente' : 'em_analise', local: 'A definir',
     };
     B.lotes.unshift(lote);
     lotes.push(lote);
@@ -111,7 +111,7 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
     B.saldos.unshift({
       id: `s${lote.id}`, loteCodigo: codigo, especieDocumental: lote.especieDocumental, classe: lote.classe,
       disponivel: 0, bloqueado: 0, emAnalise: acimaTolerancia ? 0 : c.quantidade, divergente: acimaTolerancia ? c.quantidade : 0,
-      metrosLineares: lote.metrosLineares, volumeM3: c.volumeM3, local: lote.local,
+      metrosLineares: lote.metrosLineares, volumeM3: c.volumeM3, local: lote.local, idadeDias: 0, acimaLimiteIdade: false,
     });
     const dif = volumeDocumentalM3 - c.volumeM3;
     B.volumetria.unshift({
@@ -119,7 +119,7 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
       diferencaPct: c.volumeM3 > 0 ? (dif / c.volumeM3) * 100 : 0, situacao: acimaTolerancia ? 'divergente' : 'conforme',
     });
     B.movimentacoes.unshift({
-      id: ctx.novoId('m'), tipo: 'entrada', loteCodigo: codigo, referencia: `NF ${nf.numero}`, quantidade: c.quantidade, origem: nf.fornecedor, destino: 'A definir',
+      id: ctx.novoId('m'), tipo: 'entrada', loteCodigo: codigo, especie: c.especie.nomeCientifico, referencia: `NF ${nf.numero}`, quantidade: c.quantidade, origem: nf.fornecedor, destino: 'A definir',
       dataHora: ctx.quando, usuario: ctx.usuario, status: 'aprovado',
     });
   }

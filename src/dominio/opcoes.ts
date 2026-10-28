@@ -1,5 +1,8 @@
 import type { Documento, StatusRegistro } from '../types/models';
-import { RESULTADO_INSPECAO, SITUACAO_MEDIDAS, SITUACAO_NF, SITUACAO_VOLUMETRIA, STATUS_RME, TIPO_MOVIMENTACAO, URGENCIA_RME, USO_ESPECIE, type Rotulos } from './rotulos';
+import {
+  MOTIVO_PERDA, RESULTADO_INSPECAO, SITUACAO_MEDIDAS, SITUACAO_NF, SITUACAO_VOLUMETRIA, STATUS_REGISTRO, STATUS_RME, TIPO_MOVIMENTACAO, URGENCIA_RME, USO_ESPECIE,
+  type Rotulos,
+} from './rotulos';
 
 export interface Opcao<V extends string = string> { valor: V; rotulo: string }
 
@@ -26,6 +29,9 @@ export const SITUACAO_NF_OPCOES = opcoesDe(SITUACAO_NF);
 export const STATUS_RME_OPCOES = opcoesDe(STATUS_RME);
 export const URGENCIA_OPCOES = opcoesDe(URGENCIA_RME);
 export const TIPO_MOVIMENTACAO_OPCOES = opcoesDe(TIPO_MOVIMENTACAO);
+export const STATUS_MOVIMENTACAO_OPCOES = opcoesDe(STATUS_REGISTRO, ['pendente', 'aprovado', 'rejeitado']);
+export const MOTIVO_PERDA_OPCOES = opcoesDe(MOTIVO_PERDA);
+export const IDADE_LOTE_OPCOES: Opcao[] = [{ valor: 'true', rotulo: 'Acima do limite de dias' }, { valor: 'false', rotulo: 'Dentro do limite' }];
 
 export const TIPO_DOCUMENTO_OPCOES: Opcao<Documento['tipo']>[] = (['NF-e', 'DOF', 'Romaneio', 'Laudo'] as const).map((t) => ({ valor: t, rotulo: t }));
 

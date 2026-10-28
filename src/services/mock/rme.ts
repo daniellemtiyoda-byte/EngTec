@@ -3,6 +3,7 @@ import type {
 } from '../../types/models';
 import { STATUS_RME } from '../../dominio/rotulos';
 import { ApiError } from '../http';
+import { alterarSaldoFardo } from './estoque';
 
 /** O que as operações de RME leem e alteram nos dados simulados. */
 export interface BaseRme {
@@ -30,8 +31,8 @@ function exigirStatus(rme: Rme, ...status: StatusRme[]) {
 
 const registrar = (rme: Rme, ctx: Contexto, acao: string, detalhe?: string) => rme.historico.push({ quando: ctx.quando, usuario: ctx.usuario, acao, detalhe });
 
-/** Quantidade de cada fardo já separada em outras RMEs ainda não entregues. */
-function reservas(B: BaseRme, excetoRmeId?: string) {
+/** Quantidade de cada fardo já separada em RMEs ainda não entregues. */
+export function reservas(B: BaseRme, excetoRmeId?: string) {
   const r = new Map<string, number>();
   for (const x of B.rmes) {
     if (x.id === excetoRmeId || !RESERVA.includes(x.status)) continue;
@@ -160,19 +161,9 @@ export function entregarRme(B: BaseRme, rme: Rme, ctx: Contexto): Rme {
     if (!f || f.saldo < s.quantidade) throw new ApiError(409, `Saldo insuficiente no fardo ${s.fardoCodigo}. Devolva a RME para nova separação.`);
   }
   for (const s of sep.itens) {
-    const f = B.fardos.find((x) => x.codigo === s.fardoCodigo)!;
-    const lote = B.lotes.find((l) => l.codigo === f.loteCodigo)!;
-    f.saldo -= s.quantidade;
-    f.estado = f.saldo > 0 ? 'aberto' : 'baixado';
-    lote.saldo -= s.quantidade;
-    const saldo = B.saldos.find((x) => x.loteCodigo === lote.codigo);
-    if (saldo) {
-      saldo.disponivel -= s.quantidade;
-      saldo.volumeM3 = (lote.volumeCalculadoM3 / lote.quantidade) * lote.saldo;
-      saldo.metrosLineares = lote.comprimentoM * lote.saldo;
-    }
+    const { fardo: f, lote } = alterarSaldoFardo(B, s.fardoCodigo, -s.quantidade);
     B.movimentacoes.unshift({
-      id: ctx.novoId('m'), tipo: 'saida', loteCodigo: lote.codigo, fardoCodigo: f.codigo, referencia: rme.numero, quantidade: s.quantidade,
+      id: ctx.novoId('m'), tipo: 'saida', loteCodigo: lote.codigo, fardoCodigo: f.codigo, especie: lote.especieDocumental, referencia: rme.numero, quantidade: s.quantidade,
       origem: f.local, destino: rme.destinatario, dataHora: ctx.quando, usuario: ctx.usuario, status: 'aprovado',
     });
     const item = rme.itens.find((i) => i.id === s.itemId)!;

@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react';
 import { BadgeDe } from '../components/Badge';
+import { DeclararDofModal, type AlvoDeclaracao } from '../components/DeclararDofModal';
 import { Aviso } from '../components/Estados';
 import { FormModal, type Campo } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
@@ -15,7 +16,7 @@ import { DECLARACAO_DOF, ORIGEM_NF, SITUACAO_NF } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import type { NotaFiscal } from '../types/models';
-import { data, m3, paraNumero, un } from '../utils/format';
+import { data, dataHora, m3, paraNumero, un } from '../utils/format';
 
 export default function NotasFiscais() {
   const { pode } = useAuth();
@@ -26,6 +27,7 @@ export default function NotasFiscais() {
   const [dofDe, setDofDe] = useState<NotaFiscal | null>(null);
   const [ver, setVer] = useState<NotaFiscal | null>(null);
   const [receber, setReceber] = useState<NotaFiscal | null>(null);
+  const [declarar, setDeclarar] = useState<AlvoDeclaracao | null>(null);
   const tam = useAsync(() => servicos.tamanhos.listar({ pageSize: 50 }), []);
 
   const recarregar = () => { setRec((x) => x + 1); alertas.recarregar(); };
@@ -37,6 +39,7 @@ export default function NotasFiscais() {
     { chave: 'quantidadeTotal', titulo: 'Quantidade', alinhar: 'right', ordenavel: true, render: (n) => `${un(n.quantidadeTotal)} em ${n.itens.length} item(ns)` },
     { chave: 'origem', titulo: 'Origem', render: (n) => <BadgeDe mapa={ORIGEM_NF} valor={n.origem} /> },
     { chave: 'dof', titulo: 'DOF', render: (n) => (n.dof ? n.dof.numero : <span className="mudo">Sem DOF</span>) },
+    { chave: 'sinaflor', titulo: 'Sinaflor', render: (n) => (n.dof && n.situacao === 'recebida' ? <BadgeDe mapa={DECLARACAO_DOF} valor={n.dof.declaracao} /> : <span className="mudo">—</span>) },
     { chave: 'situacao', titulo: 'Situação', render: (n) => <BadgeDe mapa={SITUACAO_NF} valor={n.situacao} /> },
   ];
 
@@ -70,6 +73,10 @@ export default function NotasFiscais() {
           { rotulo: 'Ver', aoClicar: setVer },
           { rotulo: 'Cadastrar DOF', aoClicar: setDofDe, visivel: (n) => !n.dof && pode('nf:cadastrar') },
           { rotulo: 'Receber', aoClicar: setReceber, visivel: (n) => n.situacao === 'aguardando_recebimento' && pode('recebimento:registrar') },
+          {
+            rotulo: 'Marcar como declarado', visivel: (n) => n.situacao === 'recebida' && n.dof?.declaracao === 'pendente' && pode('dof:declarar'),
+            aoClicar: (n) => setDeclarar({ nfId: n.id, nfNumero: n.numero, dofNumero: n.dof!.numero, prazoDeclaracao: n.dof!.prazoDeclaracao }),
+          },
         ]}
       />
       <NfModal
@@ -89,6 +96,7 @@ export default function NotasFiscais() {
           recarregar();
         }}
       />
+      <DeclararDofModal alvo={declarar} aoFechar={() => setDeclarar(null)} aoConcluir={recarregar} />
       <RecebimentoModal nf={receber} aoFechar={() => setReceber(null)} aoConcluir={(r) => { notificar('sucesso', mensagemRecebimento(r)); recarregar(); }} />
       <Modal titulo={ver ? `NF ${ver.numero} / ${ver.serie}` : 'NF'} aberto={!!ver} aoFechar={() => setVer(null)} largo rodape={<button className="btn btn-sec" onClick={() => setVer(null)}>Fechar</button>}>
         {ver && (
@@ -110,7 +118,8 @@ export default function NotasFiscais() {
                 <h3>DOF {ver.dof.numero}</h3>
                 <dl className="detalhes">
                   <dt>Código de controle</dt><dd>{ver.dof.codigoControle}</dd><dt>Validade</dt><dd>{data(ver.dof.validade)}</dd>
-                  <dt>Declaração</dt><dd><BadgeDe mapa={DECLARACAO_DOF} valor={ver.dof.declaracao} /></dd><dt>PDF</dt><dd>{ver.dof.arquivoPdf}</dd>
+                  <dt>Prazo de declaração</dt><dd>{data(ver.dof.prazoDeclaracao)} (dia seguinte ao fim da validade)</dd>
+                  <dt>Sinaflor</dt><dd><BadgeDe mapa={DECLARACAO_DOF} valor={ver.dof.declaracao} />{ver.dof.declaradoPor && ` por ${ver.dof.declaradoPor} em ${dataHora(ver.dof.declaradoEm)}`}</dd><dt>PDF</dt><dd>{ver.dof.arquivoPdf}</dd>
                   {ver.dof.volumes.map((v) => <Fragment key={v.especieId}><dt>Volume: <em>{v.especie}</em></dt><dd>{m3(v.volumeM3)}</dd></Fragment>)}
                 </dl>
               </>

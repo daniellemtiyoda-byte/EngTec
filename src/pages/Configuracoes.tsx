@@ -1,14 +1,24 @@
 import { useState } from 'react';
 import { Badge } from '../components/Badge';
-import { Aviso, PageHeader } from '../components/Estados';
+import { Aviso, Carregando, Erro, PageHeader } from '../components/Estados';
+import { FormModal } from '../components/FormModal';
 import { useToast } from '../components/Toast';
-import { env } from '../config/env';
+import { env, SUFIXO_SIMULADO } from '../config/env';
+import { useAlertas } from '../contexts/AlertasContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
+import { dias, paraNumero } from '../utils/format';
 import { LISTA_ENDPOINTS } from '../services/endpoints';
 
 export default function Configuracoes() {
   const notificar = useToast();
+  const { pode } = useAuth();
+  const alertas = useAlertas();
   const [testando, setTestando] = useState(false);
+  const [editar, setEditar] = useState(false);
+  const par = useAsync(() => servicos.parametros.obter(), []);
+  const p = par.dados;
 
   async function testar() {
     setTestando(true);
@@ -31,6 +41,41 @@ export default function Configuracoes() {
         </dl>
         {env.USE_MOCK && <Aviso tom="alerta">Para testar estados de erro e vazio no modo simulado, acrescente <code>?simular=erro</code> ou <code>?simular=vazio</code> à URL (antes do <code>#</code>).</Aviso>}
       </section>
+      <section className="painel">
+        <PageHeader
+          titulo="Parâmetros de negócio" nivel={2} descricao="Guardados no servidor e usados nos alertas, no destaque de idade dos lotes e no dashboard."
+          acoes={pode('admin') && p ? <button className="btn btn-sec" onClick={() => setEditar(true)}>Editar parâmetros</button> : undefined}
+        />
+        {par.carregando && !p ? <Carregando linhas={3} /> : par.erro ? <Erro erro={par.erro} aoTentar={par.recarregar} /> : p && (
+          <>
+            {p.provisorio && <Aviso tom="alerta">Valores <strong>provisórios</strong>: o limite de dias em estoque ainda será definido com a CPTM.</Aviso>}
+            <dl className="detalhes">
+              <dt>Limite de dias em estoque</dt><dd>{dias(p.limiteIdadeDias)}: lotes mais antigos aparecem em destaque e geram alerta</dd>
+              <dt>Alerta crítico de DOF</dt><dd>prazo de declaração vencido ou vencendo em até {dias(p.alertaDofCriticoDias)}</dd>
+              <dt>Alerta de atenção de DOF</dt><dd>prazo vencendo em até {dias(p.alertaDofAtencaoDias)}</dd>
+              <dt>Prazo de declaração</dt><dd>dia seguinte ao fim da validade do DOF (IN Ibama 21/2014, art. 51); não é editável</dd>
+            </dl>
+          </>
+        )}
+      </section>
+      <FormModal
+        titulo="Editar parâmetros de negócio" aberto={editar} aoFechar={() => setEditar(false)}
+        iniciais={p ? { limiteIdadeDias: String(p.limiteIdadeDias), alertaDofCriticoDias: String(p.alertaDofCriticoDias), alertaDofAtencaoDias: String(p.alertaDofAtencaoDias) } : undefined}
+        campos={[
+          { nome: 'limiteIdadeDias', rotulo: 'Limite de dias em estoque', tipo: 'number', inteiro: true, obrigatorio: true, min: 1, max: 3650 },
+          { nome: 'alertaDofCriticoDias', rotulo: 'Alerta crítico de DOF: dias antes do prazo', tipo: 'number', inteiro: true, obrigatorio: true, min: 0, max: 60, ajuda: 'Prazo vencido sempre é crítico.' },
+          { nome: 'alertaDofAtencaoDias', rotulo: 'Alerta de atenção de DOF: dias antes do prazo', tipo: 'number', inteiro: true, obrigatorio: true, min: 0, max: 60 },
+        ]}
+        validar={(v): Record<string, string> => (paraNumero(v.alertaDofAtencaoDias, true) < paraNumero(v.alertaDofCriticoDias, true) ? { alertaDofAtencaoDias: 'Precisa ser maior ou igual ao do alerta crítico.' } : {})}
+        aoEnviar={async (v) => {
+          await servicos.parametros.atualizar({
+            limiteIdadeDias: paraNumero(v.limiteIdadeDias, true), alertaDofCriticoDias: paraNumero(v.alertaDofCriticoDias, true), alertaDofAtencaoDias: paraNumero(v.alertaDofAtencaoDias, true),
+          });
+          notificar('sucesso', `Parâmetros atualizados${SUFIXO_SIMULADO}.`);
+          par.recarregar();
+          alertas.recarregar();
+        }}
+      />
       <section className="painel">
         <PageHeader titulo="Contratos de API" nivel={2} descricao="Todos os endpoints abaixo são provisórios até a documentação do back-end ser recebida e validada." />
         <div className="tabela-wrap">

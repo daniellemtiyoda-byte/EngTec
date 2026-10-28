@@ -4,6 +4,14 @@ import { ApiError } from '../http';
 /** Volume de um dormente em m³ a partir das dimensões em cm. No modo real quem calcula é o servidor. */
 export const volumeDormenteM3 = (larguraCm: number, alturaCm: number, comprimentoCm: number) => (larguraCm * alturaCm * comprimentoCm) / 1_000_000;
 
+const DIA_MS = 86_400_000;
+/** Data de hoje (AAAA-MM-DD) no fuso de São Paulo. */
+export const hojeSP = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+export const dataSP = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+/** Dias de `de` até `ate`, ambos AAAA-MM-DD (negativo se `ate` for antes). */
+export const diasEntre = (de: string, ate: string) => Math.round((Date.parse(ate) - Date.parse(de)) / DIA_MS);
+export const somarDias = (aaaammdd: string, n: number) => new Date(Date.parse(aaaammdd) + n * DIA_MS).toISOString().slice(0, 10);
+
 export const atraso = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**

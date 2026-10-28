@@ -1,5 +1,5 @@
 export type Origem = 'simulado' | 'api';
-export type StatusRegistro = 'aprovado' | 'pendente' | 'bloqueado' | 'simulado';
+export type StatusRegistro = 'aprovado' | 'pendente' | 'bloqueado' | 'rejeitado' | 'simulado';
 export type StatusEstoque = 'disponivel' | 'bloqueado' | 'em_analise' | 'divergente';
 /** Classe vem do cadastro da espécie (ex. "1ª"); sem valor = "a definir". */
 export type Classe = string;
@@ -123,6 +123,26 @@ export interface Dof {
   volumeTotalM3: number;
   arquivoPdf: string;
   declaracao: 'pendente' | 'declarado';
+  /** Dia seguinte ao fim da validade (IN Ibama 21/2014, art. 51). AAAA-MM-DD */
+  prazoDeclaracao: string;
+  declaradoPor?: string;
+  declaradoEm?: string;
+}
+
+/** DOF de NF já recebida, ainda não declarado no Sinaflor. Dias e nível calculados pelo serviço com os parâmetros vigentes. */
+export interface DofPendente {
+  id: string;
+  nfId: string;
+  nfNumero: string;
+  fornecedor: string;
+  dofNumero: string;
+  codigoControle: string;
+  validade: string;
+  prazoDeclaracao: string;
+  recebidoEm: string;
+  /** Negativo = prazo vencido. */
+  diasParaPrazo: number;
+  nivel: 'critico' | 'atencao' | 'no_prazo';
 }
 
 export interface NotaFiscal {
@@ -200,6 +220,9 @@ export interface Lote {
   volumeDocumentalM3: number;
   volumeCalculadoM3: number;
   recebidoEm: string;
+  /** Dias desde o recebimento e se passou do limite (parâmetro), calculados pelo serviço na consulta. */
+  idadeDias: number;
+  acimaLimiteIdade: boolean;
   status: StatusRegistro;
   estoqueStatus: StatusEstoque;
   local: string;
@@ -267,33 +290,81 @@ export interface SaldoEstoque {
   metrosLineares: number;
   volumeM3: number;
   local: string;
+  idadeDias: number;
+  acimaLimiteIdade: boolean;
 }
 
-export type TipoMovimentacao = 'entrada' | 'saida' | 'transferencia';
+export type TipoMovimentacao = 'entrada' | 'saida' | 'transferencia' | 'perda' | 'ajuste';
+export type MotivoPerda = 'avaria' | 'incendio' | 'intemperie' | 'furto' | 'outro';
 
 export interface Movimentacao {
   id: string;
   tipo: TipoMovimentacao;
   loteCodigo: string;
   fardoCodigo?: string;
+  especie: string;
   /** Documento de origem: NF (entrada) ou RME (saída). */
   referencia?: string;
+  /** Ajuste pode ser negativo; nos demais tipos é sempre positiva. */
   quantidade: number;
   origem: string;
   destino: string;
   dataHora: string;
   usuario: string;
   status: StatusRegistro;
+  motivoPerda?: MotivoPerda;
+  motivo?: string;
+  decididoPor?: string;
+  decididoEm?: string;
+  motivoRejeicao?: string;
 }
 
-/** Só transferência: entrada vem do recebimento e saída da RME. */
-export interface NovaMovimentacao {
-  tipo: 'transferencia';
-  loteCodigo: string;
+/** Entrada vem do recebimento e saída da RME. Perda e ajuste são por fardo e ficam pendentes até a aprovação. */
+export type NovaMovimentacao =
+  | { tipo: 'transferencia'; loteCodigo: string; quantidade: number; origem: string; destino: string; motivo?: string }
+  | { tipo: 'perda'; fardoCodigo: string; quantidade: number; motivoPerda: MotivoPerda; motivo: string }
+  | { tipo: 'ajuste'; fardoCodigo: string; quantidade: number; motivo: string };
+
+/** Parâmetros de negócio guardados no servidor e editáveis em Configurações. */
+export interface ParametrosNegocio {
+  limiteIdadeDias: number;
+  /** Alerta crítico quando o prazo de declaração do DOF venceu ou vence em até N dias. */
+  alertaDofCriticoDias: number;
+  /** Alerta de atenção quando vence em até N dias. */
+  alertaDofAtencaoDias: number;
+  /** Valores ainda não confirmados pela CPTM. */
+  provisorio: boolean;
+}
+
+export interface LinhaSaldoIbama {
+  id: string;
+  especie: string;
+  tamanho: string;
+  larguraCm: number;
+  alturaCm: number;
+  comprimentoCm: number;
+  lotes: number;
   quantidade: number;
-  origem?: string;
-  destino?: string;
-  motivo?: string;
+  volumeM3: number;
+  disponivelM3: number;
+  emAnaliseM3: number;
+  bloqueadoM3: number;
+  divergenteM3: number;
+}
+
+export interface FiltroMovimentacoes {
+  /** AAAA-MM-DD, inclusive */
+  de: string;
+  ate: string;
+  especie?: string;
+  tipo?: TipoMovimentacao;
+  usuario?: string;
+}
+
+export interface RelatorioMovimentacoes {
+  linhas: Movimentacao[];
+  /** Totais só das movimentações aprovadas (as que alteraram o saldo). */
+  totais: { tipo: TipoMovimentacao; registros: number; quantidade: number }[];
 }
 
 export type StatusRme = 'aberta' | 'em_separacao' | 'conferida' | 'entregue' | 'cancelada';
@@ -488,6 +559,18 @@ export interface Indicadores {
   inventariosAbertos: number;
   recebimentosPorMes: Serie[];
   estoquePorClasse: Serie[];
+  /** Indicadores do PRD. `fifoPct` sem valor quando ainda não há RME entregue. */
+  fifoPct?: number;
+  rmesEntregues: number;
+  rmesNoSistema: number;
+  idadeMediaDias: number;
+  lotesAcimaLimite: number;
+  limiteIdadeDias: number;
+  divergenciaInventarioPct: number;
+  rastreabilidadePct: number;
+  dofsPendentes: number;
+  lotesAguardandoInspecao: number;
+  saldoM3PorEspecie: Serie[];
   origem: Origem;
 }
 

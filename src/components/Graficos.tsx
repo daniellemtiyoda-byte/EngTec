@@ -56,3 +56,22 @@ export function StatCard({ rotulo, valor, detalhe, tom }: { rotulo: string; valo
     </div>
   );
 }
+
+/** Barras horizontais em HTML: rótulos longos (nomes científicos) e muitas categorias. A cor não é a única informação. */
+export function BarrasHorizontais({ dados, titulo, formatar }: { dados: Serie[]; titulo: string; formatar: (v: number) => string }) {
+  const max = Math.max(...dados.map((d) => d.valor), 0) || 1;
+  return (
+    <figure className="grafico">
+      <figcaption>{titulo}</figcaption>
+      <ul className="barras-h">
+        {dados.map((d) => (
+          <li key={d.rotulo}>
+            <span className="barras-h-rotulo"><em>{d.rotulo}</em></span>
+            <span className="barras-h-trilho"><span style={{ width: `${(d.valor / max) * 100}%` }} /></span>
+            <strong className="barras-h-valor">{formatar(d.valor)}</strong>
+          </li>
+        ))}
+      </ul>
+    </figure>
+  );
+}

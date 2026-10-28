@@ -9,6 +9,8 @@ export const PERMISSOES = [
   'inventario:criar',
   'cadastros:editar', // classe e uso das espécies; medidas dos tamanhos
   'nf:cadastrar', // NF (manual ou XML) e DOF
+  'dof:declarar', // marcar o DOF como declarado no Sinaflor
+  'movimentacoes:aprovar', // supervisor/gestor: aprovar ou rejeitar perda e ajuste
   'rme:abrir', // requisitante: abrir e cancelar RME
   'rme:separar', // almoxarife: separar e confirmar a entrega
   'rme:conferir', // supervisor: conferência antes da entrega

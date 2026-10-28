@@ -3,11 +3,11 @@ import { Aviso } from '../components/Estados';
 import { BadgeDe, StatusEstoqueBadge } from '../components/Badge';
 import { FardosModal } from '../components/FardosModal';
 import { ListPage, type Coluna } from '../components/ListPage';
-import { CATEGORIA_OPCOES, CLASSE_OPCOES, RESULTADO_INSPECAO_OPCOES } from '../dominio/opcoes';
+import { CATEGORIA_OPCOES, CLASSE_OPCOES, IDADE_LOTE_OPCOES, RESULTADO_INSPECAO_OPCOES } from '../dominio/opcoes';
 import { RESULTADO_INSPECAO } from '../dominio/rotulos';
 import { servicos } from '../services';
 import type { Lote } from '../types/models';
-import { data, m3, metros, rotuloCategoria, rotuloClasse, un } from '../utils/format';
+import { data, dias, m3, metros, rotuloCategoria, rotuloClasse, un } from '../utils/format';
 
 export default function Lotes() {
   const [fardosDe, setFardosDe] = useState<Lote | null>(null);
@@ -28,6 +28,7 @@ export default function Lotes() {
     { chave: 'volumeDocumentalM3', titulo: 'Volume documental', alinhar: 'right', ordenavel: true, render: (l) => m3(l.volumeDocumentalM3) },
     { chave: 'volumeCalculadoM3', titulo: 'Volume calculado', alinhar: 'right', ordenavel: true, render: (l) => m3(l.volumeCalculadoM3) },
     { chave: 'recebidoEm', titulo: 'Recebido em', ordenavel: true, render: (l) => data(l.recebidoEm) },
+    { chave: 'idadeDias', titulo: 'Idade', alinhar: 'right', ordenavel: true, render: (l) => (l.acimaLimiteIdade ? <span className="val-erro" title="Acima do limite de dias definido em Configurações">{dias(l.idadeDias)}</span> : dias(l.idadeDias)) },
     { chave: 'estoqueStatus', titulo: 'Estoque', render: (l) => <StatusEstoqueBadge s={l.estoqueStatus} /> },
   ];
 
@@ -40,6 +41,7 @@ export default function Lotes() {
         listar={(q) => servicos.lotes.listar(q)}
         colunas={colunas}
         filtros={[
+          { chave: 'acimaLimiteIdade', rotulo: 'Idade', opcoes: IDADE_LOTE_OPCOES },
           { chave: 'inspecao', rotulo: 'Inspeção', opcoes: RESULTADO_INSPECAO_OPCOES },
           { chave: 'classe', rotulo: 'Classe', opcoes: CLASSE_OPCOES },
           { chave: 'categoria', rotulo: 'Categoria', opcoes: CATEGORIA_OPCOES },
