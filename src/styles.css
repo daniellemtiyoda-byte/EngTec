@@ -240,10 +240,6 @@ body { background: #f6f7f9; }
 .linha-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 12px; }
 .bloco-item { border: 1px solid var(--cinza-200); border-radius: var(--raio); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .bloco-item-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
-.fardos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.fardo { display: flex; align-items: center; gap: 2px; }
-.fardo input { width: 64px; border: 1px solid var(--cinza-300); border-radius: var(--raio); padding: 6px 8px; text-align: right; }
-.fardo input[aria-invalid='true'] { border-color: var(--vermelho); }
 .caixa { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 14px; }
 
 /* Etiquetas de fardo: só aparecem na impressão disparada pela tela de fardos */
@@ -353,4 +349,36 @@ a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
   .lista-tabela { display: none; }
   .lista-cartoes { display: flex; }
   .so-celular { display: flex; }
+}
+
+/* Assistentes (UX fase 4): passos, contador −/+ e modal em tela cheia no celular */
+.passos { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+.passos-texto { font-size: 14px; color: var(--texto-mudo); }
+.passos-texto strong { color: var(--azul-800); }
+.passos-barra { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; }
+.passos-barra li { flex: 1; height: 6px; border-radius: 3px; background: var(--cinza-200); }
+.passos-barra li.feito { background: var(--verde); } .passos-barra li.atual { background: var(--azul-600); }
+.contador-campo { display: inline-flex; align-items: stretch; border: 1px solid var(--cinza-300); border-radius: var(--raio); overflow: hidden; background: #fff; }
+.contador-campo.invalido { border-color: var(--vermelho); }
+.contador-campo button { width: 40px; min-height: 40px; border: 0; background: var(--cinza-100); font-size: 20px; font-weight: 700; cursor: pointer; color: var(--azul-800); }
+.contador-campo button:disabled { color: var(--cinza-300); cursor: default; }
+.contador-campo input { width: 56px; border: 0; text-align: center; font-size: 16px; font-weight: 700; }
+.grade-fardos { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.fardo-linha { display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 1px solid var(--cinza-200); border-radius: var(--raio); padding: 4px 4px 4px 10px; font-size: 14px; }
+.total-item { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; font-size: 14px; }
+.lista-fardos { display: flex; flex-direction: column; gap: 6px; }
+.fardo-opcao { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid var(--cinza-200); border-radius: var(--raio); padding: 8px 10px; font-size: 13px; }
+.fardo-opcao.sugerido { border-left: 4px solid var(--verde); }
+.resumo { background: var(--azul-100); border-radius: var(--raio); padding: 12px 14px; }
+.resumo h3 { margin: 0 0 6px; font-size: 15px; color: var(--azul-800); }
+.resumo ul { margin: 0 0 6px; padding-left: 18px; font-size: 14px; }
+.caixa-grande { padding: 8px 0; font-size: 15px; } .caixa-grande input { width: 20px; height: 20px; }
+@media (max-width: 760px) {
+  .modal-fundo:has(> .modal-largo) { padding: 0; }
+  .modal-largo { max-width: none; width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+  .modal-largo .modal-rodape { padding: 10px 12px; }
+  .modal-largo .modal-rodape .btn { flex: 1; padding: 12px; font-size: 16px; }
+  .contador-campo button { width: 48px; min-height: 48px; }
+  .fardo-opcao { flex-direction: column; align-items: stretch; }
+  .fardo-opcao .contador-campo { align-self: flex-end; }
 }
