@@ -1,7 +1,7 @@
 import type { Servicos } from '../contracts';
 import { TOLERANCIA_VOLUME_PCT } from '../../dominio/parametros';
 import type {
-  DofPendente, Indicadores, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
+  DofPendente, EventoLote, Indicadores, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
   TipoMovimentacao, Usuario,
 } from '../../types/models';
 import { data, pct, rotuloClasse } from '../../utils/format';
@@ -25,7 +25,9 @@ export function criarServicosSimulados(): Servicos {
       throw new ApiError(409, 'Já existe um tamanho com este código.', { codigo: 'Código já utilizado.' });
     }
   }
-  const agora = () => ({ quando: new Date().toISOString(), usuario: D.usuarioDemo.nome, novoId });
+  /** Ações registradas em nome de quem entrou (no login simulado, o perfil escolhido). */
+  const usuarioAtual = () => sessao?.nome ?? D.usuarioDemo.nome;
+  const agora = () => ({ quando: new Date().toISOString(), usuario: usuarioAtual(), novoId });
   function acharRme(id: string) {
     const r = D.rmes.find((x) => x.id === id);
     if (!r) throw new ApiError(404, 'RME não encontrada.');
@@ -62,7 +64,7 @@ export function criarServicosSimulados(): Servicos {
       entrar: async ({ usuario, senha }) => {
         await atraso(500);
         if (!usuario.trim() || !senha) throw new ApiError(401, 'Usuário ou senha inválidos.');
-        sessao = D.usuarioDemo;
+        sessao = D.perfisDemo[usuario.trim().toLowerCase()] ?? D.usuarioDemo;
         return sessao;
       },
       usuarioAtual: async () => { await atraso(150); return sessao; },
@@ -114,7 +116,7 @@ export function criarServicosSimulados(): Servicos {
           id: `al-dof-${d.nfId}`, nivel: d.nivel === 'critico' ? 'critico' as const : 'atencao' as const,
           titulo: d.diasParaPrazo < 0 ? `DOF ${d.dofNumero} com prazo de declaração vencido` : `DOF ${d.dofNumero}: declarar no Sinaflor até ${data(d.prazoDeclaracao)}`,
           descricao: `NF ${d.nfNumero} (${d.fornecedor}). ${d.diasParaPrazo < 0 ? `Venceu há ${-d.diasParaPrazo} dia(s); novos DOFs podem ser suspensos.` : d.diasParaPrazo === 0 ? 'Vence hoje.' : `Faltam ${d.diasParaPrazo} dia(s).`}`,
-          link: '/relatorios',
+          link: '/relatorios?aba=dofs',
         }));
         const hoje = hojeSP();
         const ativas = D.rmes.filter((r) => r.status !== 'entregue' && r.status !== 'cancelada');
@@ -200,7 +202,7 @@ export function criarServicosSimulados(): Servicos {
         if (!nf?.dof) throw new ApiError(404, 'NF ou DOF não encontrado.');
         if (nf.situacao !== 'recebida') throw new ApiError(409, 'O DOF só é declarado no Sinaflor depois do recebimento da NF.');
         if (nf.dof.declaracao === 'declarado') throw new ApiError(409, 'Este DOF já foi marcado como declarado.');
-        Object.assign(nf.dof, { declaracao: 'declarado', declaradoPor: D.usuarioDemo.nome, declaradoEm: new Date().toISOString() });
+        Object.assign(nf.dof, { declaracao: 'declarado', declaradoPor: usuarioAtual(), declaradoEm: new Date().toISOString() });
         return nf;
       },
     },
@@ -210,10 +212,33 @@ export function criarServicosSimulados(): Servicos {
         await atraso(700);
         const nf = D.notas.find((x) => x.id === d.nfId);
         if (!nf) throw new ApiError(404, 'NF não encontrada.');
-        return receber(D, nf, d, { quando: new Date().toISOString(), usuario: D.usuarioDemo.nome, fotos: fotos.length, novoId });
+        return receber(D, nf, d, { quando: new Date().toISOString(), usuario: usuarioAtual(), fotos: fotos.length, novoId });
       },
     },
-    lotes: { listar: (q) => paginar(D.lotes.map(comIdade), q) },
+    lotes: {
+      listar: (q) => paginar(D.lotes.map(comIdade), q),
+      obter: async (codigo) => {
+        await simularRede();
+        const l = D.lotes.find((x) => x.codigo.toLowerCase() === codigo.trim().toLowerCase());
+        if (!l) throw new ApiError(404, `Lote ${codigo} não encontrado.`);
+        const nf = D.notas.find((n) => n.numero === l.nfNumero && n.fornecedor === l.fornecedor);
+        const recebimento = nf && D.recebimentos.find((r) => r.nfId === nf.id);
+        const titulos: Record<string, string> = { entrada: 'Entrada no estoque', saida: 'Saída por RME', transferencia: 'Transferência', perda: 'Perda', ajuste: 'Ajuste de saldo' };
+        const historico: EventoLote[] = [
+          ...(nf ? [{ quando: `${nf.emissao}T12:00:00-03:00`, tipo: 'nf' as const, titulo: `NF ${nf.numero} emitida`, detalhe: `${nf.fornecedor} · ${nf.origem === 'xml' ? 'importada do XML' : 'cadastro manual'}`, referencia: `NF ${nf.numero}` }] : []),
+          ...(recebimento ? [{
+            quando: recebimento.recebidoEm, tipo: 'recebimento' as const, titulo: 'Recebimento conferido', usuario: recebimento.conferente, referencia: `NF ${recebimento.nfNumero}`,
+            detalhe: `Lote criado com ${l.quantidade} dormentes em ${l.fardos} fardos, aguardando inspeção.${recebimento.acimaTolerancia ? ' Divergência de volume acima da tolerância.' : ''}`,
+          }] : []),
+          ...(nf?.dof?.declaradoEm ? [{ quando: nf.dof.declaradoEm, tipo: 'declaracao' as const, titulo: `DOF ${nf.dof.numero} declarado no Sinaflor`, usuario: nf.dof.declaradoPor }] : []),
+          ...D.movimentacoes.filter((m) => m.loteCodigo === l.codigo && m.tipo !== 'entrada').map((m) => ({
+            quando: m.dataHora, tipo: m.tipo, titulo: `${titulos[m.tipo]}${m.fardoCodigo ? ` · ${m.fardoCodigo}` : ''}`, usuario: m.usuario, referencia: m.referencia, status: m.status,
+            detalhe: `${m.tipo === 'ajuste' && m.quantidade > 0 ? '+' : ''}${m.quantidade} un. · ${m.origem} → ${m.destino}${m.motivo ? ` · ${m.motivo}` : ''}`,
+          })),
+        ].sort((a, b) => a.quando.localeCompare(b.quando));
+        return { lote: comIdade(l), fardos: D.fardos.filter((f) => f.loteCodigo === l.codigo).sort((a, b) => a.sequencia - b.sequencia), nf, recebimento, historico };
+      },
+    },
     fardos: { listar: (q) => paginar(D.fardos, q) },
     estoque: {
       listar: (q) => paginar(D.saldos.map((s) => {
@@ -230,7 +255,7 @@ export function criarServicosSimulados(): Servicos {
         const lote = D.lotes.find((l) => l.codigo.toLowerCase() === n.loteCodigo.trim().toLowerCase());
         if (!lote) throw new ApiError(404, 'Lote não encontrado.', { loteCodigo: 'Lote inexistente.' });
         if (lote.estoqueStatus === 'bloqueado') throw new ApiError(409, 'Lote bloqueado: movimentação não permitida.');
-        const m: Movimentacao = { id: novoId('m'), tipo: n.tipo, loteCodigo: lote.codigo, especie: lote.especieDocumental, quantidade: n.quantidade, origem: n.origem || '—', destino: n.destino || '—', dataHora: new Date().toISOString(), usuario: D.usuarioDemo.nome, status: 'pendente' };
+        const m: Movimentacao = { id: novoId('m'), tipo: n.tipo, loteCodigo: lote.codigo, especie: lote.especieDocumental, quantidade: n.quantidade, origem: n.origem || '—', destino: n.destino || '—', dataHora: new Date().toISOString(), usuario: usuarioAtual(), status: 'pendente' };
         D.movimentacoes.unshift(m);
         return m;
       },

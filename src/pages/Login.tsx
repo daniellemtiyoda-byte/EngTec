@@ -51,7 +51,7 @@ export default function Login() {
         <form className="login-form" onSubmit={enviar} noValidate>
           <h2>Entrar no sistema</h2>
           {env.USE_MOCK && (
-            <p className="login-demo"><strong>Modo de demonstração.</strong> Qualquer usuário e senha preenchidos entram, com dados fictícios. Nenhuma autenticação real é feita.</p>
+            <p className="login-demo"><strong>Modo de demonstração.</strong> Qualquer senha entra, com dados fictícios. Para testar um perfil, use como usuário <code>almoxarife</code>, <code>supervisor</code>, <code>requisitante</code>, <code>operador</code> ou <code>gestor</code>; outro nome entra como administrador. Nenhuma autenticação real é feita.</p>
           )}
           {erro && <div className="aviso aviso-critico" role="alert">{erro}</div>}
           <div className="campo">

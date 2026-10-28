@@ -7,6 +7,7 @@ import { servicos } from '../services';
 import type { LinhaSaldoIbama } from '../types/models';
 import { data, m3, un } from '../utils/format';
 import { BadgeDe } from './Badge';
+import { CodigoLink } from './Codigos';
 import { DeclararDofModal, type AlvoDeclaracao } from './DeclararDofModal';
 import { Aviso, Carregando, Erro, Vazio } from './Estados';
 
@@ -82,7 +83,7 @@ export function RelatorioDofsPendentes() {
             <tbody>
               {linhas.map((d) => (
                 <tr key={d.id}>
-                  <td>{d.dofNumero}</td><td>{d.codigoControle}</td><td>{d.nfNumero}</td><td>{d.fornecedor}</td><td>{data(d.recebidoEm)}</td><td>{data(d.validade)}</td>
+                  <td>{d.dofNumero}</td><td>{d.codigoControle}</td><td><CodigoLink codigo={`NF ${d.nfNumero}`} /></td><td>{d.fornecedor}</td><td>{data(d.recebidoEm)}</td><td>{data(d.validade)}</td>
                   <td>{data(d.prazoDeclaracao)}</td>
                   <td><BadgeDe mapa={NIVEL_PRAZO_DOF} valor={d.nivel} /> <span className={d.nivel === 'critico' ? 'val-erro' : 'mudo'}>{d.diasParaPrazo < 0 ? `venceu há ${-d.diasParaPrazo} dia(s)` : d.diasParaPrazo === 0 ? 'vence hoje' : `faltam ${d.diasParaPrazo} dia(s)`}</span></td>
                   {pode('dof:declarar') && <td><button className="btn btn-sec btn-peq" onClick={() => setDeclarar({ nfId: d.nfId, nfNumero: d.nfNumero, dofNumero: d.dofNumero, prazoDeclaracao: d.prazoDeclaracao })}>Marcar como declarado</button></td>}

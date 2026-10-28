@@ -1,5 +1,6 @@
 import { Aviso } from '../components/Estados';
 import { Badge } from '../components/Badge';
+import { CodigoLink } from '../components/Codigos';
 import { StatCard } from '../components/Graficos';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { CATEGORIA_OPCOES, CLASSE_OPCOES, IDADE_LOTE_OPCOES } from '../dominio/opcoes';
@@ -15,7 +16,7 @@ export default function Estoque() {
   const d = ind.dados;
 
   const colunas: Coluna<SaldoEstoque>[] = [
-    { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true },
+    { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true, render: (s) => <CodigoLink codigo={s.loteCodigo} /> },
     { chave: 'especieDocumental', titulo: 'Espécie (documento)', ordenavel: true },
     { chave: 'classe', titulo: 'Classe', render: (s) => rotuloClasse(s.classe) },
     { chave: 'categoria', titulo: 'Categoria', render: (s) => rotuloCategoria(s.categoria) },

@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Aviso, PageHeader } from '../components/Estados';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { RelatorioMovimentacoes } from '../components/RelatorioMovimentacoes';
+import { RelatorioVolumetria } from '../components/RelatorioVolumetria';
 import { RelatorioDofsPendentes, RelatorioSaldoIbama } from '../components/RelatoriosIbama';
 import { useToast } from '../components/Toast';
 import { SUFIXO_SIMULADO } from '../config/env';
@@ -11,7 +13,7 @@ import { mensagemSegura } from '../services/http';
 import type { Relatorio } from '../types/models';
 
 const FORMATOS = ['csv', 'xlsx', 'pdf'] as const;
-const ABAS = { saldo: 'Saldo para o IBAMA', dofs: 'DOFs pendentes', movimentacoes: 'Movimentações do período', exportacoes: 'Exportações' } as const;
+const ABAS = { saldo: 'Saldo para o IBAMA', dofs: 'DOFs pendentes', volumetria: 'Controle volumétrico', movimentacoes: 'Movimentações do período', exportacoes: 'Exportações' } as const;
 type Aba = keyof typeof ABAS;
 
 function Exportacoes() {
@@ -49,7 +51,10 @@ function Exportacoes() {
 }
 
 export default function Relatorios() {
-  const [aba, setAba] = useState<Aba>('saldo');
+  // ?aba=dofs abre direto a aba (links dos alertas).
+  const [params] = useSearchParams();
+  const [aba, setAba] = useState<Aba>(() => (params.get('aba') as Aba) in ABAS ? (params.get('aba') as Aba) : 'saldo');
+  useEffect(() => { const a = params.get('aba') as Aba; if (a in ABAS) setAba(a); }, [params]);
   return (
     <>
       <PageHeader titulo="Relatórios" descricao="Prestação de contas ao IBAMA (saldo em m³ por espécie e dimensão, DOFs pendentes de declaração) e movimentações do período." />
@@ -61,6 +66,7 @@ export default function Relatorios() {
       <div role="tabpanel" className="stack-vertical">
         {aba === 'saldo' && <RelatorioSaldoIbama />}
         {aba === 'dofs' && <RelatorioDofsPendentes />}
+        {aba === 'volumetria' && <RelatorioVolumetria />}
         {aba === 'movimentacoes' && <RelatorioMovimentacoes />}
         {aba === 'exportacoes' && <Exportacoes />}
       </div>

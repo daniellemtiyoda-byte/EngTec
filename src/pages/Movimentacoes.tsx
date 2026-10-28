@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BadgeDe, StatusRegistroBadge } from '../components/Badge';
+import { CodigoLink } from '../components/Codigos';
 import { Aviso } from '../components/Estados';
 import { FormModal } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
@@ -48,9 +49,9 @@ export default function Movimentacoes() {
   const colunas: Coluna<Movimentacao>[] = [
     { chave: 'dataHora', titulo: 'Data/hora', ordenavel: true, render: (m) => dataHora(m.dataHora) },
     { chave: 'tipo', titulo: 'Tipo', render: (m) => <BadgeDe mapa={TIPO_MOVIMENTACAO} valor={m.tipo} /> },
-    { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true },
-    { chave: 'fardoCodigo', titulo: 'Fardo', ordenavel: true, render: (m) => m.fardoCodigo ?? '—' },
-    { chave: 'referencia', titulo: 'Referência', ordenavel: true, render: (m) => m.referencia ?? '—' },
+    { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true, render: (m) => <CodigoLink codigo={m.loteCodigo} /> },
+    { chave: 'fardoCodigo', titulo: 'Fardo', ordenavel: true, render: (m) => <CodigoLink codigo={m.fardoCodigo} /> },
+    { chave: 'referencia', titulo: 'Referência', ordenavel: true, render: (m) => <CodigoLink codigo={m.referencia} /> },
     { chave: 'quantidade', titulo: 'Quantidade', alinhar: 'right', ordenavel: true, render: quantidade },
     { chave: 'origem', titulo: 'Origem' }, { chave: 'destino', titulo: 'Destino' },
     { chave: 'motivo', titulo: 'Motivo', render: (m) => (m.motivo ? <span title={m.motivo}>{m.motivoPerda ? `${MOTIVO_PERDA[m.motivoPerda][1]}: ` : ''}{m.motivo.slice(0, 40)}{m.motivo.length > 40 ? '…' : ''}</span> : '—') },

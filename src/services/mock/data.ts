@@ -19,6 +19,31 @@ export function criarDados() {
     ativo: true, ultimoAcesso: '2026-10-09T10:15:00-03:00',
   };
 
+  // Perfis do PRD para testar o menu e as ações de cada papel: no login simulado, o usuário digitado escolhe o perfil.
+  // Os nomes são os mesmos que aparecem nos registros fictícios (separação, conferência...).
+  const perfisDemo: Record<string, Usuario> = {
+    almoxarife: {
+      id: 'u-alm', nome: 'Almoxarife 1', email: 'almoxarife@exemplo.invalid', perfil: 'Almoxarife (simulado)', ativo: true,
+      permissoes: ['nf:cadastrar', 'dof:declarar', 'recebimento:registrar', 'rme:separar', 'movimentacoes:registrar', 'relatorios:exportar'],
+    },
+    operador: {
+      id: 'u-op', nome: 'Operador de Pátio 1', email: 'operador@exemplo.invalid', perfil: 'Operador de pátio (simulado)', ativo: true,
+      permissoes: ['movimentacoes:registrar', 'inventario:criar'],
+    },
+    supervisor: {
+      id: 'u-sup', nome: 'Supervisor de Conferência 1', email: 'supervisor@exemplo.invalid', perfil: 'Supervisor de conferência (simulado)', ativo: true,
+      permissoes: ['rme:conferir', 'movimentacoes:aprovar', 'relatorios:exportar'],
+    },
+    requisitante: {
+      id: 'u-req', nome: 'Requisitante (Via Permanente)', email: 'requisitante@exemplo.invalid', perfil: 'Requisitante (simulado)', ativo: true,
+      permissoes: ['rme:abrir'],
+    },
+    gestor: {
+      id: 'u-ges', nome: 'Gestor 1', email: 'gestor@exemplo.invalid', perfil: 'Gestor (simulado)', ativo: true,
+      permissoes: ['movimentacoes:aprovar', 'relatorios:exportar'],
+    },
+  };
+
   const fornecedores: Fornecedor[] = [
     { id: 'f1', razaoSocial: 'Madeireira Exemplo A Ltda.', cnpj: '00.000.000/0001-01', cidadeUf: 'Cidade A/SP', documentosVigentes: 4, status: 'aprovado' },
     { id: 'f2', razaoSocial: 'Florestal Exemplo B S.A.', cnpj: '00.000.000/0001-02', cidadeUf: 'Cidade B/MS', documentosVigentes: 3, status: 'aprovado' },
@@ -236,7 +261,7 @@ export function criarDados() {
     { id: 'u4', nome: 'Usuário Inativo', email: 'inativo@exemplo.invalid', perfil: 'Consulta', permissoes: [], ativo: false },
   ];
 
-  return { parametros, usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, rmes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
+  return { parametros, perfisDemo, usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, rmes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
 }
 
 export type DadosSimulados = ReturnType<typeof criarDados>;

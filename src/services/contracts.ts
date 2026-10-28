@@ -1,6 +1,6 @@
 import type {
   Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Especie, Fardo, Fornecedor, Indicadores,
-  ListQuery, LocalPatio, Lote, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoRecebimento, NovoTamanho,
+  ListQuery, LocalPatio, Lote, LoteDetalhe, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoRecebimento, NovoTamanho,
   DofPendente, FiltroMovimentacoes, LinhaSaldoIbama, OpcaoSeparacao, Paginado, ParametrosNegocio, RelatorioMovimentacoes, Rme,
   ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, ResultadoRecebimento, SaldoEstoque,
   SessaoInventario, SolicitacaoExportacao, Tamanho, Transferencia, Usuario, VolumetriaLote,
@@ -40,7 +40,10 @@ export interface Servicos {
     confirmar(d: NovoRecebimento, fotos: File[]): Promise<ResultadoRecebimento>;
   };
   /** Lotes só são criados pelo recebimento: não há cadastro manual. */
-  lotes: ServicoLista<Lote>;
+  lotes: ServicoLista<Lote> & {
+    /** Detalhe pelo código (ex. LT26-0042): fardos, NF, DOF, recebimento e linha do tempo. 404 se não existir. */
+    obter(codigo: string): Promise<LoteDetalhe>;
+  };
   fardos: ServicoLista<Fardo>;
   estoque: ServicoLista<SaldoEstoque>;
   movimentacoes: ServicoLista<Movimentacao> & {

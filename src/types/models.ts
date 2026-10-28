@@ -228,6 +228,27 @@ export interface Lote {
   local: string;
 }
 
+/** Evento da linha do tempo do lote (RF23): da NF ao destino, com usuário e data. */
+export interface EventoLote {
+  quando: string;
+  tipo: 'nf' | 'recebimento' | 'declaracao' | TipoMovimentacao;
+  titulo: string;
+  detalhe?: string;
+  usuario?: string;
+  /** NF ou RME relacionada (texto como "NF 1000" ou "RME26-0001"). */
+  referencia?: string;
+  status?: StatusRegistro;
+}
+
+/** Tudo sobre um lote numa consulta só (RF09/RF23): fardos, origem (NF, DOF, recebimento) e histórico. */
+export interface LoteDetalhe {
+  lote: Lote;
+  fardos: Fardo[];
+  nf?: NotaFiscal;
+  recebimento?: Recebimento;
+  historico: EventoLote[];
+}
+
 /** Comparação de volume por espécie: soma dos lotes da espécie x volume do DOF da espécie. */
 export interface VolumeRecebidoEspecie {
   especie: string;

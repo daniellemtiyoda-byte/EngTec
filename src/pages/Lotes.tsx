@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Aviso } from '../components/Estados';
 import { BadgeDe, StatusEstoqueBadge } from '../components/Badge';
+import { CodigoLink } from '../components/Codigos';
 import { FardosModal } from '../components/FardosModal';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { CATEGORIA_OPCOES, CLASSE_OPCOES, IDADE_LOTE_OPCOES, RESULTADO_INSPECAO_OPCOES } from '../dominio/opcoes';
@@ -13,8 +14,8 @@ export default function Lotes() {
   const [fardosDe, setFardosDe] = useState<Lote | null>(null);
 
   const colunas: Coluna<Lote>[] = [
-    { chave: 'codigo', titulo: 'Lote', ordenavel: true },
-    { chave: 'nfNumero', titulo: 'NF', ordenavel: true },
+    { chave: 'codigo', titulo: 'Lote', ordenavel: true, render: (l) => <CodigoLink codigo={l.codigo} /> },
+    { chave: 'nfNumero', titulo: 'NF', ordenavel: true, render: (l) => <CodigoLink codigo={`NF ${l.nfNumero}`} /> },
     { chave: 'fornecedor', titulo: 'Fornecedor', ordenavel: true },
     { chave: 'especieDocumental', titulo: 'Espécie (documento)', ordenavel: true, render: (l) => <em>{l.especieDocumental}</em> },
     { chave: 'classe', titulo: 'Classe', render: (l) => rotuloClasse(l.classe) },

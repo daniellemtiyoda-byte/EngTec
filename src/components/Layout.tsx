@@ -1,15 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import { AlertasProvider, useAlertas } from '../contexts/AlertasContext';
 import { useAuth } from '../contexts/AuthContext';
-import { GRUPOS_MENU, ROTAS } from '../rotas';
+import type { Permissao } from '../dominio/permissoes';
+import { GRUPOS_MENU, ROTAS, type Rota } from '../rotas';
+import { destinoBusca } from '../utils/busca';
 import { linkInterno } from '../utils/format';
 import { BandeiraSP } from './BandeiraSP';
 import { ErroTela } from './ErroTela';
-import { BannerSimulado } from './Estados';
+import { BannerSimulado, Vazio } from './Estados';
 import { Icone } from './Icone';
 
-const GRUPOS = GRUPOS_MENU.map((titulo) => ({ titulo, itens: ROTAS.filter((r) => r.grupo === titulo) }));
+const permite = (pode: (p: Permissao) => boolean, r: Pick<Rota, 'permissoes'>) => !r.permissoes || r.permissoes.some(pode);
+
+/** Tela sem permissão para o perfil: aviso no lugar do conteúdo (só UX; o servidor valida cada operação). */
+export function ExigePermissao({ rota, children }: { rota: Pick<Rota, 'permissoes'>; children: ReactNode }) {
+  const { pode } = useAuth();
+  if (permite(pode, rota)) return <>{children}</>;
+  return <section className="painel"><Vazio mensagem="Seu perfil não tem acesso a esta tela." dica="Use o menu para ver as funções do seu perfil. Se precisar deste acesso, fale com o administrador." /></section>;
+}
 
 export function RotaProtegida() {
   const { usuario, carregando } = useAuth();
@@ -55,8 +64,10 @@ function Notificacoes() {
 }
 
 function Layout() {
-  const { usuario, sair } = useAuth();
+  const { usuario, sair, pode } = useAuth();
   const nav = useNavigate();
+  // Menu do perfil: só as telas que ele pode usar, agrupadas pelo fluxo; grupos vazios não aparecem.
+  const grupos = GRUPOS_MENU.map((titulo) => ({ titulo, itens: ROTAS.filter((r) => r.grupo === titulo && !r.foraDoMenu && permite(pode, r)) })).filter((g) => g.itens.length);
   const loc = useLocation();
   const [recolhido, setRecolhido] = useState(false);
   const [aberto, setAberto] = useState(false);
@@ -72,7 +83,7 @@ function Layout() {
           <div className="marca-texto"><strong>Holz Trilho</strong><span>Gestão de dormentes</span></div>
         </div>
         <nav>
-          {GRUPOS.map((g) => (
+          {grupos.map((g) => (
             <div key={g.titulo} className="nav-grupo">
               <span className="nav-titulo">{g.titulo}</span>
               {g.itens.map((i) => (
@@ -92,10 +103,10 @@ function Layout() {
       <div className="principal">
         <header className="topo">
           <button className="btn-icone btn-icone-claro menu-mobile" onClick={() => setAberto(true)} aria-label="Abrir menu"><Icone nome="menu" /></button>
-          <form className="busca-global" role="search" onSubmit={(e) => { e.preventDefault(); nav(`/lotes?q=${encodeURIComponent(busca.trim())}`); }}>
+          <form className="busca-global" role="search" onSubmit={(e) => { e.preventDefault(); if (busca.trim()) { nav(destinoBusca(busca)); setBusca(''); } }}>
             <Icone nome="search" tamanho={18} />
             <label className="sr-only" htmlFor="busca-global">Pesquisa global</label>
-            <input id="busca-global" type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Pesquisar lotes (código, fornecedor, espécie)…" maxLength={80} />
+            <input id="busca-global" type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Lote, fardo, RME ou NF (ex.: LT26-0042-F03)…" maxLength={80} />
           </form>
           <Notificacoes />
           <div className="usuario">

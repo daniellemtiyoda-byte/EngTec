@@ -61,7 +61,7 @@ export function criarServicosReais(): Servicos {
       declararDof: (nfId) => post('notas.declararDof', undefined, nfId),
     },
     recebimentos: { ...servicoLista('recebimentos.listar'), confirmar: (d, fotos) => enviarComArquivos('recebimentos.confirmar', d, { fotos }) },
-    lotes: servicoLista('lotes.listar'),
+    lotes: { ...servicoLista('lotes.listar'), obter: (codigo) => http(caminho('lotes.obter', codigo)) },
     fardos: servicoLista('fardos.listar'),
     estoque: servicoLista('estoque.listar'),
     movimentacoes: {

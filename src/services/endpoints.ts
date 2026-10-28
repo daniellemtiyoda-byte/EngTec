@@ -30,6 +30,7 @@ export const ENDPOINTS = {
   'recebimentos.listar': { modulo: 'Recebimento', operacao: 'Listar conferências', metodo: 'GET', caminho: '/recebimentos', estado: P },
   'recebimentos.confirmar': { modulo: 'Recebimento', operacao: 'Confirmar recebimento (multipart: dados + fotos)', metodo: 'POST', caminho: '/recebimentos', estado: P },
   'lotes.listar': { modulo: 'Lotes', operacao: 'Listar', metodo: 'GET', caminho: '/lotes', estado: P },
+  'lotes.obter': { modulo: 'Lotes', operacao: 'Detalhe e histórico do lote', metodo: 'GET', caminho: '/lotes/{id}', estado: P },
   'fardos.listar': { modulo: 'Fardos', operacao: 'Listar', metodo: 'GET', caminho: '/fardos', estado: P },
   'estoque.listar': { modulo: 'Estoque', operacao: 'Consultar saldos', metodo: 'GET', caminho: '/estoque/saldos', estado: P },
   'movimentacoes.listar': { modulo: 'Movimentações', operacao: 'Listar', metodo: 'GET', caminho: '/movimentacoes', estado: P },

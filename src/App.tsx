@@ -1,7 +1,7 @@
 import { HashRouter, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
-import { RotaProtegida } from './components/Layout';
+import { ExigePermissao, RotaProtegida } from './components/Layout';
 import Login from './pages/Login';
 import { ROTAS } from './rotas';
 
@@ -14,7 +14,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<RotaProtegida />}>
-              {ROTAS.map(({ caminho, tela: Tela }) => <Route key={caminho} path={caminho} element={<Tela />} />)}
+              {ROTAS.map(({ caminho, tela: Tela, permissoes }) => <Route key={caminho} path={caminho} element={<ExigePermissao rota={{ permissoes }}><Tela /></ExigePermissao>} />)}
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

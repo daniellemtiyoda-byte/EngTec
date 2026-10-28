@@ -32,6 +32,7 @@
 | Recebimento | Listar | GET | /recebimentos |
 | Recebimento | Confirmar (multipart: `dados` em JSON + `fotos`, várias) → `{ recebimento, lotes, fardos }` | POST | /recebimentos |
 | Lotes | Listar (lotes só nascem do recebimento) | GET | /lotes |
+| Lotes | Detalhe pelo código: `{ lote, fardos, nf, recebimento, historico }` | GET | /lotes/{id} |
 | Fardos | Listar (filtro `loteCodigo`) | GET | /fardos |
 | Estoque | Consultar saldos | GET | /estoque/saldos |
 | Movimentações | Listar / Registrar (`transferencia`, `perda` ou `ajuste`; perda e ajuste por `fardoCodigo`, com `motivo`) | GET / POST | /movimentacoes |
@@ -82,6 +83,9 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
 9. Para relatórios: como o arquivo gerado é baixado (URL assinada, endpoint próprio?).
 
 ## Pontos em aberto
+
+- Detalhe do lote (`GET /lotes/{codigo}`): `historico` em ordem cronológica, com `tipo` (`nf`, `recebimento`, `declaracao` ou o tipo da movimentação), `titulo`, `detalhe`, `usuario`, `referencia` (ex. `NF 1000`, `RME26-0001`) e `status`. 404 quando o código não existe. Quando a inspeção (Etapa 3) e a armazenagem existirem, entram como eventos também.
+- Perfis: o menu de cada perfil é montado a partir de `permissoes` do usuário (`/auth/me`). Confirmar com o back-end a lista de permissões de cada perfil do PRD (almoxarife, operador de pátio, supervisor, requisitante, gestor, administrador).
 
 - Parâmetros (`GET/PATCH /parametros`): `{ limiteIdadeDias, alertaDofCriticoDias, alertaDofAtencaoDias, provisorio }`. O servidor usa os valores para calcular `idadeDias`/`acimaLimiteIdade` de lotes e saldos, o `nivel` dos DOFs pendentes, os alertas e os indicadores. Definir quem pode editar (o front exige `admin`).
 - DOF: `prazoDeclaracao` = validade + 1 dia (IN Ibama 21/2014, art. 51). A declaração só é aceita para NF recebida; o servidor grava `declaradoPor` e `declaradoEm`.

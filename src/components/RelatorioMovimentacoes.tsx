@@ -6,6 +6,7 @@ import { servicos } from '../services';
 import type { FiltroMovimentacoes, TipoMovimentacao } from '../types/models';
 import { dataHora, un } from '../utils/format';
 import { BadgeDe, StatusRegistroBadge } from './Badge';
+import { CodigoLink } from './Codigos';
 import { Aviso, Carregando, Erro, Vazio } from './Estados';
 import { StatCard } from './Graficos';
 
@@ -59,7 +60,7 @@ export function RelatorioMovimentacoes() {
                   {r.dados.linhas.map((m) => (
                     <tr key={m.id}>
                       <td>{dataHora(m.dataHora)}</td><td><BadgeDe mapa={TIPO_MOVIMENTACAO} valor={m.tipo} /></td><td><em>{m.especie}</em></td>
-                      <td>{m.fardoCodigo ?? m.loteCodigo}</td><td>{m.referencia ?? '—'}</td><td className="al-right">{un(m.quantidade)}</td>
+                      <td><CodigoLink codigo={m.fardoCodigo ?? m.loteCodigo} /></td><td><CodigoLink codigo={m.referencia} /></td><td className="al-right">{un(m.quantidade)}</td>
                       <td>{m.origem} → {m.destino}</td><td>{m.motivoPerda ? `${MOTIVO_PERDA[m.motivoPerda][1]}: ` : ''}{m.motivo ?? '—'}</td><td>{m.usuario}</td><td><StatusRegistroBadge s={m.status} /></td>
                     </tr>
                   ))}

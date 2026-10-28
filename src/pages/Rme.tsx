@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Badge, BadgeDe } from '../components/Badge';
+import { CodigoLink } from '../components/Codigos';
 import { Aviso } from '../components/Estados';
 import { FormModal } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
@@ -128,7 +129,7 @@ export default function RmePage() {
                     <thead><tr><th>Fardo</th><th>Lote</th><th className="al-right">Separado</th><th className="al-right">Saldo do fardo</th><th className="al-right">Fica no fardo</th></tr></thead>
                     <tbody>
                       {sobras(sel).map((s) => (
-                        <tr key={s.fardoCodigo}><td>{s.fardoCodigo}</td><td>{s.loteCodigo}</td><td className="al-right">{un(s.quantidade)}</td><td className="al-right">{un(s.saldoFardo)}</td><td className="al-right">{s.sobra ? `${un(s.sobra)} (aberto)` : 'baixado'}</td></tr>
+                        <tr key={s.fardoCodigo}><td><CodigoLink codigo={s.fardoCodigo} /></td><td><CodigoLink codigo={s.loteCodigo} /></td><td className="al-right">{un(s.quantidade)}</td><td className="al-right">{un(s.saldoFardo)}</td><td className="al-right">{s.sobra ? `${un(s.sobra)} (aberto)` : 'baixado'}</td></tr>
                       ))}
                     </tbody>
                   </table>

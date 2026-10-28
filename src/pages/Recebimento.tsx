@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Badge } from '../components/Badge';
+import { CodigoLink, CodigosLink } from '../components/Codigos';
 import { Aviso } from '../components/Estados';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { Modal } from '../components/Modal';
@@ -29,7 +30,7 @@ export default function RecebimentoPage() {
   const semDof = notas.dados?.items.filter((n) => n.situacao === 'aguardando_dof') ?? [];
 
   const colunas: Coluna<Recebimento>[] = [
-    { chave: 'nfNumero', titulo: 'NF', ordenavel: true },
+    { chave: 'nfNumero', titulo: 'NF', ordenavel: true, render: (r) => <CodigoLink codigo={`NF ${r.nfNumero}`} /> },
     { chave: 'dofNumero', titulo: 'DOF', ordenavel: true },
     { chave: 'fornecedor', titulo: 'Fornecedor', ordenavel: true },
     { chave: 'recebidoEm', titulo: 'Recebido em', ordenavel: true, render: (r) => data(r.recebidoEm) },
@@ -43,7 +44,7 @@ export default function RecebimentoPage() {
       chave: 'divergenciaVolumePct', titulo: 'Volume x DOF', alinhar: 'right', ordenavel: true,
       render: (r) => <Badge tom={r.acimaTolerancia ? 'vermelho' : 'verde'}>{sinal(r.divergenciaVolumePct)}{pct(r.divergenciaVolumePct)}</Badge>,
     },
-    { chave: 'lotes', titulo: 'Lotes criados', render: (r) => r.lotes.join(', ') },
+    { chave: 'lotes', titulo: 'Lotes criados', render: (r) => <CodigosLink codigos={r.lotes} /> },
     { chave: 'fardos', titulo: 'Fardos', alinhar: 'right', ordenavel: true },
     { chave: 'conferente', titulo: 'Conferente', ordenavel: true },
   ];
@@ -95,7 +96,7 @@ export default function RecebimentoPage() {
               <dt>Recebido em</dt><dd>{data(ver.recebidoEm)} por {ver.conferente}</dd>
               <dt>Quantidade</dt><dd>NF {un(ver.quantidadeDocumental)} · conferida {un(ver.quantidadeConferida)}</dd>
               <dt>Avaria</dt><dd>{ver.avaria ? 'Sim' : 'Não'}</dd><dt>Fotos</dt><dd>{ver.fotos}</dd>
-              <dt>Lotes</dt><dd>{ver.lotes.join(', ')} ({ver.fardos} fardos)</dd>
+              <dt>Lotes</dt><dd><CodigosLink codigos={ver.lotes} /> ({ver.fardos} fardos)</dd>
               {ver.justificativa && <><dt>Justificativa</dt><dd>{ver.justificativa}</dd></>}
               {ver.observacao && <><dt>Observação</dt><dd>{ver.observacao}</dd></>}
             </dl>

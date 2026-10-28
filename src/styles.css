@@ -262,3 +262,19 @@ body { background: #f6f7f9; }
 .barras-h-trilho span { display: block; height: 100%; background: var(--azul-600); }
 .barras-h-valor { text-align: right; }
 .titulo-secao { font-size: 16px; color: var(--azul-800); margin: 8px 0 0; }
+
+/* Navegação: migalhas, códigos clicáveis e página do lote */
+.migalhas { font-size: 13px; color: var(--texto-mudo); display: flex; gap: 6px; align-items: center; }
+.migalhas a { color: var(--azul-600); }
+a.codigo { color: var(--azul-600); font-weight: 600; text-decoration: none; white-space: nowrap; }
+a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
+.selos { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.linha-destaque td { background: var(--laranja-100); font-weight: 600; }
+.linha-tempo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.evento { display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 0 0 16px; position: relative; font-size: 14px; }
+.evento:not(:last-child)::before { content: ''; position: absolute; left: 21px; top: 34px; bottom: 0; width: 2px; background: var(--cinza-200); }
+.evento-marca { width: 44px; height: 30px; border-radius: 15px; display: grid; place-items: center; font: 700 10px/1 system-ui, sans-serif; background: var(--azul-100); color: var(--azul-800); }
+.evento-saida .evento-marca { background: var(--laranja-100); }
+.evento-perda .evento-marca { background: var(--vermelho-100); color: var(--vermelho); }
+.evento-recebimento .evento-marca, .evento-declaracao .evento-marca { background: #e6f4ea; color: #1e6b34; }
+.evento-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

@@ -31,7 +31,7 @@ npm run build                # typecheck + vite build em dist/
 
 Não há testes automatizados nem ESLint configurados (os comentários `eslint-disable` no código são residuais). Validar mudanças com `npm run build`.
 
-No modo simulado qualquer usuário/senha preenchidos entram. Para testar estados da UI: `http://localhost:5173/?simular=erro` ou `?simular=vazio` (tratado em `src/services/mock/util.ts`; o parâmetro fica antes do `#`, pois o app usa `HashRouter`). Para testar a importação de NF-e, use o XML fictício `docs/exemplos/nfe-exemplo.xml` (CNPJ de um fornecedor do mock, chave válida e DOF citado em `infCpl`).
+No modo simulado qualquer senha entra; o usuário digitado escolhe o perfil (`almoxarife`, `supervisor`, `requisitante`, `operador`, `gestor`, em `perfisDemo` de `mock/data.ts`) e qualquer outro nome entra como administrador. As ações ficam registradas no nome desse perfil. Para testar estados da UI: `http://localhost:5173/?simular=erro` ou `?simular=vazio` (tratado em `src/services/mock/util.ts`; o parâmetro fica antes do `#`, pois o app usa `HashRouter`). Para testar a importação de NF-e, use o XML fictício `docs/exemplos/nfe-exemplo.xml` (CNPJ de um fornecedor do mock, chave válida e DOF citado em `infCpl`).
 
 ## Arquitetura
 
@@ -44,7 +44,7 @@ No modo simulado qualquer usuário/senha preenchidos entram. Para testar estados
 
 **Dicionário do domínio (`src/dominio/`):** `rotulos.ts` tem o rótulo e a cor (`Tom`) de cada estado (`STATUS_REGISTRO`, `ESTADO_INVENTARIO`, etc.), `opcoes.ts` tem as opções de filtro/select (`STATUS_OPCOES`, `CLASSE_OPCOES`… e `opcoesDe(mapa)`), `permissoes.ts` tem o tipo `Permissao`, `parametros.ts` tem as regras fixas do PRD (tolerância de volume de 10% da IN Ibama, 14 dormentes por fardo como sugestão) e as funções de prévia usadas pelas telas e pelo mock (`diferencaVolumePct`, `foraDaTolerancia`, `sugerirFardos`); no modo real a regra vale no servidor. Badges de estado usam `<BadgeDe mapa={…} valor={…} />`. Não definir mapas de rótulos nem opções dentro das páginas, e páginas não importam constantes de outras páginas.
 
-**Rotas e menu:** `src/rotas.tsx` (`ROTAS`) é a lista única das telas protegidas; `App.tsx` gera as rotas e `Layout.tsx` gera o menu a partir dela. Tela nova = uma linha em `ROTAS`.
+**Rotas e menu:** `src/rotas.tsx` (`ROTAS`) é a lista única das telas protegidas; `App.tsx` gera as rotas e `Layout.tsx` gera o menu a partir dela. Tela nova = uma linha em `ROTAS`. O menu segue o fluxo do PRD (`GRUPOS_MENU`: Início, Entrada, Estoque, Saída, Controle, Cadastros, Sistema). `permissoes` (basta uma) esconde a tela do menu do perfil e, se acessada pelo endereço, mostra "sem permissão" (`ExigePermissao`, só UX); `foraDoMenu` deixa a rota acessível por link (ex. `/lotes/:codigo`, telas fora do MVP).
 
 **Componentes genéricos que quase todas as telas usam:**
 - `ListPage` recebe `listar(q: ListQuery)`, `colunas`, `filtros`, `acoesLinha` e cuida de busca com debounce, filtros, ordenação, paginação e estados carregando/erro/vazio. Para forçar recarga após uma mutação, a tela incrementa um contador e passa em `recarregar`. Em `Coluna<T>`, coluna `ordenavel` exige `chave` que seja campo real do modelo (vai como `sortBy`).
@@ -54,10 +54,12 @@ No modo simulado qualquer usuário/senha preenchidos entram. Para testar estados
 - Arquivos são validados no navegador por `arquivoInvalido(f, extensoes)` (`utils/format.ts`: extensão, `VITE_UPLOAD_MAX_MB`, arquivo vazio), usado por `UploadModal`, `FormModal` e os modais de NF e recebimento.
 - `utils/nfeXml.ts` lê o XML da NF-e com `DOMParser` (modo XML, sem executar nada) só para preencher o formulário; `chaveAcessoValida()` confere os 44 dígitos e o dígito verificador. O servidor recebe o arquivo e valida de novo.
 - `useAsync(fn, deps)` em `hooks/useAsync.ts` é o padrão para carregar dados fora de listas.
+- Códigos de lote, fardo, RME e NF nas tabelas usam `<CodigoLink codigo={…} />` (`components/Codigos.tsx`), que leva ao registro pela mesma regra da busca global (`rotaDoCodigo`). NF vai como `` `NF ${numero}` ``.
+- A página do lote (`/lotes/:codigo`, `servicos.lotes.obter`) reúne situação, fardos (`?fardo=` destaca um), origem (NF, DOF, recebimento) e a linha do tempo da NF ao destino (RF09/RF23).
 
 **Autenticação/permissões:** `AuthContext` mantém o usuário só em memória (sem `localStorage`, de propósito). `pode(p: Permissao)` e `RotaProtegida` são apenas UX — o servidor deve validar. Permissão nova entra em `dominio/permissoes.ts` (e em `usuarioDemo`, em `mock/data.ts`, para aparecer no modo simulado).
 
-**Roteamento:** `HashRouter` em `App.tsx`, para funcionar em hospedagem estática sem rewrite. Todas as rotas exceto `/login` ficam sob `RotaProtegida`, que renderiza o `Layout` (sidebar com os grupos de navegação, busca global que leva a `/lotes?q=`, notificações). Sem sessão, redireciona ao login guardando caminho + parâmetros para voltar depois.
+**Roteamento:** `HashRouter` em `App.tsx`, para funcionar em hospedagem estática sem rewrite. Todas as rotas exceto `/login` ficam sob `RotaProtegida`, que renderiza o `Layout` (sidebar com os grupos de navegação, busca global que reconhece códigos por `destinoBusca()` de `utils/busca.ts`: lote e fardo abrem a página do lote, RME e NF abrem a lista filtrada, texto livre pesquisa em `/lotes?q=`, notificações). Sem sessão, redireciona ao login guardando caminho + parâmetros para voltar depois.
 
 ## Regras de domínio e de interface a preservar
 
