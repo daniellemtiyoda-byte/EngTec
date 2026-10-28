@@ -97,7 +97,7 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
     const lote: Lote = {
       id: ctx.novoId('l'), codigo, fornecedor: nf.fornecedor, nfNumero: nf.numero, dofNumero: dof.numero,
       especieDocumental: c.especie.nomeCientifico, classe: c.especie.classe, inspecao: 'aguardando', tamanho: c.tamanho.codigo,
-      quantidade: c.quantidade, fardos: c.fardos.length,
+      quantidade: c.quantidade, saldo: c.quantidade, fardos: c.fardos.length,
       comprimentoM: c.tamanho.comprimentoCm / 100, larguraM: c.tamanho.larguraCm / 100, alturaM: c.tamanho.alturaCm / 100,
       metrosLineares: (c.quantidade * c.tamanho.comprimentoCm) / 100, volumeDocumentalM3, volumeCalculadoM3: c.volumeM3,
       recebidoEm: ctx.quando, status: 'pendente', estoqueStatus: acimaTolerancia ? 'divergente' : 'em_analise', local: 'A definir',
@@ -119,7 +119,7 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
       diferencaPct: c.volumeM3 > 0 ? (dif / c.volumeM3) * 100 : 0, situacao: acimaTolerancia ? 'divergente' : 'conforme',
     });
     B.movimentacoes.unshift({
-      id: ctx.novoId('m'), tipo: 'entrada', loteCodigo: codigo, quantidade: c.quantidade, origem: `NF ${nf.numero}`, destino: 'A definir',
+      id: ctx.novoId('m'), tipo: 'entrada', loteCodigo: codigo, referencia: `NF ${nf.numero}`, quantidade: c.quantidade, origem: nf.fornecedor, destino: 'A definir',
       dataHora: ctx.quando, usuario: ctx.usuario, status: 'aprovado',
     });
   }

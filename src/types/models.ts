@@ -187,7 +187,10 @@ export interface Lote {
   categoria?: Categoria;
   inspecao: ResultadoInspecao;
   tamanho: string;
+  /** Quantidade recebida. */
   quantidade: number;
+  /** Dormentes ainda no estoque (recebido menos as baixas por RME). */
+  saldo: number;
   fardos: number;
   comprimentoM: number;
   larguraM: number;
@@ -272,6 +275,9 @@ export interface Movimentacao {
   id: string;
   tipo: TipoMovimentacao;
   loteCodigo: string;
+  fardoCodigo?: string;
+  /** Documento de origem: NF (entrada) ou RME (saída). */
+  referencia?: string;
   quantidade: number;
   origem: string;
   destino: string;
@@ -280,13 +286,102 @@ export interface Movimentacao {
   status: StatusRegistro;
 }
 
+/** Só transferência: entrada vem do recebimento e saída da RME. */
 export interface NovaMovimentacao {
-  tipo: TipoMovimentacao;
+  tipo: 'transferencia';
   loteCodigo: string;
   quantidade: number;
   origem?: string;
   destino?: string;
   motivo?: string;
+}
+
+export type StatusRme = 'aberta' | 'em_separacao' | 'conferida' | 'entregue' | 'cancelada';
+export type UrgenciaRme = 'normal' | 'urgente';
+
+export interface ItemRme {
+  id: string;
+  especieId: string;
+  especie: string;
+  tamanhoId: string;
+  tamanho: string;
+  quantidade: number;
+  quantidadeEntregue: number;
+}
+
+export interface ItemSeparacao {
+  itemId: string;
+  fardoCodigo: string;
+  loteCodigo: string;
+  quantidade: number;
+  /** Saldo do fardo no momento da separação (para mostrar o que sobra na entrega). */
+  saldoFardo: number;
+}
+
+export interface Separacao {
+  itens: ItemSeparacao[];
+  /** Se a escolha foi exatamente a sugestão FIFO (indicador "% de saídas que respeitaram o lote mais antigo"). */
+  seguiuSugestao: boolean;
+  justificativa?: string;
+  almoxarife: string;
+  separadaEm: string;
+}
+
+export interface EventoRme {
+  quando: string;
+  usuario: string;
+  acao: string;
+  detalhe?: string;
+}
+
+export interface Rme {
+  id: string;
+  /** Sequencial por ano, ex. RME26-0007. */
+  numero: string;
+  requisitante: string;
+  destinatario: string;
+  urgencia: UrgenciaRme;
+  /** AAAA-MM-DD */
+  dataLimite: string;
+  observacao?: string;
+  abertaEm: string;
+  status: StatusRme;
+  itens: ItemRme[];
+  separacao?: Separacao;
+  supervisor?: string;
+  conferidaEm?: string;
+  entreguePor?: string;
+  entregueEm?: string;
+  motivoCancelamento?: string;
+  historico: EventoRme[];
+}
+
+export interface NovaRme {
+  destinatario: string;
+  urgencia: UrgenciaRme;
+  dataLimite: string;
+  observacao?: string;
+  itens: { especieId: string; tamanhoId: string; quantidade: number }[];
+}
+
+/** Fardo elegível para um item da RME, na ordem da sugestão (abertos primeiro, depois fechados por FIFO de lote). */
+export interface OpcaoSeparacao {
+  itemId: string;
+  fardoCodigo: string;
+  loteCodigo: string;
+  recebidoEm: string;
+  estado: EstadoFardo;
+  local: string;
+  /** Saldo do fardo menos o que já está reservado em outras RMEs. */
+  disponivel: number;
+  /** Quantidade que a sugestão FIFO tira deste fardo (0 = não sugerido). */
+  sugerido: number;
+}
+
+export interface NovaSeparacao {
+  itens: { itemId: string; fardoCodigo: string; quantidade: number }[];
+  /** Obrigatória quando a escolha difere da sugestão. */
+  justificativa?: string;
 }
 
 export interface SessaoInventario {

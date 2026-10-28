@@ -64,6 +64,15 @@ export function criarServicosReais(): Servicos {
     fardos: servicoLista('fardos.listar'),
     estoque: servicoLista('estoque.listar'),
     movimentacoes: { ...servicoLista('movimentacoes.listar'), registrar: (d) => post('movimentacoes.registrar', d) },
+    rme: {
+      ...servicoLista('rme.listar'),
+      abrir: (d) => post('rme.abrir', d),
+      opcoesSeparacao: (id) => http(caminho('rme.opcoesSeparacao', id)),
+      separar: (id, d) => post('rme.separar', d, id),
+      conferir: (id, d) => post('rme.conferir', d, id),
+      entregar: (id) => post('rme.entregar', undefined, id),
+      cancelar: (id, motivo) => post('rme.cancelar', { motivo }, id),
+    },
     inventario: {
       ...servicoLista('inventario.listar'),
       criarSessao: (d) => post('inventario.criarSessao', d),

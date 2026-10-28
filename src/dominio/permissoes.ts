@@ -9,6 +9,9 @@ export const PERMISSOES = [
   'inventario:criar',
   'cadastros:editar', // classe e uso das espécies; medidas dos tamanhos
   'nf:cadastrar', // NF (manual ou XML) e DOF
+  'rme:abrir', // requisitante: abrir e cancelar RME
+  'rme:separar', // almoxarife: separar e confirmar a entrega
+  'rme:conferir', // supervisor: conferência antes da entrega
   'visao:enviar',
   'relatorios:exportar',
   'admin',

@@ -1,6 +1,7 @@
 import type {
   Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Especie, Fardo, Fornecedor, Indicadores,
-  ListQuery, LocalPatio, Lote, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovoDof, NovoRecebimento, NovoTamanho, Paginado,
+  ListQuery, LocalPatio, Lote, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoRecebimento, NovoTamanho,
+  OpcaoSeparacao, Paginado, Rme,
   ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, ResultadoRecebimento, SaldoEstoque,
   SessaoInventario, SolicitacaoExportacao, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../types/models';
@@ -41,7 +42,20 @@ export interface Servicos {
   fardos: ServicoLista<Fardo>;
   estoque: ServicoLista<SaldoEstoque>;
   movimentacoes: ServicoLista<Movimentacao> & {
+    /** Só transferência: entrada vem do recebimento e saída da RME. */
     registrar(d: NovaMovimentacao): Promise<Movimentacao>;
+  };
+  /** RME: única forma de saída do estoque. Quem confere não pode ser quem separou (validado no servidor). */
+  rme: ServicoLista<Rme> & {
+    abrir(d: NovaRme): Promise<Rme>;
+    /** Fardos elegíveis por item, já na ordem da sugestão e com a quantidade sugerida. */
+    opcoesSeparacao(id: string): Promise<OpcaoSeparacao[]>;
+    separar(id: string, d: NovaSeparacao): Promise<Rme>;
+    /** `aprovada: false` devolve para separação; o motivo é obrigatório. */
+    conferir(id: string, d: { aprovada: boolean; motivo?: string }): Promise<Rme>;
+    /** Confirma a entrega e dá a baixa nos fardos separados. */
+    entregar(id: string): Promise<Rme>;
+    cancelar(id: string, motivo: string): Promise<Rme>;
   };
   inventario: ServicoLista<SessaoInventario> & {
     criarSessao(d: { descricao: string; local: string }): Promise<SessaoInventario>;

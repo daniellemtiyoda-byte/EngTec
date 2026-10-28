@@ -11,6 +11,7 @@ const ICONES: Record<string, string> = {
   users: 'M9 11a4 4 0 100-8 4 4 0 000 8zM2 21c0-4 3-6 7-6s7 2 7 6M17 5a3 3 0 010 6M19 15c2 1 3 3 3 6',
   leaf: 'M5 19C5 9 11 4 21 3c0 10-5 16-14 16M5 19l8-8',
   ruler: 'M3 16L16 3l5 5L8 21zM7 12l2 2M10 9l2 2M13 6l2 2',
+  pedido: 'M6 3h12v18H6zM9 7h6M9 11h6M9 15h4',
   medida: 'M3 8h18v8H3zM7 8v3M11 8v4M15 8v3M19 8v4',
   chart: 'M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3',
   shield: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z',

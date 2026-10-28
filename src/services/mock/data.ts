@@ -1,10 +1,11 @@
 import type {
   DivergenciaInventario, Documento, Especie, Fardo, Fornecedor, ItemNf, LocalPatio, Lote, Movimentacao, NotaFiscal, ProcessamentoImagem,
-  Recebimento, RegistroAuditoria, Relatorio, SaldoEstoque, SessaoInventario, Tamanho, Transferencia, Usuario, VolumetriaLote,
+  Recebimento, RegistroAuditoria, Relatorio, Rme, SaldoEstoque, SessaoInventario, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../../types/models';
 import { sugerirFardos } from '../../dominio/parametros';
 import { chaveComDigito } from '../../utils/nfeXml';
 import { receber } from './recebimento';
+import { abrirRme, cancelarRme, conferirRme, entregarRme, opcoesSeparacao, separarRme } from './rme';
 import { volumeDormenteM3 } from './util';
 
 // DADOS FICTÍCIOS para desenvolvimento. Nenhum valor aqui representa estoque, fornecedores ou documentos reais.
@@ -13,7 +14,7 @@ export function criarDados() {
 
   const usuarioDemo: Usuario = {
     id: 'u1', nome: 'Usuário de Demonstração', email: 'demo@exemplo.invalid', perfil: 'Administrador (simulado)',
-    permissoes: ['recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'nf:cadastrar', 'visao:enviar', 'relatorios:exportar', 'admin'],
+    permissoes: ['recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'nf:cadastrar', 'rme:abrir', 'rme:separar', 'rme:conferir', 'visao:enviar', 'relatorios:exportar', 'admin'],
     ativo: true, ultimoAcesso: '2026-10-09T10:15:00-03:00',
   };
 
@@ -128,6 +129,37 @@ export function criarDados() {
     });
   }
 
+  // RMEs fictícias, uma em cada status, pela mesma regra do serviço. Grupos espécie + tamanho com saldo disponível, do mais antigo.
+  const rmes: Rme[] = [];
+  const baseRme = { especies, tamanhos, lotes, fardos, saldos, movimentacoes, rmes };
+  const grupos = [...new Map([...lotes].reverse().filter((l) => l.estoqueStatus === 'disponivel').map((l) => [`${l.especieDocumental}|${l.tamanho}`, l]))]
+    .map(([, l]) => ({ especieId: especies.find((e) => e.nomeCientifico === l.especieDocumental)!.id, tamanhoId: tamanhos.find((t) => t.codigo === l.tamanho)!.id }));
+  const pessoa = { requisitante: 'Requisitante (Via Permanente)', almoxarife: 'Almoxarife 1', supervisor: 'Supervisor de Conferência 1' };
+  const ctx = (n: number, usuario: string) => ({ quando: dia(n), usuario, novoId });
+  const sugerida = (r: Rme) => ({ itens: opcoesSeparacao(baseRme, r).filter((o) => o.sugerido > 0).map((o) => ({ itemId: o.itemId, fardoCodigo: o.fardoCodigo, quantidade: o.sugerido })) });
+  const nova = (n: number, destinatario: string, itens: [number, number][], urgencia: 'normal' | 'urgente' = 'normal', limite = n + 45) => abrirRme(baseRme, {
+    destinatario, urgencia, dataLimite: dia(limite).slice(0, 10), itens: itens.map(([g, quantidade]) => ({ ...grupos[g % grupos.length], quantidade })),
+  }, ctx(n, pessoa.requisitante));
+
+  // Entregue: tira 8 de um fardo de 14, que fica aberto com saldo 6.
+  const r1 = nova(118, 'Manutenção da Via Permanente – Linha 10', [[0, 8]]);
+  separarRme(baseRme, r1, sugerida(r1), ctx(119, pessoa.almoxarife));
+  conferirRme(r1, { aprovada: true }, ctx(119, pessoa.supervisor));
+  entregarRme(baseRme, r1, ctx(120, pessoa.almoxarife));
+  // Conferida, aguardando a entrega.
+  const r2 = nova(124, 'Manutenção da Via Permanente – Linha 12', [[1, 20]]);
+  separarRme(baseRme, r2, sugerida(r2), ctx(125, pessoa.almoxarife));
+  conferirRme(r2, { aprovada: true }, ctx(125, pessoa.supervisor));
+  // Em separação: a sugestão começa pelo fardo aberto da RME entregue.
+  const r3 = nova(128, 'Obras – Pátio Presidente Altino', [[0, 10]], 'urgente');
+  separarRme(baseRme, r3, sugerida(r3), ctx(129, pessoa.almoxarife));
+  // Cancelada.
+  const r4 = nova(126, 'Manutenção da Via Permanente – Linha 11', [[2, 14]]);
+  cancelarRme(r4, 'Serviço reprogramado pela manutenção.', ctx(127, pessoa.requisitante));
+  // Abertas: uma urgente com dois itens e uma com data limite vencida.
+  nova(140, 'Manutenção da Via Permanente – Linha 13', [[2, 30], [3, 14]], 'urgente', 160);
+  nova(130, 'Manutenção da Via Permanente – Linha 10', [[3, 6]], 'normal', 140);
+
   const documentos: Documento[] = Array.from({ length: 20 }, (_, i) => {
     const l = lotes[i % lotes.length];
     return {
@@ -184,7 +216,7 @@ export function criarDados() {
     { id: 'u4', nome: 'Usuário Inativo', email: 'inativo@exemplo.invalid', perfil: 'Consulta', permissoes: [], ativo: false },
   ];
 
-  return { usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
+  return { usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, rmes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
 }
 
 export type DadosSimulados = ReturnType<typeof criarDados>;

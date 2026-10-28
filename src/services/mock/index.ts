@@ -6,6 +6,7 @@ import { chaveAcessoValida } from '../../utils/nfeXml';
 import { ApiError } from '../http';
 import { criarDados } from './data';
 import { receber } from './recebimento';
+import { abrirRme, cancelarRme, conferirRme, entregarRme, opcoesSeparacao, separarRme } from './rme';
 import { atraso, paginar, simularRede, volumeDormenteM3 } from './util';
 
 let sessao: Usuario | null = null; // apenas em memória: nada de credenciais no armazenamento do navegador
@@ -19,6 +20,12 @@ export function criarServicosSimulados(): Servicos {
     if (D.tamanhos.some((t) => t.id !== id && t.codigo.toLowerCase() === n.codigo.toLowerCase())) {
       throw new ApiError(409, 'Já existe um tamanho com este código.', { codigo: 'Código já utilizado.' });
     }
+  }
+  const agora = () => ({ quando: new Date().toISOString(), usuario: D.usuarioDemo.nome, novoId });
+  function acharRme(id: string) {
+    const r = D.rmes.find((x) => x.id === id);
+    if (!r) throw new ApiError(404, 'RME não encontrada.');
+    return r;
   }
   const comVolume = (id: string, n: NovoTamanho): Tamanho => ({ id, ...n, volumeM3: volumeDormenteM3(n.larguraCm, n.alturaCm, n.comprimentoCm) });
 
@@ -58,10 +65,15 @@ export function criarServicosSimulados(): Servicos {
           descricao: `DOF ${r.dofNumero}: ${r.divergenciaVolumePct > 0 ? '+' : ''}${pct(r.divergenciaVolumePct)}. A norma manda recusar a carga e comunicar o órgão; os lotes ficam com divergência até serem liberados.`,
           link: '/recebimento',
         }));
+        const hoje = new Date().toISOString().slice(0, 10);
+        const vencidas = D.rmes.filter((r) => r.dataLimite < hoje && r.status !== 'entregue' && r.status !== 'cancelada');
+        const aConferir = D.rmes.filter((r) => r.status === 'em_separacao').length;
         const semDof = D.notas.filter((n) => n.situacao === 'aguardando_dof').length;
         const aReceber = D.notas.filter((n) => n.situacao === 'aguardando_recebimento').length;
         return [
           ...divergentes,
+          ...vencidas.map((r) => ({ id: `al-rme-${r.id}`, nivel: 'critico' as const, titulo: `RME ${r.numero} com data limite vencida`, descricao: `Destinatário: ${r.destinatario}. Ainda não entregue.`, link: '/rme' })),
+          ...(aConferir ? [{ id: 'al-conferir', nivel: 'atencao' as const, titulo: `${aConferir} RME aguardando conferência`, descricao: 'A entrega e a baixa só acontecem após a conferência do supervisor.', link: '/rme' }] : []),
           ...(semDof ? [{ id: 'al-sem-dof', nivel: 'atencao' as const, titulo: `${semDof} NF aguardando DOF`, descricao: 'O recebimento não avança sem o DOF cadastrado.', link: '/notas' }] : []),
           ...(aReceber ? [{ id: 'al-receber', nivel: 'atencao' as const, titulo: `${aReceber} NF aguardando recebimento`, descricao: 'NF com DOF pronta para conferência.', link: '/recebimento' }] : []),
           { id: 'al3', nivel: 'atencao' as const, titulo: 'Ajuste de inventário pendente de aprovação', descricao: 'O saldo oficial só muda após a aprovação.', link: '/inventario' },
@@ -138,6 +150,7 @@ export function criarServicosSimulados(): Servicos {
       listar: (q) => paginar(D.movimentacoes, q),
       registrar: async (n) => {
         await atraso(600);
+        if (n.tipo !== 'transferencia') throw new ApiError(422, 'Só transferências são registradas aqui: entrada vem do recebimento e saída da RME.');
         const lote = D.lotes.find((l) => l.codigo.toLowerCase() === n.loteCodigo.trim().toLowerCase());
         if (!lote) throw new ApiError(404, 'Lote não encontrado.', { loteCodigo: 'Lote inexistente.' });
         if (lote.estoqueStatus === 'bloqueado') throw new ApiError(409, 'Lote bloqueado: movimentação não permitida.');
@@ -145,6 +158,15 @@ export function criarServicosSimulados(): Servicos {
         D.movimentacoes.unshift(m);
         return m;
       },
+    },
+    rme: {
+      listar: (q) => paginar(D.rmes, q),
+      abrir: async (n) => { await atraso(500); return abrirRme(D, n, agora()); },
+      opcoesSeparacao: async (id) => { await simularRede(); return opcoesSeparacao(D, acharRme(id)); },
+      separar: async (id, n) => { await atraso(600); return separarRme(D, acharRme(id), n, agora()); },
+      conferir: async (id, d) => { await atraso(500); return conferirRme(acharRme(id), d, agora()); },
+      entregar: async (id) => { await atraso(700); return entregarRme(D, acharRme(id), agora()); },
+      cancelar: async (id, motivo) => { await atraso(500); return cancelarRme(acharRme(id), motivo, agora()); },
     },
     inventario: {
       listar: (q) => paginar(D.sessoesInventario, q),

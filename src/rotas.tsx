@@ -13,6 +13,7 @@ import NotasFiscais from './pages/NotasFiscais';
 import Patio from './pages/Patio';
 import Recebimento from './pages/Recebimento';
 import Relatorios from './pages/Relatorios';
+import RmePage from './pages/Rme';
 import Tamanhos from './pages/Tamanhos';
 import VisaoComputacional from './pages/VisaoComputacional';
 import Volumetria from './pages/Volumetria';
@@ -39,6 +40,7 @@ export const ROTAS: Rota[] = [
   { caminho: '/recebimento', tela: Recebimento, rotulo: 'Recebimento', icone: 'truck', grupo: 'Operação' },
   { caminho: '/lotes', tela: Lotes, rotulo: 'Lotes', icone: 'layers', grupo: 'Operação' },
   { caminho: '/estoque', tela: Estoque, rotulo: 'Estoque', icone: 'box', grupo: 'Operação' },
+  { caminho: '/rme', tela: RmePage, rotulo: 'RME', icone: 'pedido', grupo: 'Operação' },
   { caminho: '/movimentacoes', tela: Movimentacoes, rotulo: 'Movimentações', icone: 'swap', grupo: 'Operação' },
   { caminho: '/patio', tela: Patio, rotulo: 'Pátio', icone: 'map', grupo: 'Operação' },
   { caminho: '/inventario', tela: Inventario, rotulo: 'Inventário físico', icone: 'clipboard', grupo: 'Operação' },

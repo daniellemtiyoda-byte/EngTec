@@ -1,6 +1,6 @@
 import type {
   Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoMedidas, SituacaoNf, StatusEstoque,
-  StatusRegistro, TipoMovimentacao, UsoEspecie,
+  StatusRegistro, StatusRme, TipoMovimentacao, UrgenciaRme, UsoEspecie,
 } from '../types/models';
 
 /**
@@ -45,6 +45,14 @@ export const DECLARACAO_DOF: Rotulos<Dof['declaracao']> = {
 
 export const ESTADO_FARDO: Rotulos<EstadoFardo> = {
   fechado: ['verde', 'Fechado'], aberto: ['laranja', 'Aberto'], baixado: ['cinza', 'Baixado'],
+};
+
+export const STATUS_RME: Rotulos<StatusRme> = {
+  aberta: ['azul', 'Aberta'], em_separacao: ['laranja', 'Em separação'], conferida: ['verde', 'Conferida'], entregue: ['cinza', 'Entregue'], cancelada: ['vermelho', 'Cancelada'],
+};
+
+export const URGENCIA_RME: Rotulos<UrgenciaRme> = {
+  normal: ['cinza', 'Normal'], urgente: ['vermelho', 'Urgente'],
 };
 
 export const TIPO_MOVIMENTACAO: Rotulos<TipoMovimentacao> = {

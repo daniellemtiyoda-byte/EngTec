@@ -33,7 +33,13 @@
 | Lotes | Listar (lotes só nascem do recebimento) | GET | /lotes |
 | Fardos | Listar (filtro `loteCodigo`) | GET | /fardos |
 | Estoque | Consultar saldos | GET | /estoque/saldos |
-| Movimentações | Listar / Registrar | GET / POST | /movimentacoes |
+| Movimentações | Listar / Registrar (só `tipo: 'transferencia'`) | GET / POST | /movimentacoes |
+| RME | Listar / Abrir | GET / POST | /rmes |
+| RME | Fardos elegíveis e sugestão FIFO | GET | /rmes/{id}/opcoes-separacao |
+| RME | Registrar separação (`{ itens: [{ itemId, fardoCodigo, quantidade }], justificativa? }`) | POST | /rmes/{id}/separacao |
+| RME | Conferência (`{ aprovada, motivo? }`; `aprovada: false` devolve para separação) | POST | /rmes/{id}/conferencia |
+| RME | Confirmar entrega (dá a baixa) | POST | /rmes/{id}/entrega |
+| RME | Cancelar (`{ motivo }`) | POST | /rmes/{id}/cancelamento |
 | Inventário | Listar sessões / Criar sessão | GET / POST | /inventarios |
 | Inventário | Registrar contagem | POST | /inventarios/{id}/contagens |
 | Inventário | Consultar divergências | GET | /inventarios/{id}/divergencias |
@@ -62,7 +68,7 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
    - O front envia `X-Requested-With: XMLHttpRequest` em **toda** chamada: o CORS precisa permitir esse cabeçalho (`Access-Control-Allow-Headers`).
    - Proteção contra CSRF no servidor: cookie com `SameSite=Lax` ou `Strict` e, de preferência, rejeitar requisições sem o cabeçalho acima ou usar token anti-CSRF.
    - O campo `mensagem` dos erros é exibido ao usuário como veio: deve ser texto seguro, sem detalhes internos (stack trace, SQL, caminhos).
-4. Permissões por operação (nomes das permissões usados em `pode('...')`: `nf:cadastrar`, `recebimento:registrar`, `movimentacoes:registrar`, `inventario:criar`, `cadastros:editar`, `visao:enviar`, `relatorios:exportar`, `admin`).
+4. Permissões por operação (nomes das permissões usados em `pode('...')`: `nf:cadastrar`, `rme:abrir`, `rme:separar`, `rme:conferir`, `recebimento:registrar`, `movimentacoes:registrar`, `inventario:criar`, `cadastros:editar`, `visao:enviar`, `relatorios:exportar`, `admin`).
 5. Códigos de resposta e formato dos erros (incluindo erros por campo).
 6. Exemplos de sucesso e de erro.
 7. Regras de negócio decididas no servidor: tolerância volumétrica, estados de aprovação, fluxo de aprovação de ajustes de inventário, formatos/tamanhos de upload.
@@ -70,6 +76,8 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
 9. Para relatórios: como o arquivo gerado é baixado (URL assinada, endpoint próprio?).
 
 ## Pontos em aberto
+
+- RME: o servidor deve recusar a conferência feita pelo mesmo usuário que separou (regra das duas pessoas; o mock aceita para demonstração). Reserva: o que está separado em RME `em_separacao` ou `conferida` não aparece como disponível em outra RME. Sugestão: fardos abertos primeiro (do mais antigo), depois fechados por FIFO de lote; só lotes `inspecao: 'aprovado'` e `estoqueStatus: 'disponivel'`. Separação fora da sugestão exige `justificativa` (erro por campo). A entrega gera uma movimentação `saida` por fardo, com `referencia` = número da RME. Confirmação de recebimento pelo requisitante fica para depois.
 
 - NF: o servidor recusa chave de acesso repetida (409, campo `chaveAcesso`) e NF repetida do mesmo fornecedor (mesmo número e série, 409, campo `numero`). Confirmar se o XML é validado (assinatura, schema) e guardado no servidor.
 - DOF: um por NF no MVP; volumes por espécie (`[{ especieId, volumeM3 }]`). Erros por campo usam `vol_<especieId>`.
