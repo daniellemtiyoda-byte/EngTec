@@ -19,6 +19,7 @@ import { STATUS_RME, URGENCIA_RME } from '../dominio/rotulos';
 import { servicos } from '../services';
 import { mensagemSegura } from '../services/http';
 import type { Rme } from '../types/models';
+import { seqPeca } from '../utils/busca';
 import { data, dataHora, dias, diasAte, diasDesde, hojeSP, prazoTexto, un } from '../utils/format';
 
 const emAndamento = (r: Rme) => r.status !== 'entregue' && r.status !== 'cancelada';
@@ -202,10 +203,10 @@ export default function RmePage() {
                 {sel.separacao.justificativa && <Aviso tom="alerta"><strong>Justificativa:</strong> {sel.separacao.justificativa}</Aviso>}
                 <div className="tabela-wrap">
                   <table className="tabela">
-                    <thead><tr><th>Fardo</th><th>Lote</th><th className="al-right">Separado</th><th className="al-right">Saldo do fardo</th><th className="al-right">Fica no fardo</th></tr></thead>
+                    <thead><tr><th>Fardo</th><th>Lote</th><th className="al-right">Separado</th><th>Dormentes</th><th className="al-right">Saldo do fardo</th><th className="al-right">Fica no fardo</th></tr></thead>
                     <tbody>
                       {sobras(sel).map((s) => (
-                        <tr key={s.fardoCodigo}><td><CodigoLink codigo={s.fardoCodigo} /></td><td><CodigoLink codigo={s.loteCodigo} /></td><td className="al-right">{un(s.quantidade)}</td><td className="al-right">{un(s.saldoFardo)}</td><td className="al-right">{s.sobra ? `${un(s.sobra)} (aberto)` : 'baixado'}</td></tr>
+                        <tr key={s.fardoCodigo}><td><CodigoLink codigo={s.fardoCodigo} /></td><td><CodigoLink codigo={s.loteCodigo} /></td><td className="al-right">{un(s.quantidade)}</td><td title={s.dormentes.join(', ')}>{s.dormentes.map(seqPeca).join(', ')}</td><td className="al-right">{un(s.saldoFardo)}</td><td className="al-right">{s.sobra ? `${un(s.sobra)} (aberto)` : 'baixado'}</td></tr>
                       ))}
                     </tbody>
                   </table>

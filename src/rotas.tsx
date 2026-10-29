@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Especies from './pages/Especies';
 import Estoque from './pages/Estoque';
 import Fornecedores from './pages/Fornecedores';
+import Inspecao from './pages/Inspecao';
 import Inventario from './pages/Inventario';
 import LoteDetalhe from './pages/LoteDetalhe';
 import Lotes from './pages/Lotes';
@@ -46,6 +47,7 @@ export const ROTAS: Rota[] = [
   { caminho: '/', tela: Dashboard, rotulo: 'Painel', icone: 'grid', grupo: 'Início', fim: true },
   { caminho: '/notas', tela: NotasFiscais, rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: ['nf:cadastrar', 'dof:declarar', 'recebimento:registrar'] },
   { caminho: '/recebimento', tela: Recebimento, rotulo: 'Recebimento', icone: 'truck', grupo: 'Entrada', permissoes: ['recebimento:registrar'] },
+  { caminho: '/inspecao', tela: Inspecao, rotulo: 'Inspeção', icone: 'inspecao', grupo: 'Entrada', permissoes: ['inspecao:concluir', 'recebimento:registrar'] },
   { caminho: '/lotes', tela: Lotes, rotulo: 'Lotes e fardos', icone: 'layers', grupo: 'Estoque' },
   { caminho: '/lotes/:codigo', tela: LoteDetalhe, rotulo: 'Lote', icone: 'layers', grupo: 'Estoque', foraDoMenu: true },
   { caminho: '/estoque', tela: Estoque, rotulo: 'Saldo de estoque', icone: 'box', grupo: 'Estoque' },

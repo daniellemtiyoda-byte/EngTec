@@ -5,6 +5,7 @@
  */
 export const PERMISSOES = [
   'recebimento:registrar',
+  'inspecao:concluir', // lançar resultado manual e concluir a inspeção formando os fardos
   'movimentacoes:registrar',
   'inventario:criar',
   'cadastros:editar', // classe e uso das espécies; medidas dos tamanhos

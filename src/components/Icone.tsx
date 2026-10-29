@@ -18,6 +18,7 @@ const ICONES: Record<string, string> = {
   gear: 'M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2',
   bell: 'M6 16V11a6 6 0 1112 0v5l2 2H4zM10 21h4',
   search: 'M11 18a7 7 0 100-14 7 7 0 000 14zM21 21l-5-5',
+  inspecao: 'M11 18a7 7 0 100-14 7 7 0 000 14zM21 21l-5-5M8 11l2 2 4-4',
   menu: 'M4 6h16M4 12h16M4 18h16',
   building: 'M4 21V8l8-5 8 5v13zM9 21v-6h6v6',
   out: 'M9 4H4v16h5M16 8l4 4-4 4M20 12H9',

@@ -1,7 +1,7 @@
 import type {
-  Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Especie, Fardo, Fornecedor, Indicadores,
+  Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Dormente, Especie, Fardo, Fornecedor, Indicadores,
   ListQuery, LocalPatio, Lote, LoteDetalhe, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoRecebimento, NovoTamanho,
-  DofPendente, FiltroMovimentacoes, Pendencia, LinhaSaldoIbama, OpcaoSeparacao, Paginado, ParametrosNegocio, RelatorioMovimentacoes, Rme,
+  DofPendente, FiltroMovimentacoes, InspecaoPeca, NovaFormacaoFardos, NovaInspecaoManual, Pendencia, SugestaoFardos, LinhaSaldoIbama, OpcaoSeparacao, Paginado, ParametrosNegocio, RelatorioMovimentacoes, Rme,
   ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, ResultadoRecebimento, SaldoEstoque,
   SessaoInventario, SolicitacaoExportacao, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../types/models';
@@ -38,15 +38,32 @@ export interface Servicos {
     declararDof(nfId: string): Promise<NotaFiscal>;
   };
   recebimentos: ServicoLista<Recebimento> & {
-    /** Recusado sem DOF. Cria um lote por espécie e tamanho e os fardos, todos aguardando inspeção. */
+    /** Recusado sem DOF. Cria um lote por espécie e tamanho, em unidades e aguardando inspeção (os fardos vêm depois). */
     confirmar(d: NovoRecebimento, fotos: File[]): Promise<ResultadoRecebimento>;
   };
   /** Lotes só são criados pelo recebimento: não há cadastro manual. */
   lotes: ServicoLista<Lote> & {
     /** Detalhe pelo código (ex. LT26-0042): fardos, NF, DOF, recebimento e linha do tempo. 404 se não existir. */
     obter(codigo: string): Promise<LoteDetalhe>;
+    /** Resumo das inspeções vigentes do lote e a sugestão de fardos (um grupo por resultado e categoria, até 14 por fardo). */
+    sugestaoFardos(codigo: string): Promise<SugestaoFardos>;
+    /**
+     * Conclui a inspeção: forma os fardos confirmados pelo almoxarife. A soma por grupo tem de bater com as peças
+     * inspecionadas e nenhuma unidade pode ficar sem resultado. Fardo aprovado fica disponível; os demais, segregados.
+     */
+    formarFardos(codigo: string, d: NovaFormacaoFardos): Promise<LoteDetalhe>;
+  };
+  /**
+   * Inspeções por peça. As do sistema de inspeção chegam sozinhas pelo servidor (integração banco a banco, ver
+   * docs/INTEGRACAO-INSPECAO.md) e nada muda no estoque até `lotes.formarFardos`.
+   */
+  inspecoes: ServicoLista<InspecaoPeca> & {
+    /** Lançamento manual (RF06 sem o Inspector), registrando quem lançou. Só antes da conclusão da inspeção do lote. */
+    lancar(loteCodigo: string, d: NovaInspecaoManual): Promise<InspecaoPeca[]>;
   };
   fardos: ServicoLista<Fardo>;
+  /** Dormentes individuais (rastreio por peça), criados na formação dos fardos. Filtros: `loteCodigo`, `fardoCodigo`, `estado`. */
+  dormentes: ServicoLista<Dormente>;
   estoque: ServicoLista<SaldoEstoque>;
   movimentacoes: ServicoLista<Movimentacao> & {
     /** Transferência, perda ou ajuste. Perda e ajuste ficam pendentes e não alteram o saldo até a aprovação. */

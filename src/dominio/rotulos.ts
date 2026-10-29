@@ -1,5 +1,5 @@
 import type {
-  DofPendente, EtapaEntrada, MotivoPerda, Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoLote, SituacaoMedidas, SituacaoNf, StatusEstoque,
+  DofPendente, EtapaEntrada, EtapaInspecao, InspecaoPeca, VereditoInspector, MotivoPerda, Dof, EstadoFardo, LocalPatio, NotaFiscal, ProcessamentoImagem, ResultadoInspecao, SessaoInventario, SituacaoLote, SituacaoMedidas, SituacaoNf, StatusEstoque,
   StatusRegistro, StatusRme, TipoMovimentacao, UrgenciaRme, UsoEspecie,
 } from '../types/models';
 
@@ -22,6 +22,19 @@ export const STATUS_ESTOQUE: Rotulos<StatusEstoque> = {
 
 export const RESULTADO_INSPECAO: Rotulos<ResultadoInspecao> = {
   aguardando: ['azul', 'Aguardando inspeção'], aprovado: ['verde', 'Aprovado'], reprovado: ['vermelho', 'Reprovado'], quarentena: ['laranja', 'Quarentena'],
+};
+
+export const ETAPA_INSPECAO: Rotulos<EtapaInspecao> = {
+  aguardando: ['azul', 'Aguardando inspeção'], em_inspecao: ['azul', 'Em inspeção'], concluida: ['verde', 'Fardos formados'],
+};
+
+/** Veredito como vem do Inspector (o mapeamento para o resultado do PRD é provisório e fica no servidor). */
+export const VEREDITO_INSPECTOR: Rotulos<VereditoInspector> = {
+  APROVADO: ['verde', 'Aprovado'], ATENCAO: ['laranja', 'Atenção'], REJEITADO: ['vermelho', 'Rejeitado'],
+};
+
+export const ORIGEM_INSPECAO: Rotulos<InspecaoPeca['origem']> = {
+  inspector: ['azul', 'Inspector'], manual: ['cinza', 'Lançamento manual'],
 };
 
 export const SITUACAO_LOTE: Rotulos<SituacaoLote> = {

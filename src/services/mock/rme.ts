@@ -1,9 +1,9 @@
 import type {
-  Especie, Fardo, ItemSeparacao, Lote, Movimentacao, NovaRme, NovaSeparacao, OpcaoSeparacao, Rme, SaldoEstoque, StatusRme, Tamanho,
+  Dormente, Especie, Fardo, ItemSeparacao, Lote, Movimentacao, NovaRme, NovaSeparacao, OpcaoSeparacao, Rme, SaldoEstoque, StatusRme, Tamanho,
 } from '../../types/models';
 import { STATUS_RME } from '../../dominio/rotulos';
 import { ApiError } from '../http';
-import { alterarSaldoFardo } from './estoque';
+import { fardoLiberado, movimentarDormentes } from './estoque';
 
 /** O que as operações de RME leem e alteram nos dados simulados. */
 export interface BaseRme {
@@ -14,6 +14,7 @@ export interface BaseRme {
   saldos: SaldoEstoque[];
   movimentacoes: Movimentacao[];
   rmes: Rme[];
+  dormentes: Dormente[];
 }
 
 interface Contexto {
@@ -41,18 +42,25 @@ export function reservas(B: BaseRme, excetoRmeId?: string) {
   return r;
 }
 
+/** Códigos dos dormentes já separados em RMEs ainda não entregues. */
+export function dormentesReservados(B: BaseRme, excetoRmeId?: string) {
+  return new Set(B.rmes.filter((x) => x.id !== excetoRmeId && RESERVA.includes(x.status)).flatMap((x) => x.separacao?.itens.flatMap((s) => s.dormentes) ?? []));
+}
+
 /**
- * Regras 3, 4 e 7 do PRD: só lote aprovado na inspeção e com estoque disponível (fora: aguardando inspeção, quarentena,
- * reprovado, com divergência); fardos abertos primeiro, do mais antigo ao mais novo, depois os fechados por FIFO de lote.
+ * Regras 3, 4 e 7 do PRD: só fardo aprovado na inspeção, sem divergência de espécie/tamanho, de lote com estoque disponível
+ * (fora: aguardando inspeção, quarentena, reprovado, com divergência); fardos abertos primeiro, do mais antigo ao mais novo,
+ * depois os fechados por FIFO de lote.
  */
 export function opcoesSeparacao(B: BaseRme, rme: Rme): OpcaoSeparacao[] {
   const reservado = reservas(B, rme.id);
+  const presos = dormentesReservados(B, rme.id);
   return rme.itens.flatMap((item) => {
     const lotes = new Map(B.lotes
-      .filter((l) => l.inspecao === 'aprovado' && l.estoqueStatus === 'disponivel' && l.especieDocumental === item.especie && l.tamanho === item.tamanho)
+      .filter((l) => l.etapaInspecao === 'concluida' && l.estoqueStatus === 'disponivel' && l.especieDocumental === item.especie && l.tamanho === item.tamanho)
       .map((l) => [l.codigo, l]));
     const candidatos = B.fardos
-      .filter((f) => f.estado !== 'baixado' && lotes.has(f.loteCodigo))
+      .filter((f) => f.estado !== 'baixado' && fardoLiberado(f) && lotes.has(f.loteCodigo))
       .map((f) => ({ f, lote: lotes.get(f.loteCodigo)!, disponivel: f.saldo - (reservado.get(f.codigo) ?? 0) }))
       .filter((c) => c.disponivel > 0)
       .sort((a, b) => Number(b.f.estado === 'aberto') - Number(a.f.estado === 'aberto')
@@ -61,7 +69,14 @@ export function opcoesSeparacao(B: BaseRme, rme: Rme): OpcaoSeparacao[] {
     return candidatos.map(({ f, lote, disponivel }) => {
       const sugerido = Math.min(disponivel, falta);
       falta -= sugerido;
-      return { itemId: item.id, fardoCodigo: f.codigo, loteCodigo: lote.codigo, recebidoEm: lote.recebidoEm, estado: f.estado, local: f.local, disponivel, sugerido };
+      // Peças livres do fardo, na ordem da sequência; a sugestão tira as primeiras.
+      const dormentesDisponiveis = B.dormentes
+        .filter((d) => d.fardoCodigo === f.codigo && d.estado === 'em_estoque' && !presos.has(d.codigo))
+        .sort((a, b) => a.sequencia - b.sequencia).map((d) => d.codigo);
+      return {
+        itemId: item.id, fardoCodigo: f.codigo, loteCodigo: lote.codigo, recebidoEm: lote.recebidoEm, estado: f.estado, local: f.local, disponivel, sugerido,
+        dormentesDisponiveis, dormentesSugeridos: dormentesDisponiveis.slice(0, sugerido),
+      };
     });
   });
 }
@@ -101,7 +116,10 @@ export function abrirRme(B: BaseRme, n: NovaRme, ctx: Contexto): Rme {
   return rme;
 }
 
-/** Separação: a quantidade de cada item tem de bater com a pedida; escolha diferente da sugestão exige justificativa. */
+/**
+ * Separação: a quantidade de cada item tem de bater com a pedida, e cada fardo diz quais dormentes saem (livres, deste fardo).
+ * Escolha de fardos ou quantidades diferente da sugestão exige justificativa; trocar só os dormentes dentro do fardo, não.
+ */
 export function separarRme(B: BaseRme, rme: Rme, n: NovaSeparacao, ctx: Contexto): Rme {
   exigirStatus(rme, 'aberta');
   const opcoes = opcoesSeparacao(B, rme);
@@ -115,8 +133,12 @@ export function separarRme(B: BaseRme, rme: Rme, n: NovaSeparacao, ctx: Contexto
       const op = opcoes.find((o) => o.itemId === item.id && o.fardoCodigo === e.fardoCodigo);
       if (!op) { erros[`item-${item.id}`] = `Fardo ${e.fardoCodigo} não está disponível para este item.`; continue; }
       if (!Number.isInteger(e.quantidade) || e.quantidade > op.disponivel) { erros[`item-${item.id}`] = `Quantidade inválida no fardo ${e.fardoCodigo} (disponível: ${op.disponivel}).`; continue; }
+      const dormentes = e.dormentes ?? [];
+      if (dormentes.length !== e.quantidade || new Set(dormentes).size !== dormentes.length) { erros[`item-${item.id}`] = `Fardo ${e.fardoCodigo}: informe ${e.quantidade} dormente(s) diferentes.`; continue; }
+      const fora = dormentes.find((d) => !op.dormentesDisponiveis.includes(d));
+      if (fora) { erros[`item-${item.id}`] = `O dormente ${fora} não está livre no fardo ${e.fardoCodigo}.`; continue; }
       const f = B.fardos.find((x) => x.codigo === e.fardoCodigo)!;
-      itens.push({ itemId: item.id, fardoCodigo: f.codigo, loteCodigo: f.loteCodigo, quantidade: e.quantidade, saldoFardo: f.saldo });
+      itens.push({ itemId: item.id, fardoCodigo: f.codigo, loteCodigo: f.loteCodigo, quantidade: e.quantidade, dormentes, saldoFardo: f.saldo });
       total += e.quantidade;
     }
     if (!erros[`item-${item.id}`] && total !== item.quantidade) erros[`item-${item.id}`] = `Separado ${total} de ${item.quantidade}: a quantidade separada tem de bater com a pedida.`;
@@ -152,7 +174,7 @@ export function conferirRme(rme: Rme, d: { aprovada: boolean; motivo?: string },
   return rme;
 }
 
-/** Entrega com baixa: saldo do fardo diminui; com sobra fica "aberto", zerado fica "baixado". Cada fardo gera uma saída. */
+/** Entrega com baixa: os dormentes separados saem, o saldo do fardo diminui; com sobra fica "aberto", zerado fica "baixado". Cada fardo gera uma saída. */
 export function entregarRme(B: BaseRme, rme: Rme, ctx: Contexto): Rme {
   exigirStatus(rme, 'conferida');
   const sep = rme.separacao!;
@@ -161,10 +183,10 @@ export function entregarRme(B: BaseRme, rme: Rme, ctx: Contexto): Rme {
     if (!f || f.saldo < s.quantidade) throw new ApiError(409, `Saldo insuficiente no fardo ${s.fardoCodigo}. Devolva a RME para nova separação.`);
   }
   for (const s of sep.itens) {
-    const { fardo: f, lote } = alterarSaldoFardo(B, s.fardoCodigo, -s.quantidade);
+    const { fardo: f, lote } = movimentarDormentes(B, s.fardoCodigo, s.dormentes, 'sai', { tipo: 'saida', referencia: rme.numero, quando: ctx.quando, usuario: ctx.usuario });
     B.movimentacoes.unshift({
       id: ctx.novoId('m'), tipo: 'saida', loteCodigo: lote.codigo, fardoCodigo: f.codigo, especie: lote.especieDocumental, referencia: rme.numero, quantidade: s.quantidade,
-      origem: f.local, destino: rme.destinatario, dataHora: ctx.quando, usuario: ctx.usuario, status: 'aprovado',
+      origem: f.local, destino: rme.destinatario, dataHora: ctx.quando, usuario: ctx.usuario, status: 'aprovado', dormentes: s.dormentes,
     });
     const item = rme.itens.find((i) => i.id === s.itemId)!;
     item.quantidadeEntregue += s.quantidade;

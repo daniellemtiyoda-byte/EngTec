@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { SUFIXO_SIMULADO } from '../config/env';
-import { diferencaVolumePct, DORMENTES_POR_FARDO, foraDaTolerancia, sugerirFardos, TOLERANCIA_VOLUME_PCT } from '../dominio/parametros';
+import { diferencaVolumePct, foraDaTolerancia, TOLERANCIA_VOLUME_PCT } from '../dominio/parametros';
 import { SITUACAO_VOLUMETRIA } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
@@ -13,20 +13,20 @@ import { ConfirmModal, Modal } from './Modal';
 import { ProgressoPassos } from './Passos';
 
 const EXTENSOES_FOTO = ['jpg', 'jpeg', 'png'];
-const PASSOS = ['Fardos', 'Fotos e observações', 'Revisar e confirmar'];
+const PASSOS = ['Quantidades', 'Fotos e observações', 'Revisar e confirmar'];
 
 /** Texto do toast após a confirmação (mostrado só depois da resposta do serviço). */
 export function mensagemRecebimento(r: ResultadoRecebimento) {
   const lotes = r.lotes.map((l) => l.codigo).join(', ');
   const divergencia = r.recebimento.acimaTolerancia ? ' Lotes "Com divergência": alerta gerado.' : '';
-  return `Recebimento confirmado: lote(s) ${lotes} e ${r.fardos.length} fardo(s) criados, aguardando inspeção.${divergencia}${SUFIXO_SIMULADO}`;
+  return `Recebimento confirmado: lote(s) ${lotes} criado(s), aguardando inspeção. Os fardos são formados depois da inspeção.${divergencia}${SUFIXO_SIMULADO}`;
 }
 
 interface Props { nf: NotaFiscal | null; aoFechar: () => void; aoConcluir: (r: ResultadoRecebimento) => void }
 
 /**
- * Recebimento de uma NF com DOF (RF03/RF04/RF07/RF31), em 3 passos pensados para o celular:
- * 1. fardos de cada item (a conferida é a soma); 2. avaria, fotos (obrigatórias com divergência ou avaria) e justificativa
+ * Recebimento de uma NF com DOF (RF03/RF04/RF31), em 3 passos pensados para o celular:
+ * 1. quantidade conferida de cada item, em unidades (os fardos são formados depois da inspeção); 2. avaria, fotos (obrigatórias com divergência ou avaria) e justificativa
  * (obrigatória com divergência de volume acima da tolerância); 3. revisão do que será criado antes de confirmar.
  */
 export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
@@ -34,7 +34,7 @@ export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
   const topo = useRef<HTMLDivElement>(null);
   const tam = useAsync(() => servicos.tamanhos.listar({ pageSize: 50 }), []);
   const [passo, setPasso] = useState(0);
-  const [fardos, setFardos] = useState<Record<string, string[]>>({});
+  const [quantidades, setQuantidades] = useState<Record<string, string>>({});
   const [avaria, setAvaria] = useState(false);
   const [observacao, setObservacao] = useState('');
   const [justificativa, setJustificativa] = useState('');
@@ -46,16 +46,16 @@ export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
 
   useEffect(() => {
     if (!nf) return;
-    setFardos(Object.fromEntries(nf.itens.map((i) => [i.id, sugerirFardos(i.quantidade).map(String)])));
+    setQuantidades(Object.fromEntries(nf.itens.map((i) => [i.id, String(i.quantidade)])));
     setPasso(0); setAvaria(false); setObservacao(''); setJustificativa(''); setFotos([]); setErros({}); setErroGeral(undefined); setConfirmando(false);
   }, [nf]);
   useEffect(() => { topo.current?.scrollIntoView({ block: 'start' }); }, [passo]);
 
   if (!nf) return null;
   const tamanhos = tam.dados?.items ?? [];
-  const numeros = (itemId: string) => (fardos[itemId] ?? []).map((t) => paraNumero(t, true));
+  const numero = (itemId: string) => paraNumero(quantidades[itemId] ?? '', true);
   const valido = (q: number) => Number.isInteger(q) && q > 0;
-  const conferida = (itemId: string) => numeros(itemId).reduce((a, q) => a + (valido(q) ? q : 0), 0);
+  const conferida = (itemId: string) => (valido(numero(itemId)) ? numero(itemId) : 0);
   const divergenciaQuantidade = nf.itens.some((i) => conferida(i.id) !== i.quantidade);
   const precisaFotos = divergenciaQuantidade || avaria;
 
@@ -72,20 +72,10 @@ export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
   // Prévia dos lotes: um por espécie + tamanho (itens iguais da NF somados), como o serviço vai criar.
   const lotesPrevistos = [...nf.itens.reduce((m, i) => {
     const k = `${i.especieId}|${i.tamanhoId}`;
-    const g = m.get(k) ?? { especie: i.especie, tamanho: i.tamanho, fardos: [] as number[] };
-    g.fardos.push(...numeros(i.id).filter(valido));
+    const g = m.get(k) ?? { especie: i.especie, tamanho: i.tamanho, quantidade: 0 };
+    g.quantidade += conferida(i.id);
     return m.set(k, g);
-  }, new Map<string, { especie: string; tamanho: string; fardos: number[] }>()).values()];
-  const totalFardos = lotesPrevistos.reduce((a, l) => a + l.fardos.length, 0);
-
-  const mudarFardo = (itemId: string, idx: number, valor: string) => setFardos((f) => ({ ...f, [itemId]: f[itemId].map((x, i) => (i === idx ? valor : x)) }));
-  const removerFardo = (itemId: string, idx: number) => setFardos((f) => ({ ...f, [itemId]: f[itemId].filter((_, i) => i !== idx) }));
-  // Fardo novo já vem com o que falta para fechar a NF (ou 14, se nada falta).
-  const adicionarFardo = (itemId: string, quantidadeNf: number) => {
-    const falta = quantidadeNf - conferida(itemId);
-    setFardos((f) => ({ ...f, [itemId]: [...(f[itemId] ?? []), String(falta > 0 ? Math.min(falta, DORMENTES_POR_FARDO) : DORMENTES_POR_FARDO)] }));
-  };
-  const sugerirDeNovo = (itemId: string, quantidadeNf: number) => setFardos((f) => ({ ...f, [itemId]: sugerirFardos(quantidadeNf).map(String) }));
+  }, new Map<string, { especie: string; tamanho: string; quantidade: number }>()).values()];
 
   function escolherFotos(lista: FileList | null) {
     const fs = Array.from(lista ?? []);
@@ -98,9 +88,7 @@ export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
     const e: Record<string, string> = {};
     if (p === 0) {
       for (const item of nf!.itens) {
-        const ns = numeros(item.id);
-        if (!ns.length) e[`item-${item.id}`] = 'Informe ao menos um fardo.';
-        else if (!ns.every(valido)) e[`item-${item.id}`] = 'Cada fardo precisa de uma quantidade inteira, mínimo 1.';
+        if (!valido(numero(item.id))) e[`item-${item.id}`] = 'Informe a quantidade conferida: inteiro, mínimo 1.';
       }
     }
     if (p === 1) {
@@ -125,7 +113,7 @@ export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
     setErroGeral(undefined);
     try {
       const r = await servicos.recebimentos.confirmar({
-        nfId: nf!.id, itens: nf!.itens.map((i) => ({ itemId: i.id, fardos: numeros(i.id) })), avaria,
+        nfId: nf!.id, itens: nf!.itens.map((i) => ({ itemId: i.id, quantidade: numero(i.id) })), avaria,
         observacao: observacao.trim() || undefined, justificativa: acimaTolerancia ? justificativa.trim() : undefined,
       }, fotos);
       setConfirmando(false);
@@ -166,7 +154,7 @@ export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
 
           {passo === 0 && (
             <>
-              <p className="mudo">{nf.fornecedor} · DOF {nf.dof?.numero}. Ajuste a quantidade de cada fardo (sugestão: fardos de {DORMENTES_POR_FARDO}). A conferida é a soma.</p>
+              <p className="mudo">{nf.fornecedor} · DOF {nf.dof?.numero}. Conte os dormentes de cada item. Os fardos são montados depois da inspeção, pelo resultado.</p>
               {nf.itens.map((item) => {
                 const total = conferida(item.id);
                 const dif = total - item.quantidade;
@@ -181,25 +169,18 @@ export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
                         {dif !== 0 && <span className="val-erro">{dif > 0 ? '+' : ''}{un(dif)}</span>}
                       </div>
                     </div>
-                    <div className="grade-fardos">
-                      {(fardos[item.id] ?? []).map((q, i) => (
-                        <div className="fardo-linha" key={i}>
-                          <span>Fardo {i + 1}</span>
-                          <Contador valor={q} aoMudar={(v) => mudarFardo(item.id, i, v)} rotulo={`${item.especie} ${item.tamanho}, fardo ${i + 1}`} min={1} invalido={!valido(paraNumero(q, true))} />
-                          <button type="button" className="btn-icone" aria-label={`Remover fardo ${i + 1}`} onClick={() => removerFardo(item.id, i)}>×</button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="acoes">
-                      <button type="button" className="btn btn-sec btn-peq" onClick={() => adicionarFardo(item.id, item.quantidade)}>+ Fardo</button>
-                      <button type="button" className="btn btn-sec btn-peq" onClick={() => sugerirDeNovo(item.id, item.quantidade)}>Refazer sugestão</button>
-                      <span className="mudo">{(fardos[item.id] ?? []).length} fardo(s)</span>
+                    <div className="fardo-linha">
+                      <span>Conferido</span>
+                      <Contador
+                        valor={quantidades[item.id] ?? ''} aoMudar={(v) => setQuantidades((q) => ({ ...q, [item.id]: v }))}
+                        rotulo={`${item.especie} ${item.tamanho}, quantidade conferida`} min={1} invalido={!valido(numero(item.id))}
+                      />
                     </div>
                     {erros[`item-${item.id}`] && <span className="erro-campo">{erros[`item-${item.id}`]}</span>}
                   </fieldset>
                 );
               })}
-              {acimaTolerancia && <div className="aviso aviso-alerta">Divergência de volume acima de {TOLERANCIA_VOLUME_PCT}% em relação ao DOF. Confira os fardos; se estiver certo, você justifica no próximo passo.</div>}
+              {acimaTolerancia && <div className="aviso aviso-alerta">Divergência de volume acima de {TOLERANCIA_VOLUME_PCT}% em relação ao DOF. Confira as quantidades; se estiver certo, você justifica no próximo passo.</div>}
             </>
           )}
 
@@ -236,15 +217,16 @@ export function RecebimentoModal({ nf, aoFechar, aoConcluir }: Props) {
           {passo === 2 && (
             <>
               <div className="resumo">
-                <h3>Ao confirmar, o sistema cria {lotesPrevistos.length} lote(s) e {totalFardos} fardo(s), aguardando inspeção</h3>
+                <h3>Ao confirmar, o sistema cria {lotesPrevistos.length} lote(s), aguardando inspeção</h3>
                 <ul>
                   {lotesPrevistos.map((l) => (
-                    <li key={`${l.especie}|${l.tamanho}`}>
-                      <strong><em>{l.especie}</em> · {l.tamanho}</strong>: {un(l.fardos.reduce((a, q) => a + q, 0))} em {l.fardos.length} fardo(s) ({l.fardos.join(', ')})
-                    </li>
+                    <li key={`${l.especie}|${l.tamanho}`}><strong><em>{l.especie}</em> · {l.tamanho}</strong>: {un(l.quantidade)}</li>
                   ))}
                 </ul>
-                <p className="mudo">Os códigos (ex.: LT26-0042 e LT26-0042-F01) são gerados na confirmação.</p>
+                <p className="mudo">
+                  O código do lote (ex.: LT26-0042) é gerado na confirmação. Cada peça é inspecionada com o código do lote e a sua sequência
+                  (LT26-0042-0001…), e os fardos são formados na tela Inspeção, pelo resultado.
+                </p>
               </div>
               <dl className="detalhes">
                 <dt>NF / DOF</dt><dd>{nf.numero} / {nf.dof?.numero} · {nf.fornecedor}</dd>

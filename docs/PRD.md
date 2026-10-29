@@ -23,7 +23,7 @@ Estes termos devem ser usados exatamente assim nas telas, no código e na docume
 | Termo | Significado |
 | --- | --- |
 | Dormente | Peça de madeira que sustenta os trilhos; é o material controlado pelo sistema |
-| Fardo | Grupo de dormentes amarrados, normalmente 14, com quantidade variável. É a unidade física que se movimenta no pátio |
+| Fardo | Grupo de dormentes amarrados, normalmente 14, com quantidade variável, montado depois da inspeção com peças de um lote e de um mesmo resultado (e categoria, se aprovadas). É a unidade física que se movimenta no pátio |
 | Fardo aberto | Fardo do qual já saíram dormentes e que mantém saldo |
 | Lote | Conjunto de dormentes de uma mesma NF, espécie e tamanho, criado no recebimento. É a base do FIFO e da rastreabilidade |
 | NF / NF-e | Nota fiscal do fornecedor; a NF-e pode ser importada pelo XML |
@@ -77,7 +77,7 @@ O MVP cobre o ciclo completo do dormente dentro do almoxarifado, da NF até a ba
 
 - Cadastro de NF e DOF e confirmação de recebimento com conferência de quantidade e volume
 - Rastreabilidade por lote e fardo, ligando cada um à NF e ao DOF de origem
-- Cadastro de fardos com código gerado a partir do lote para agrupar dormentes
+- Formação dos fardos depois da inspeção, pelo resultado de cada peça, com código gerado a partir do lote
 - Endereçamento (pátio, rua, posição) e movimentação entre endereços
 - Saldo de estoque por espécie, tamanho, lote e endereço, com idade de cada lote
 - RME digital com destinatário, urgência e data limite
@@ -100,17 +100,17 @@ O contrato entre os dois sistemas precisa ser combinado entre as equipes agora, 
 
 | Direção | Dados | Quando |
 | --- | --- | --- |
-| Estoque → Inspeção | ID do lote, NF, quantidade recebida, espécie e tamanho declarados na NF, usuário logado | Ao clicar no botão após o recebimento |
-| Inspeção → Estoque | Espécie confirmada (nome científico), tamanho, categoria de qualidade, resultado (aprovado, reprovado, quarentena), data e inspetor | Ao finalizar a inspeção |
+| Estoque → Inspeção | ID do lote, NF, quantidade recebida, espécie e tamanho declarados na NF | Ao clicar no botão após o recebimento (abre o Inspector) |
+| Inspeção → Estoque | Por peça (código do lote + sequência, ex. LT26-0042-0007): resultado (aprovado, reprovado, quarentena), índice que define a categoria, data, inspetor e link do relatório | A cada peça inspecionada, banco a banco; o estoque só muda quando o almoxarife forma os fardos |
 
-Se o outro projeto não estiver pronto a tempo, o resultado da inspeção é lançado manualmente no estoque, no mesmo formato de dados.
+Se o outro projeto não estiver pronto a tempo, o resultado da inspeção é lançado manualmente no estoque, no mesmo formato de dados. Detalhes técnicos da integração (banco a banco, mapeamento provisório do veredito do Inspector, botão de abertura) estão em `docs/INTEGRACAO-INSPECAO.md`. O Inspector não identifica espécie nem tamanho: peças diferentes do declarado na NF são marcadas como divergentes na formação dos fardos.
 
 ## Fluxo de informação
 
 1. **NF e DOF**: cadastro da nota (manual ou XML) e do DOF.
 2. **Recebimento**: conferência da quantidade física contra a NF.
-3. **Inspeção** (sistema externo, ou lançamento manual): aprovado segue; reprovado ou em quarentena fica segregado, fora do estoque disponível.
-4. **Lote e fardo**: lote e fardos ligados à NF e ao DOF de origem.
+3. **Inspeção** (sistema externo, ou lançamento manual): cada peça do lote recebe um resultado; até o fim da inspeção o lote fica fora do estoque disponível.
+4. **Fardos**: com todas as peças inspecionadas, os fardos são formados pelo resultado, ligados ao lote, à NF e ao DOF de origem; aprovado segue, reprovado ou em quarentena fica segregado.
 5. **Armazenagem**: endereço (pátio, rua, posição).
 6. **Estoque**: saldo e idade do lote.
 7. **RME digital**: o requisitante faz o pedido.
@@ -128,11 +128,11 @@ Os requisitos marcados como Essencial formam o MVP do Gate 3; os Desejáveis ent
 | --- | --- | --- | --- |
 | RF01 | Nota fiscal | Cadastrar NF manualmente ou importando o XML da NF-e, que preenche número, chave de acesso, fornecedor, data, itens e quantidades e impede cadastro duplicado | Essencial |
 | RF02 | Nota fiscal | Guardar o XML da NF e anexar o PDF do DOF ao registro da entrada | Essencial |
-| RF03 | Recebimento | Confirmar recebimento informando quantidade física, registrar divergência com a NF e anexar fotos da carga (obrigatórias quando houver divergência ou avaria) | Essencial |
+| RF03 | Recebimento | Confirmar recebimento informando a quantidade física de cada item da NF, em unidades, registrar divergência com a NF e anexar fotos da carga (obrigatórias quando houver divergência ou avaria) | Essencial |
 | RF04 | Recebimento | Criar o lote automaticamente ao confirmar o recebimento, um por espécie e tamanho da NF, com código sequencial por ano e data de recebimento | Essencial |
 | RF05 | Inspeção | Botão que abre o sistema de inspeção com os dados do lote | Essencial |
-| RF06 | Inspeção | Receber espécie, categoria e resultado do lote e atualizar o status, com opção de lançar classe e categoria manualmente | Essencial |
-| RF07 | Fardo | Cadastrar fardo com quantidade de dormentes e código gerado pelo sistema a partir do lote (ex. LT26-0042-F03, fardo 3 do lote 42 de 2026), e imprimir etiqueta com código, espécie, classe e tamanho | Essencial |
+| RF06 | Inspeção | Receber o resultado e a categoria de cada peça do lote, com opção de lançar o resultado manualmente, e concluir a inspeção formando os fardos | Essencial |
+| RF07 | Fardo | Formar os fardos depois da inspeção, registrando quais dormentes (pelo código da etiqueta) vão em cada fardo (o sistema distribui, até 14 por fardo, sem misturar resultados ou categorias; o almoxarife ajusta e confirma), com código gerado a partir do lote (ex. LT26-0042-F03, fardo 3 do lote 42 de 2026), e imprimir etiqueta com código, espécie, classe, categoria e tamanho | Essencial |
 | RF08 | Fardo | Baixar parte dos dormentes de um fardo e manter o saldo restante (fardo aberto) | Essencial |
 | RF09 | Consulta | Buscar lote ou fardo pelo código e mostrar localização, NF, DOF e histórico | Essencial |
 | RF10 | Armazenagem | Registrar endereço (pátio, rua, posição) do fardo | Essencial |
@@ -144,7 +144,7 @@ Os requisitos marcados como Essencial formam o MVP do Gate 3; os Desejáveis ent
 | RF16 | RME | Abrir RME com destinatário, espécie, tamanho, quantidade, urgência e data limite | Essencial |
 | RF17 | RME | Acompanhar status da RME (aberta, em separação, conferida, entregue, cancelada) | Essencial |
 | RF18 | Separação | Sugerir lotes e endereços por FIFO para atender a RME | Essencial |
-| RF19 | Separação | Validar lote, espécie e quantidade separados contra a RME e alertar divergência | Essencial |
+| RF19 | Separação | Validar lote, espécie e quantidade separados contra a RME e alertar divergência, registrando quais dormentes saem de cada fardo | Essencial |
 | RF20 | Expedição | Conferência e aprovação do supervisor pelo login | Essencial |
 | RF21 | Expedição | Dar baixa no estoque ao confirmar a entrega | Essencial |
 | RF22 | Expedição | Gerar comprovante da RME em PDF, no formato do papel atual | Desejável |
@@ -169,8 +169,8 @@ As telas seguem a ordem do fluxo do dormente. Cada uma só está pronta quando a
 | --- | --- | --- |
 | Login | Acesso por matrícula e senha, com menu conforme o perfil | Cada perfil vê só as funções permitidas a ele |
 | Cadastro de NF e DOF | Cadastra a NF manualmente ou por XML e registra o DOF com o PDF anexo | O XML preenche os campos; NF com chave de acesso repetida é bloqueada; o recebimento não avança sem DOF |
-| Recebimento | Confere quantidades, monta os fardos e registra divergências | Ao confirmar, o sistema cria um lote por espécie e tamanho e gera os códigos dos fardos (ex. LT26-0042-F03); divergência exige foto; divergência de volume acima de 10% gera alerta; lotes ficam "aguardando inspeção" |
-| Inspeção | Abre o sistema de inspeção ou permite lançar resultado, classe e categoria manualmente | Lote aprovado fica disponível; reprovado ou em quarentena não aparece para separação; o lançamento manual registra quem lançou |
+| Recebimento | Confere quantidades e registra divergências | Ao confirmar, o sistema cria um lote por espécie e tamanho, em unidades; divergência exige foto; divergência de volume acima de 10% gera alerta; lotes ficam "aguardando inspeção" |
+| Inspeção | Abre o sistema de inspeção, acompanha as peças inspecionadas, permite lançar o resultado manualmente e forma os fardos | Os fardos só são formados com todas as peças com resultado; fardo aprovado fica disponível; reprovado, em quarentena ou com espécie divergente não aparece para separação; o lançamento manual e a formação registram quem fez |
 | Armazenagem | Define e altera o endereço dos fardos | Toda mudança de endereço gera uma movimentação com usuário e data |
 | Estoque | Consulta saldo com filtros por espécie, tamanho, lote, endereço e status | Mostra quantidade e m³, idade de cada lote e destaque para lotes acima do limite de dias |
 | RME | Abre a requisição e acompanha o status | RME tem destinatário, itens, urgência e data limite, e muda de status ao longo do fluxo |
@@ -199,13 +199,13 @@ Artigos da [IN Ibama 21/2014](https://www.ibama.gov.br/phocadownload/dof/legisla
 
 A regra central é que nenhuma movimentação acontece sem usuário identificado e lote de referência, e o saldo nunca é editado diretamente.
 
-1. **Unidade de rastreio.** No MVP o rastreio é por lote (NF + espécie + tamanho) e por fardo, controlando quantidades. O fardo recebe um código formado pelo lote e pela sua sequência dentro dele, usando só dados que não mudam depois do recebimento, e movimentar um fardo movimenta todos os dormentes dele. A identificação individual de cada dormente fica para a fase de automação.
+1. **Unidade de rastreio.** O rastreio é por lote (NF + espécie + tamanho), por fardo e por dormente. Na inspeção cada peça recebe uma etiqueta impressa com o código do lote e a sua sequência (ex. LT26-0042-0007), que é o ID do dormente. O fardo é formado depois da inspeção, recebe um código formado pelo lote e pela sua sequência dentro dele, e o sistema registra quais dormentes estão nele; movimentar um fardo movimenta todos os dormentes dele. A separação da RME, as perdas e os ajustes informam quais dormentes saem, então cada peça é rastreada da NF ao destino. A leitura automática (QR Code, RFID) continua para a fase de automação: no MVP o código da etiqueta é digitado ou tocado na tela.
 2. **Lote.** Todo recebimento gera um lote com a data de entrada. A idade do lote é calculada a partir dessa data e substitui a marcação "antes/após julho de 2023" do papel.
-3. **Bloqueio por inspeção.** Material com status "aguardando inspeção", "quarentena" ou "reprovado" não aparece como disponível nem pode ser separado para RME.
+3. **Bloqueio por inspeção.** Lote com a inspeção não concluída (sem fardos) e fardos em "quarentena", "reprovado" ou com espécie/tamanho divergente da NF não aparecem como disponíveis nem podem ser separados para RME.
 4. **FIFO.** A separação sugere sempre o lote disponível mais antigo da espécie e do tamanho pedidos. Pular a sugestão exige justificativa registrada.
 5. **Alerta de idade.** Lotes acima de um limite de dias (a definir com a CPTM) aparecem em destaque no estoque e no dashboard.
 6. **Saldo por movimentação.** Toda entrada, transferência, saída e ajuste vira um registro imutável. O saldo é calculado a partir desses registros; correções são feitas por um novo registro de ajuste, nunca apagando o anterior.
-7. **Saída parcial de fardo.** Os dormentes chegam em fardos, normalmente de 14, mas a quantidade varia e é informada no recebimento. Ao retirar parte de um fardo, por exemplo 8 de 14, o sistema baixa os 8, o fardo fica com saldo 6 e passa ao status "aberto". Na separação, fardos abertos da mesma espécie e tamanho são sugeridos antes de abrir um novo, respeitando o FIFO.
+7. **Saída parcial de fardo.** Os fardos têm normalmente 14 dormentes, mas a quantidade varia e é confirmada na formação, depois da inspeção. Ao retirar parte de um fardo, por exemplo 8 de 14, o sistema baixa os 8, o fardo fica com saldo 6 e passa ao status "aberto". Na separação, fardos abertos da mesma espécie e tamanho são sugeridos antes de abrir um novo, respeitando o FIFO.
 8. **Conferência em duas pessoas.** A baixa só acontece com a separação do almoxarife e a conferência do supervisor, como na RME em papel.
 9. **Ajuste de inventário.** Divergências de inventário só alteram o saldo depois de aprovadas pelo supervisor ou gestor.
 10. **Registro automático.** Data, hora e usuário de cada ação são gravados pelo sistema, sem digitação.
@@ -225,13 +225,13 @@ O núcleo do modelo é o Lote, ligado à NF e ao DOF e dividido em fardos, com t
 | Especie | nome científico, família, nome popular, classe, uso (via corrida ou AMV) | ItemNF, Dormente |
 | Tamanho | código, largura, altura e comprimento (cm); volume em m³ calculado pelo sistema | ItemNF, Dormente |
 | Lote | código, data de entrada, NF de origem, ata de registro, contrato, tratamento e empresa, empresa inspetora e ano, status de inspeção | ItemNF, Dormente |
-| Fardo | código (lote + sequência, ex. LT26-0042-F03), lote, endereço atual, quantidade atual | Dormente, Endereco |
-| Dormente | fase futura: código individual, espécie, tamanho, lote, fardo, categoria, status (no MVP o controle é por quantidade no lote e no fardo) | Lote, Fardo, Movimentacao |
+| Fardo | código (lote + sequência, ex. LT26-0042-F03), lote, resultado da inspeção, categoria, endereço atual, quantidade atual, quem formou e quando | Dormente, Endereco |
+| Dormente | código individual (etiqueta da inspeção: lote + sequência), lote, fardo, resultado da inspeção, categoria, situação (em estoque ou baixado) e a baixa (saída por RME, perda ou ajuste, com referência) | Lote, Fardo, Movimentacao |
 | Endereco | pátio, rua, posição, capacidade | Fardo, Dormente |
-| Movimentacao | tipo (entrada, transferência, saída, perda, ajuste), origem, destino, quantidade, usuário, data/hora, referência (NF ou RME) | Dormente, Fardo, RME |
+| Movimentacao | tipo (entrada, transferência, saída, perda, ajuste), origem, destino, quantidade, dormentes (saída, perda e ajuste), usuário, data/hora, referência (NF ou RME) | Dormente, Fardo, RME |
 | RME | número, requisitante, destinatário, urgência, data limite, status, almoxarife, supervisor | ItemRME, Movimentacao |
 | ItemRME | espécie, tamanho, quantidade pedida, quantidade entregue | RME |
-| Inspecao | referência externa, resultado, categoria, inspetor, data | Lote, Dormente |
+| Inspecao | por peça: código da peça (lote + sequência), referência externa (link do relatório), resultado, categoria, inspetor, data, se é a vigente | Lote, Dormente |
 | Usuario | nome, matrícula, perfil | Movimentacao, RME |
 
 A tabela Inspecao guarda apenas o resultado recebido do outro sistema; o checklist detalhado fica no projeto de inspeção.

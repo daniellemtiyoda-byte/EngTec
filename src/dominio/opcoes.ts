@@ -1,6 +1,6 @@
 import type { Documento, StatusRegistro } from '../types/models';
 import {
-  ETAPA_ENTRADA, MOTIVO_PERDA, RESULTADO_INSPECAO, SITUACAO_LOTE, SITUACAO_MEDIDAS, SITUACAO_NF, SITUACAO_VOLUMETRIA, STATUS_REGISTRO, STATUS_RME, TIPO_MOVIMENTACAO, URGENCIA_RME, USO_ESPECIE,
+  ETAPA_ENTRADA, ETAPA_INSPECAO, MOTIVO_PERDA, RESULTADO_INSPECAO, SITUACAO_LOTE, SITUACAO_MEDIDAS, SITUACAO_NF, SITUACAO_VOLUMETRIA, STATUS_REGISTRO, STATUS_RME, TIPO_MOVIMENTACAO, URGENCIA_RME, USO_ESPECIE,
   type Rotulos,
 } from './rotulos';
 
@@ -23,6 +23,9 @@ export const CLASSE_OPCOES: Opcao[] = ['1ª', '2ª', '3ª'].map((c) => ({ valor:
 export const CATEGORIA_OPCOES: Opcao[] = [1, 2, 3].map((c) => ({ valor: String(c), rotulo: `Categoria ${c}` }));
 
 export const RESULTADO_INSPECAO_OPCOES = opcoesDe(RESULTADO_INSPECAO);
+/** Resultado de uma peça já inspecionada (lançamento manual). */
+export const RESULTADO_PECA_OPCOES = opcoesDe(RESULTADO_INSPECAO, ['aprovado', 'quarentena', 'reprovado']);
+export const ETAPA_INSPECAO_OPCOES = opcoesDe(ETAPA_INSPECAO);
 export const SITUACAO_LOTE_OPCOES = opcoesDe(SITUACAO_LOTE);
 export const USO_OPCOES = opcoesDe(USO_ESPECIE);
 export const SITUACAO_MEDIDAS_OPCOES = opcoesDe(SITUACAO_MEDIDAS);

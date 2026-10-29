@@ -6,7 +6,7 @@ import { CodigoLink } from '../components/Codigos';
 import { FardosModal } from '../components/FardosModal';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { CATEGORIA_OPCOES, CLASSE_OPCOES, IDADE_LOTE_OPCOES, SITUACAO_LOTE_OPCOES } from '../dominio/opcoes';
-import { RESULTADO_INSPECAO, SITUACAO_LOTE } from '../dominio/rotulos';
+import { ETAPA_INSPECAO, SITUACAO_LOTE } from '../dominio/rotulos';
 import { servicos } from '../services';
 import type { Lote } from '../types/models';
 import { classeCategoria, data, dias, m3, metros, un } from '../utils/format';
@@ -31,7 +31,7 @@ export default function Lotes() {
     { chave: 'fornecedor', titulo: 'Fornecedor', ordenavel: true, opcional: true },
     { chave: 'fardos', titulo: 'Fardos', alinhar: 'right', ordenavel: true, opcional: true },
     { chave: 'recebidoEm', titulo: 'Recebido em', ordenavel: true, opcional: true, render: (l) => data(l.recebidoEm) },
-    { chave: 'inspecao', titulo: 'Inspeção', opcional: true, render: (l) => <BadgeDe mapa={RESULTADO_INSPECAO} valor={l.inspecao} /> },
+    { chave: 'etapaInspecao', titulo: 'Inspeção', opcional: true, render: (l) => <BadgeDe mapa={ETAPA_INSPECAO} valor={l.etapaInspecao} /> },
     { chave: 'estoqueStatus', titulo: 'Estoque', opcional: true, render: (l) => <StatusEstoqueBadge s={l.estoqueStatus} /> },
     { chave: 'dimensoes', titulo: 'Dimensões (C × L × A)', opcional: true, render: (l) => `${metros(l.comprimentoM)} × ${metros(l.larguraM)} × ${metros(l.alturaM)}` },
     { chave: 'volumeDocumentalM3', titulo: 'Volume documental', alinhar: 'right', ordenavel: true, opcional: true, render: (l) => m3(l.volumeDocumentalM3) },
@@ -41,12 +41,12 @@ export default function Lotes() {
   return (
     <>
       <ListPage<Lote>
-        titulo="Lotes e fardos"
-        descricao="Um lote por NF, espécie e tamanho, criado ao confirmar o recebimento."
+        titulo="Lotes"
+        descricao="Um lote por NF, espécie e tamanho: origem, documentos e volume. O estoque do dia a dia, por fardo, fica em Estoque."
         aviso={
           <ComoFunciona>
-            Lotes não são cadastrados à mão: nascem do recebimento, com os fardos. Material aguardando inspeção, em quarentena, reprovado
-            ou com divergência não fica disponível para separação. Volume documental (parte do DOF da espécie) e volume calculado aparecem
+            Lotes não são cadastrados à mão: nascem do recebimento, em unidades. Os fardos são formados depois da inspeção, um por resultado
+            e categoria. Material aguardando inspeção, em quarentena, reprovado ou com divergência não fica disponível para separação. Volume documental (parte do DOF da espécie) e volume calculado aparecem
             separados, em "Colunas".
           </ComoFunciona>
         }
@@ -60,7 +60,7 @@ export default function Lotes() {
         ]}
         acoesLinha={[
           { rotulo: 'Abrir', aoClicar: (l) => nav(`/lotes/${encodeURIComponent(l.codigo)}`) },
-          { rotulo: 'Fardos e etiquetas', aoClicar: setFardosDe },
+          { rotulo: 'Fardos e etiquetas', aoClicar: setFardosDe, visivel: (l) => l.fardos > 0 },
         ]}
       />
       <FardosModal lote={fardosDe} aoFechar={() => setFardosDe(null)} />

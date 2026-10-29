@@ -6,6 +6,12 @@ export type Classe = string;
 /** Categoria numérica do estado do dormente (1, 2, 3...), vinda da inspeção; sem valor = "a definir". */
 export type Categoria = number;
 export type ResultadoInspecao = 'aguardando' | 'aprovado' | 'reprovado' | 'quarentena';
+/** Resultado de uma peça já inspecionada (sem "aguardando"). */
+export type ResultadoPeca = Exclude<ResultadoInspecao, 'aguardando'>;
+/** Veredito como sai do sistema de inspeção (Railway Edge Inspector). */
+export type VereditoInspector = 'APROVADO' | 'ATENCAO' | 'REJEITADO';
+/** Etapa da inspeção do lote: as peças chegam aos poucos; os fardos só são formados na conclusão. */
+export type EtapaInspecao = 'aguardando' | 'em_inspecao' | 'concluida';
 /** Situação única do lote para a tela (junta inspeção, estoque e saldo): diz o que se pode fazer com ele. */
 export type SituacaoLote = 'disponivel' | 'aguardando_inspecao' | 'quarentena' | 'reprovado' | 'divergente' | 'bloqueado' | 'sem_saldo';
 export type UsoEspecie = 'via' | 'AMV';
@@ -195,6 +201,7 @@ export interface NovoDof {
 
 export type EstadoFardo = 'fechado' | 'aberto' | 'baixado';
 
+/** Fardo formado depois da inspeção: só peças de um lote, com o mesmo resultado (e a mesma categoria, se aprovado). */
 export interface Fardo {
   id: string;
   /** Lote + sequência, ex. LT26-0042-F03. Gerado pelo sistema. */
@@ -205,6 +212,98 @@ export interface Fardo {
   saldo: number;
   estado: EstadoFardo;
   local: string;
+  resultado: ResultadoPeca;
+  categoria?: Categoria;
+  /** Peças com espécie ou tamanho diferente da NF: fardo bloqueado até o supervisor resolver. */
+  motivoBloqueio?: string;
+  formadoEm: string;
+  formadoPor: string;
+}
+
+/** Inspeção de uma peça (dormente), vinda do sistema de inspeção ou lançada à mão. Só o resultado: o detalhe fica no Inspector. */
+export interface InspecaoPeca {
+  id: string;
+  /** Lote + sequência da peça, ex. LT26-0042-0007 (o `codigo_peca` no Inspector). */
+  codigoPeca: string;
+  loteCodigo: string;
+  sequencia: number;
+  resultado: ResultadoPeca;
+  /** Veredito original do Inspector (ausente no lançamento manual). */
+  veredito?: VereditoInspector;
+  /** Índice de integridade 0–100 do Inspector. */
+  indice?: number;
+  categoria?: Categoria;
+  inspetor: string;
+  estacao?: string;
+  inspecionadoEm: string;
+  /** Relatório (PDF) no sistema de inspeção; abrir sempre com `urlSegura()`. */
+  relatorioUrl?: string;
+  /** Falso quando a peça foi inspecionada de novo: vale a mais recente. */
+  vigente: boolean;
+  origem: 'inspector' | 'manual';
+}
+
+export type EstadoDormente = 'em_estoque' | 'baixado';
+
+/**
+ * Dormente individual, criado na formação dos fardos a partir da inspeção vigente da peça: rastreio por peça da NF ao destino.
+ * O código é o mesmo da etiqueta colada na peça na inspeção (lote + sequência).
+ */
+export interface Dormente {
+  id: string;
+  codigo: string;
+  loteCodigo: string;
+  sequencia: number;
+  /** Fardo atual (perda e ajuste aprovados podem devolver a peça ao fardo). */
+  fardoCodigo: string;
+  resultado: ResultadoPeca;
+  categoria?: Categoria;
+  estado: EstadoDormente;
+  /** Última baixa: saída por RME, perda ou ajuste (a referência é o número da RME). */
+  baixa?: { tipo: 'saida' | 'perda' | 'ajuste'; referencia?: string; quando: string; usuario: string };
+}
+
+/** Lançamento manual (RF06, sem o Inspector): N peças com o mesmo resultado, numeradas em sequência. */
+export interface NovaInspecaoManual {
+  quantidade: number;
+  resultado: ResultadoPeca;
+  /** Obrigatória para peças aprovadas. */
+  categoria?: Categoria;
+}
+
+/** Grupo de peças com o mesmo resultado (e categoria, se aprovado): cada grupo vira um ou mais fardos. */
+export interface GrupoInspecao {
+  resultado: ResultadoPeca;
+  categoria?: Categoria;
+  quantidade: number;
+}
+
+/** Fardo sugerido: o grupo e os códigos das peças que vão nele (a quantidade é o número de peças). */
+export interface FardoSugerido extends GrupoInspecao {
+  dormentes: string[];
+}
+
+/** Resumo das peças vigentes do lote e a sugestão de fardos (até 14 por fardo, sem misturar grupos). */
+export interface SugestaoFardos {
+  loteCodigo: string;
+  quantidadeLote: number;
+  pecasInspecionadas: number;
+  /** Unidades do lote ainda sem resultado; a conclusão exige zero. */
+  semResultado: number;
+  /** Peças a mais que o lote (código digitado errado no Inspector); a conclusão exige zero. */
+  excedentes: number;
+  /** Grupos com os códigos das peças, na ordem da sequência. */
+  grupos: FardoSugerido[];
+  fardos: FardoSugerido[];
+}
+
+export interface NovaFormacaoFardos {
+  /** Cada peça do lote aparece em exatamente um fardo, do seu grupo. */
+  fardos: (FardoSugerido & { divergente?: boolean })[];
+  /** Endereço onde os fardos foram montados. */
+  local: string;
+  /** Obrigatório quando algum fardo é marcado como divergente (espécie ou tamanho diferente da NF). */
+  motivoDivergencia?: string;
 }
 
 export interface Lote {
@@ -216,8 +315,17 @@ export interface Lote {
   dofNumero: string;
   especieDocumental: string;
   classe?: Classe;
+  /** Categoria com mais peças aprovadas (cada fardo tem a sua). */
   categoria?: Categoria;
+  /** Resumo: "aguardando" até a conclusão; depois, aprovado se algum fardo foi aprovado, senão quarentena ou reprovado. */
   inspecao: ResultadoInspecao;
+  etapaInspecao: EtapaInspecao;
+  /** Peças com inspeção vigente (calculado pelo serviço). */
+  pecasInspecionadas: number;
+  /** Dormentes recebidos que ainda não estão em fardo (todos, até a conclusão da inspeção). */
+  unidadesSemFardo: number;
+  inspecaoConcluidaEm?: string;
+  inspecaoConcluidaPor?: string;
   tamanho: string;
   /** Quantidade recebida. */
   quantidade: number;
@@ -245,7 +353,7 @@ export interface Lote {
 /** Evento da linha do tempo do lote (RF23): da NF ao destino, com usuário e data. */
 export interface EventoLote {
   quando: string;
-  tipo: 'nf' | 'recebimento' | 'declaracao' | TipoMovimentacao;
+  tipo: 'nf' | 'recebimento' | 'declaracao' | 'inspecao' | TipoMovimentacao;
   titulo: string;
   detalhe?: string;
   usuario?: string;
@@ -258,6 +366,10 @@ export interface EventoLote {
 export interface LoteDetalhe {
   lote: Lote;
   fardos: Fardo[];
+  /** Inspeções das peças, as vigentes primeiro (as substituídas ficam como histórico). */
+  inspecoes: InspecaoPeca[];
+  /** Dormentes do lote (depois da formação dos fardos), com fardo e baixa. */
+  dormentes: Dormente[];
   nf?: NotaFiscal;
   recebimento?: Recebimento;
   historico: EventoLote[];
@@ -292,14 +404,13 @@ export interface Recebimento {
   justificativa?: string;
   observacao?: string;
   lotes: string[];
-  fardos: number;
   conferente: string;
 }
 
 export interface NovoRecebimento {
   nfId: string;
-  /** Quantidade de cada fardo por item da NF; a quantidade conferida é a soma. */
-  itens: { itemId: string; fardos: number[] }[];
+  /** Quantidade conferida de cada item da NF, em unidades: os fardos só são formados depois da inspeção. */
+  itens: { itemId: string; quantidade: number }[];
   avaria: boolean;
   observacao?: string;
   /** Obrigatória quando a divergência de volume passa da tolerância. */
@@ -309,7 +420,6 @@ export interface NovoRecebimento {
 export interface ResultadoRecebimento {
   recebimento: Recebimento;
   lotes: Lote[];
-  fardos: Fardo[];
 }
 
 export interface SaldoEstoque {
@@ -352,13 +462,19 @@ export interface Movimentacao {
   decididoPor?: string;
   decididoEm?: string;
   motivoRejeicao?: string;
+  /** Códigos dos dormentes (saída, perda e ajuste). */
+  dormentes?: string[];
 }
 
-/** Entrada vem do recebimento e saída da RME. Perda e ajuste são por fardo e ficam pendentes até a aprovação. */
+/**
+ * Entrada vem do recebimento e saída da RME. Perda e ajuste são por fardo, com os códigos dos dormentes, e ficam pendentes
+ * até a aprovação. Ajuste negativo tira as peças do fardo; positivo devolve ao fardo peças do lote que tinham baixa por perda
+ * ou ajuste (nenhum código novo é criado). A quantidade é o número de peças (com sinal no ajuste).
+ */
 export type NovaMovimentacao =
   | { tipo: 'transferencia'; loteCodigo: string; quantidade: number; origem: string; destino: string; motivo?: string }
-  | { tipo: 'perda'; fardoCodigo: string; quantidade: number; motivoPerda: MotivoPerda; motivo: string }
-  | { tipo: 'ajuste'; fardoCodigo: string; quantidade: number; motivo: string };
+  | { tipo: 'perda'; fardoCodigo: string; quantidade: number; dormentes: string[]; motivoPerda: MotivoPerda; motivo: string }
+  | { tipo: 'ajuste'; fardoCodigo: string; quantidade: number; dormentes: string[]; motivo: string };
 
 /** Parâmetros de negócio guardados no servidor e editáveis em Configurações. */
 export interface ParametrosNegocio {
@@ -367,6 +483,9 @@ export interface ParametrosNegocio {
   alertaDofCriticoDias: number;
   /** Alerta de atenção quando vence em até N dias. */
   alertaDofAtencaoDias: number;
+  /** Categoria pelo índice 0–100 da inspeção: a partir deste índice é Categoria 1; abaixo de `categoria2IndiceMin`, Categoria 3. */
+  categoria1IndiceMin: number;
+  categoria2IndiceMin: number;
   /** Valores ainda não confirmados pela CPTM. */
   provisorio: boolean;
 }
@@ -420,6 +539,8 @@ export interface ItemSeparacao {
   fardoCodigo: string;
   loteCodigo: string;
   quantidade: number;
+  /** Códigos dos dormentes separados (a quantidade é o número deles). */
+  dormentes: string[];
   /** Saldo do fardo no momento da separação (para mostrar o que sobra na entrega). */
   saldoFardo: number;
 }
@@ -484,10 +605,14 @@ export interface OpcaoSeparacao {
   disponivel: number;
   /** Quantidade que a sugestão FIFO tira deste fardo (0 = não sugerido). */
   sugerido: number;
+  /** Dormentes livres do fardo (em estoque e não reservados), na ordem da sequência. */
+  dormentesDisponiveis: string[];
+  /** Os que a sugestão tira (os primeiros livres). */
+  dormentesSugeridos: string[];
 }
 
 export interface NovaSeparacao {
-  itens: { itemId: string; fardoCodigo: string; quantidade: number }[];
+  itens: { itemId: string; fardoCodigo: string; quantidade: number; dormentes: string[] }[];
   /** Obrigatória quando a escolha difere da sugestão. */
   justificativa?: string;
 }

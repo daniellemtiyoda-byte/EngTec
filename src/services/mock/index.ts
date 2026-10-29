@@ -1,7 +1,7 @@
 import type { Servicos } from '../contracts';
 import { TOLERANCIA_VOLUME_PCT } from '../../dominio/parametros';
 import type {
-  DofPendente, EventoLote, Indicadores, Pendencia, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
+  DofPendente, EventoLote, Fardo, Indicadores, Pendencia, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
   TipoMovimentacao, Usuario,
 } from '../../types/models';
 import { data, pct, rotuloClasse } from '../../utils/format';
@@ -9,6 +9,8 @@ import { chaveAcessoValida } from '../../utils/nfeXml';
 import { ApiError } from '../http';
 import { decidirMovimentacao, registrarPerdaAjuste } from './ajustes';
 import { situacaoDoLote } from './estoque';
+import { rotuloGrupo } from '../../dominio/inspecao';
+import { formarFardos, lancarManual, sugestaoFardos, vigentes } from './inspecao';
 import { criarDados } from './data';
 import { receber } from './recebimento';
 import { abrirRme, cancelarRme, conferirRme, entregarRme, opcoesSeparacao, separarRme } from './rme';
@@ -37,7 +39,10 @@ export function criarServicosSimulados(): Servicos {
   /** Idade e limite calculados na consulta, com o parâmetro vigente (no modo real, pelo servidor). */
   function comIdade<T extends Lote>(l: T): T {
     const idadeDias = diasEntre(dataSP(l.recebidoEm), hojeSP());
-    return { ...l, idadeDias, acimaLimiteIdade: l.saldo > 0 && idadeDias > D.parametros.limiteIdadeDias, situacao: situacaoDoLote(l) };
+    return {
+      ...l, idadeDias, acimaLimiteIdade: l.saldo > 0 && idadeDias > D.parametros.limiteIdadeDias, situacao: situacaoDoLote(l, D.fardos),
+      pecasInspecionadas: vigentes(D, l.codigo).length,
+    };
   }
   /** Lote com NF e DOF de origem e todo o saldo que saiu explicado por movimentações aprovadas (histórico NF → destino). */
   function rastreavel(l: Lote) {
@@ -73,7 +78,19 @@ export function criarServicosSimulados(): Servicos {
   const exemplos = <T,>(l: T[], f: (x: T) => { codigo: string; texto: string }) => l.slice(0, 3).map(f);
   const comVolume = (id: string, n: NovoTamanho): Tamanho => ({ id, ...n, volumeM3: volumeDormenteM3(n.larguraCm, n.alturaCm, n.comprimentoCm) });
 
-  return {
+  /** "Aprovado · Categoria 1: 3 fardo(s), 42 un. · Quarentena: 1 fardo(s), 5 un." */
+  function resumoFardos(fs: Fardo[]) {
+    const g = new Map<string, { n: number; q: number }>();
+    for (const f of fs) {
+      const k = `${rotuloGrupo(f)}${f.motivoBloqueio ? ' (divergente)' : ''}`;
+      const x = g.get(k) ?? { n: 0, q: 0 };
+      x.n += 1; x.q += f.quantidadeInicial;
+      g.set(k, x);
+    }
+    return [...g].map(([k, x]) => `${k}: ${x.n} fardo(s), ${x.q} un.`).join(' · ');
+  }
+
+  const servicos: Servicos = {
     auth: {
       entrar: async ({ usuario, senha }) => {
         await atraso(500);
@@ -113,7 +130,7 @@ export function criarServicosSimulados(): Servicos {
           lotesAcimaLimite: lotes.filter((l) => l.acimaLimiteIdade).length, limiteIdadeDias: D.parametros.limiteIdadeDias,
           divergenciaInventarioPct: baseInv ? (inv.reduce((a, x) => a + Math.abs(x.diferenca), 0) / baseInv) * 100 : 0,
           rastreabilidadePct: D.lotes.length ? (D.lotes.filter(rastreavel).length / D.lotes.length) * 100 : 0,
-          dofsPendentes: dofsPendentes().length, lotesAguardandoInspecao: D.lotes.filter((l) => l.inspecao === 'aguardando').length,
+          dofsPendentes: dofsPendentes().length, lotesAguardandoInspecao: D.lotes.filter((l) => l.etapaInspecao !== 'concluida').length,
           saldoM3PorEspecie: [...porEspecie].sort((a, b) => b[1] - a[1]).map(([rotulo, valor]) => ({ rotulo, valor })),
           origem: 'simulado',
         };
@@ -134,7 +151,9 @@ export function criarServicosSimulados(): Servicos {
         const abertas = rmes('aberta'), emSep = rmes('em_separacao'), conferidas = rmes('conferida');
         const minhas = D.rmes.filter((r) => r.requisitante === (sessao ?? D.usuarioDemo).nome && r.status !== 'entregue' && r.status !== 'cancelada');
         const aprovar = D.movimentacoes.filter((m) => (m.tipo === 'perda' || m.tipo === 'ajuste') && m.status === 'pendente');
-        const aguardandoInsp = D.lotes.filter((l) => l.inspecao === 'aguardando');
+        const abertos = D.lotes.filter((l) => l.etapaInspecao !== 'concluida').map((l) => ({ l, s: sugestaoFardos(D, l.codigo) }));
+        const prontos = abertos.filter((x) => x.s.semResultado === 0 && x.s.excedentes === 0);
+        const aguardandoInsp = abertos.filter((x) => !prontos.includes(x));
         const lista: (Pendencia | false)[] = [
           pode('rme:separar') && abertas.length > 0 && {
             id: 'separar', nivel: critica(abertas) ? 'critico' : 'atencao', titulo: 'RMEs para separar', quantidade: abertas.length,
@@ -172,9 +191,15 @@ export function criarServicosSimulados(): Servicos {
             exemplos: exemplos(minhas, (r) => ({ codigo: r.numero, texto: `${({ aberta: 'Aberta', em_separacao: 'Em separação', conferida: 'Conferida' } as Record<string, string>)[r.status] ?? r.status} · ${r.destinatario}` })),
             acao: { rotulo: 'Abrir RME', link: '/rme' },
           },
-          pode('recebimento:registrar', 'admin') && aguardandoInsp.length > 0 && {
+          pode('inspecao:concluir') && prontos.length > 0 && {
+            id: 'formar', nivel: 'atencao', titulo: 'Lotes inspecionados: formar os fardos', quantidade: prontos.length,
+            descricao: 'Todas as peças têm resultado. O material só fica disponível depois de formar os fardos.',
+            exemplos: exemplos(prontos, ({ l }) => ({ codigo: l.codigo, texto: `${l.quantidade} peças · ${l.especieDocumental}` })), acao: { rotulo: 'Formar fardos', link: '/inspecao' },
+          },
+          pode('inspecao:concluir', 'recebimento:registrar', 'admin') && aguardandoInsp.length > 0 && {
             id: 'inspecao', nivel: 'info', titulo: 'Lotes aguardando inspeção', quantidade: aguardandoInsp.length, descricao: 'Fora do estoque disponível até o resultado da inspeção.',
-            exemplos: exemplos(aguardandoInsp, (l) => ({ codigo: l.codigo, texto: l.especieDocumental })), acao: { rotulo: 'Ver lotes', link: '/lotes?situacao=aguardando_inspecao' },
+            exemplos: exemplos(aguardandoInsp, ({ l, s }) => ({ codigo: l.codigo, texto: `${s.pecasInspecionadas} de ${l.quantidade} peças inspecionadas` })),
+            acao: { rotulo: 'Ver inspeção', link: '/inspecao' },
           },
         ];
         return lista.filter((x): x is Pendencia => !!x);
@@ -199,7 +224,7 @@ export function criarServicosSimulados(): Servicos {
         const urgentes = ativas.filter((r) => r.urgencia === 'urgente' && r.dataLimite >= hoje);
         const aConferir = D.rmes.filter((r) => r.status === 'em_separacao').length;
         const velhos = D.lotes.map(comIdade).filter((l) => l.saldo > 0 && l.acimaLimiteIdade).length;
-        const aguardando = D.lotes.filter((l) => l.inspecao === 'aguardando').length;
+        const aguardando = D.lotes.filter((l) => l.etapaInspecao !== 'concluida').length;
         const pendentesAprov = D.movimentacoes.filter((m) => (m.tipo === 'perda' || m.tipo === 'ajuste') && m.status === 'pendente').length;
         const semDof = D.notas.filter((n) => n.situacao === 'aguardando_dof').length;
         const aReceber = D.notas.filter((n) => n.situacao === 'aguardando_recebimento').length;
@@ -211,7 +236,7 @@ export function criarServicosSimulados(): Servicos {
           ...urgentes.map((r) => ({ id: `al-urg-${r.id}`, nivel: 'critico' as const, titulo: `RME urgente ${r.numero}`, descricao: `${r.destinatario}: data limite ${data(r.dataLimite)}.`, link: '/rme' })),
           ...se(aConferir, { id: 'al-conferir', nivel: 'atencao' as const, titulo: `${aConferir} RME aguardando conferência`, descricao: 'A entrega e a baixa só acontecem após a conferência do supervisor.', link: '/rme' }),
           ...se(velhos, { id: 'al-idade', nivel: 'atencao' as const, titulo: `${velhos} lote(s) acima de ${p.limiteIdadeDias} dias em estoque`, descricao: `Limite ${p.provisorio ? 'provisório ' : ''}definido em Configurações.`, link: '/lotes' }),
-          ...se(aguardando, { id: 'al-inspecao', nivel: 'atencao' as const, titulo: `${aguardando} lote(s) aguardando inspeção`, descricao: 'Material fora do estoque disponível até o resultado da inspeção.', link: '/lotes' }),
+          ...se(aguardando, { id: 'al-inspecao', nivel: 'atencao' as const, titulo: `${aguardando} lote(s) aguardando inspeção`, descricao: 'Material fora do estoque disponível até a inspeção e a formação dos fardos.', link: '/inspecao' }),
           ...se(pendentesAprov, { id: 'al-aprovar', nivel: 'atencao' as const, titulo: `${pendentesAprov} perda/ajuste aguardando aprovação`, descricao: 'O saldo só muda após a aprovação do supervisor ou gestor.', link: '/movimentacoes' }),
           ...se(semDof, { id: 'al-sem-dof', nivel: 'atencao' as const, titulo: `${semDof} NF aguardando DOF`, descricao: 'O recebimento não avança sem o DOF cadastrado.', link: '/notas' }),
           ...se(aReceber, { id: 'al-receber', nivel: 'atencao' as const, titulo: `${aReceber} NF aguardando recebimento`, descricao: 'NF com DOF pronta para conferência.', link: '/recebimento' }),
@@ -298,21 +323,40 @@ export function criarServicosSimulados(): Servicos {
         if (!l) throw new ApiError(404, `Lote ${codigo} não encontrado.`);
         const nf = D.notas.find((n) => n.numero === l.nfNumero && n.fornecedor === l.fornecedor);
         const recebimento = nf && D.recebimentos.find((r) => r.nfId === nf.id);
+        const fardos = D.fardos.filter((f) => f.loteCodigo === l.codigo).sort((a, b) => a.sequencia - b.sequencia);
         const titulos: Record<string, string> = { entrada: 'Entrada no estoque', saida: 'Saída por RME', transferencia: 'Transferência', perda: 'Perda', ajuste: 'Ajuste de saldo' };
         const historico: EventoLote[] = [
           ...(nf ? [{ quando: `${nf.emissao}T12:00:00-03:00`, tipo: 'nf' as const, titulo: `NF ${nf.numero} emitida`, detalhe: `${nf.fornecedor} · ${nf.origem === 'xml' ? 'importada do XML' : 'cadastro manual'}`, referencia: `NF ${nf.numero}` }] : []),
           ...(recebimento ? [{
             quando: recebimento.recebidoEm, tipo: 'recebimento' as const, titulo: 'Recebimento conferido', usuario: recebimento.conferente, referencia: `NF ${recebimento.nfNumero}`,
-            detalhe: `Lote criado com ${l.quantidade} dormentes em ${l.fardos} fardos, aguardando inspeção.${recebimento.acimaTolerancia ? ' Divergência de volume acima da tolerância.' : ''}`,
+            detalhe: `Lote criado com ${l.quantidade} dormentes, aguardando inspeção.${recebimento.acimaTolerancia ? ' Divergência de volume acima da tolerância.' : ''}`,
+          }] : []),
+          ...(l.inspecaoConcluidaEm ? [{
+            quando: l.inspecaoConcluidaEm, tipo: 'inspecao' as const, titulo: `Inspeção concluída: ${fardos.length} fardo(s) formado(s)`, usuario: l.inspecaoConcluidaPor,
+            detalhe: resumoFardos(fardos),
           }] : []),
           ...(nf?.dof?.declaradoEm ? [{ quando: nf.dof.declaradoEm, tipo: 'declaracao' as const, titulo: `DOF ${nf.dof.numero} declarado no Sinaflor`, usuario: nf.dof.declaradoPor }] : []),
           ...D.movimentacoes.filter((m) => m.loteCodigo === l.codigo && m.tipo !== 'entrada').map((m) => ({
             quando: m.dataHora, tipo: m.tipo, titulo: `${titulos[m.tipo]}${m.fardoCodigo ? ` · ${m.fardoCodigo}` : ''}`, usuario: m.usuario, referencia: m.referencia, status: m.status,
-            detalhe: `${m.tipo === 'ajuste' && m.quantidade > 0 ? '+' : ''}${m.quantidade} un. · ${m.origem} → ${m.destino}${m.motivo ? ` · ${m.motivo}` : ''}`,
+            detalhe: `${m.tipo === 'ajuste' && m.quantidade > 0 ? '+' : ''}${m.quantidade} un. · ${m.origem} → ${m.destino}${m.motivo ? ` · ${m.motivo}` : ''}${m.dormentes?.length ? ` · dormentes ${m.dormentes.map((d) => d.slice(-4)).join(', ')}` : ''}`,
           })),
         ].sort((a, b) => a.quando.localeCompare(b.quando));
-        return { lote: comIdade(l), fardos: D.fardos.filter((f) => f.loteCodigo === l.codigo).sort((a, b) => a.sequencia - b.sequencia), nf, recebimento, historico };
+        const inspecoes = D.inspecoes.filter((x) => x.loteCodigo === l.codigo)
+          .sort((a, b) => Number(b.vigente) - Number(a.vigente) || a.sequencia - b.sequencia || b.inspecionadoEm.localeCompare(a.inspecionadoEm));
+        const dormentes = D.dormentes.filter((x) => x.loteCodigo === l.codigo).sort((a, b) => a.sequencia - b.sequencia);
+        return { lote: comIdade(l), fardos, inspecoes, dormentes, nf, recebimento, historico };
       },
+      sugestaoFardos: async (codigo) => { await simularRede(); return sugestaoFardos(D, codigo); },
+      formarFardos: async (codigo, d) => {
+        await atraso(700);
+        formarFardos(D, codigo, d, agora());
+        return servicos.lotes.obter(codigo);
+      },
+    },
+    dormentes: { listar: (q) => paginar(D.dormentes, q) },
+    inspecoes: {
+      listar: (q) => paginar(D.inspecoes, q),
+      lancar: async (loteCodigo, d) => { await atraso(500); return lancarManual(D, loteCodigo, d, agora()); },
     },
     fardos: { listar: (q) => paginar(D.fardos, q) },
     estoque: {
@@ -390,9 +434,14 @@ export function criarServicosSimulados(): Servicos {
             id: k, especie: l.especieDocumental, tamanho: l.tamanho, larguraCm: t?.larguraCm ?? 0, alturaCm: t?.alturaCm ?? 0, comprimentoCm: t?.comprimentoCm ?? 0,
             lotes: 0, quantidade: 0, volumeM3: 0, disponivelM3: 0, emAnaliseM3: 0, bloqueadoM3: 0, divergenteM3: 0,
           };
-          const v = (l.volumeCalculadoM3 / l.quantidade) * l.saldo;
-          const balde = ({ disponivel: 'disponivelM3', em_analise: 'emAnaliseM3', bloqueado: 'bloqueadoM3', divergente: 'divergenteM3' } as const)[l.estoqueStatus];
-          linha.lotes += 1; linha.quantidade += l.saldo; linha.volumeM3 += v; linha[balde] += v;
+          // Por estado do saldo (vem dos fardos): um lote pode ter parte disponível e parte segregada.
+          const vu = l.volumeCalculadoM3 / l.quantidade;
+          const s = D.saldos.find((x) => x.loteCodigo === l.codigo);
+          linha.lotes += 1; linha.quantidade += l.saldo; linha.volumeM3 += vu * l.saldo;
+          if (s) {
+            linha.disponivelM3 += vu * s.disponivel; linha.emAnaliseM3 += vu * s.emAnalise;
+            linha.bloqueadoM3 += vu * s.bloqueado; linha.divergenteM3 += vu * s.divergente;
+          }
           linhas.set(k, linha);
         }
         return [...linhas.values()].sort((a, b) => a.especie.localeCompare(b.especie) || a.tamanho.localeCompare(b.tamanho));
@@ -422,6 +471,8 @@ export function criarServicosSimulados(): Servicos {
         if (!Number.isInteger(d.limiteIdadeDias) || d.limiteIdadeDias < 1 || d.limiteIdadeDias > 3650) erros.limiteIdadeDias = 'Inteiro entre 1 e 3650.';
         if (!Number.isInteger(d.alertaDofCriticoDias) || d.alertaDofCriticoDias < 0) erros.alertaDofCriticoDias = 'Inteiro, mínimo 0.';
         if (!Number.isInteger(d.alertaDofAtencaoDias) || d.alertaDofAtencaoDias < d.alertaDofCriticoDias) erros.alertaDofAtencaoDias = 'Inteiro, maior ou igual ao do alerta crítico.';
+        if (!Number.isInteger(d.categoria1IndiceMin) || d.categoria1IndiceMin < 1 || d.categoria1IndiceMin > 100) erros.categoria1IndiceMin = 'Inteiro entre 1 e 100.';
+        if (!Number.isInteger(d.categoria2IndiceMin) || d.categoria2IndiceMin < 0 || d.categoria2IndiceMin >= d.categoria1IndiceMin) erros.categoria2IndiceMin = 'Inteiro, menor que o da Categoria 1.';
         if (Object.keys(erros).length) throw new ApiError(422, 'Confira os parâmetros.', erros);
         Object.assign(D.parametros, d);
         return { ...D.parametros };
@@ -463,4 +514,5 @@ export function criarServicosSimulados(): Servicos {
     usuarios: { listar: (q) => paginar(D.usuarios, q) },
     sistema: { testarConexao: async () => { await atraso(300); return { ok: true, mensagem: 'Modo simulado: nenhuma conexão real foi testada.', simulado: true }; } },
   };
+  return servicos;
 }

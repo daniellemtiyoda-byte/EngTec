@@ -44,7 +44,6 @@ export default function RecebimentoPage() {
       render: (r) => <Badge tom={r.acimaTolerancia ? 'vermelho' : 'verde'}>{sinal(r.divergenciaVolumePct)}{pct(r.divergenciaVolumePct)}</Badge>,
     },
     { chave: 'lotes', titulo: 'Lotes criados', render: (r) => <CodigosLink codigos={r.lotes} /> },
-    { chave: 'fardos', titulo: 'Fardos', alinhar: 'right', ordenavel: true, opcional: true },
     { chave: 'conferente', titulo: 'Conferente', ordenavel: true, opcional: true },
   ];
 
@@ -55,7 +54,8 @@ export default function RecebimentoPage() {
         descricao="Conferência da carga contra a NF e o DOF."
         aviso={
           <ComoFunciona>
-            Sem DOF não há recebimento. Ao confirmar, o sistema cria um lote por espécie e tamanho e os fardos, todos aguardando inspeção.
+            Sem DOF não há recebimento. Ao confirmar, o sistema cria um lote por espécie e tamanho, em unidades, aguardando inspeção;
+            os fardos são formados depois, na tela Inspeção, pelo resultado de cada peça.
             Divergência de quantidade ou avaria exige fotos; divergência de volume acima de {TOLERANCIA_VOLUME_PCT}% exige justificativa e
             deixa os lotes "Com divergência".
           </ComoFunciona>
@@ -101,7 +101,7 @@ export default function RecebimentoPage() {
               <dt>Recebido em</dt><dd>{data(ver.recebidoEm)} por {ver.conferente}</dd>
               <dt>Quantidade</dt><dd>NF {un(ver.quantidadeDocumental)} · conferida {un(ver.quantidadeConferida)}</dd>
               <dt>Avaria</dt><dd>{ver.avaria ? 'Sim' : 'Não'}</dd><dt>Fotos</dt><dd>{ver.fotos}</dd>
-              <dt>Lotes</dt><dd><CodigosLink codigos={ver.lotes} /> ({ver.fardos} fardos)</dd>
+              <dt>Lotes</dt><dd><CodigosLink codigos={ver.lotes} /></dd>
               {ver.justificativa && <><dt>Justificativa</dt><dd>{ver.justificativa}</dd></>}
               {ver.observacao && <><dt>Observação</dt><dd>{ver.observacao}</dd></>}
             </dl>

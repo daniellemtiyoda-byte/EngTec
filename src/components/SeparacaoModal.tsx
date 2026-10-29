@@ -4,6 +4,7 @@ import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import { ApiError, mensagemSegura } from '../services/http';
 import type { OpcaoSeparacao, Rme } from '../types/models';
+import { seqPeca } from '../utils/busca';
 import { data, paraNumero, un } from '../utils/format';
 import { Badge, BadgeDe } from './Badge';
 import { Contador } from './Contador';
@@ -13,33 +14,48 @@ import { ProgressoPassos } from './Passos';
 
 const PASSOS = ['Separar', 'Revisar e confirmar'];
 const chave = (o: { itemId: string; fardoCodigo: string }) => `${o.itemId}|${o.fardoCodigo}`;
-const sugestao = (ops: OpcaoSeparacao[]) => Object.fromEntries(ops.map((o) => [chave(o), String(o.sugerido)]));
+const sugestao = (ops: OpcaoSeparacao[]) => Object.fromEntries(ops.map((o) => [chave(o), o.dormentesSugeridos]));
 
 interface Props { rme: Rme | null; aoFechar: () => void; aoConcluir: (r: Rme) => void }
 
 /**
- * Separação (RF18/RF19, regras 4 e 7) em 2 passos: 1. quantidade de cada fardo, já preenchida com a sugestão
- * (abertos primeiro, depois fechados por FIFO de lote); 2. revisão do que sai de cada fardo, com justificativa
- * obrigatória se a escolha diferir da sugestão. A quantidade separada de cada item tem de bater com a pedida.
+ * Separação (RF18/RF19, regras 4 e 7) em 2 passos: 1. dormentes de cada fardo, já marcados com a sugestão
+ * (abertos primeiro, depois fechados por FIFO de lote; dentro do fardo, as primeiras sequências livres); 2. revisão do que
+ * sai de cada fardo, com justificativa obrigatória se fardos ou quantidades diferirem da sugestão. Trocar só as peças dentro
+ * do fardo não pede justificativa. A quantidade separada de cada item tem de bater com a pedida.
  */
 export function SeparacaoModal({ rme, aoFechar, aoConcluir }: Props) {
   const formId = useId();
   const topo = useRef<HTMLDivElement>(null);
   const opcoes = useAsync(() => (rme ? servicos.rme.opcoesSeparacao(rme.id) : Promise.resolve([])), [rme?.id]);
   const [passo, setPasso] = useState(0);
-  const [qtd, setQtd] = useState<Record<string, string>>({});
+  const [sel, setSel] = useState<Record<string, string[]>>({});
   const [justificativa, setJustificativa] = useState('');
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string>();
   const [enviando, setEnviando] = useState(false);
 
   const ops = opcoes.dados ?? [];
-  useEffect(() => { setQtd(sugestao(ops)); setPasso(0); setJustificativa(''); setErros({}); setErroGeral(undefined); }, [opcoes.dados]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setSel(sugestao(ops)); setPasso(0); setJustificativa(''); setErros({}); setErroGeral(undefined); }, [opcoes.dados]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { topo.current?.scrollIntoView({ block: 'start' }); }, [passo]);
 
   if (!rme) return null;
-  const valor = (o: OpcaoSeparacao) => { const t = (qtd[chave(o)] ?? '').trim(); return t ? paraNumero(t, true) : 0; };
-  const invalido = (o: OpcaoSeparacao) => { const v = valor(o); return !Number.isInteger(v) || v < 0 || v > o.disponivel; };
+  const pecas = (o: OpcaoSeparacao) => sel[chave(o)] ?? [];
+  const valor = (o: OpcaoSeparacao) => pecas(o).length;
+  const invalido = (o: OpcaoSeparacao) => valor(o) > o.disponivel;
+  // Contador: mais peças entram pela ordem da sequência; menos tiram as últimas marcadas.
+  const mudarQuantidade = (o: OpcaoSeparacao, texto: string) => {
+    const n = Math.max(0, Math.min(o.disponivel, paraNumero(texto, true) || 0));
+    setSel((x) => {
+      const atuais = x[chave(o)] ?? [];
+      const proximas = o.dormentesDisponiveis.filter((d) => !atuais.includes(d));
+      return { ...x, [chave(o)]: n >= atuais.length ? [...atuais, ...proximas.slice(0, n - atuais.length)] : atuais.slice(0, n) };
+    });
+  };
+  const alternar = (o: OpcaoSeparacao, d: string) => setSel((x) => {
+    const atuais = x[chave(o)] ?? [];
+    return { ...x, [chave(o)]: atuais.includes(d) ? atuais.filter((y) => y !== d) : [...atuais, d] };
+  });
   const totalItem = (itemId: string) => ops.filter((o) => o.itemId === itemId).reduce((a, o) => a + (invalido(o) ? 0 : valor(o)), 0);
   const disponivelItem = (itemId: string) => ops.filter((o) => o.itemId === itemId).reduce((a, o) => a + o.disponivel, 0);
   const diferente = ops.some((o) => !invalido(o) && valor(o) !== o.sugerido);
@@ -67,7 +83,7 @@ export function SeparacaoModal({ rme, aoFechar, aoConcluir }: Props) {
     setErroGeral(undefined);
     try {
       const r = await servicos.rme.separar(rme!.id, {
-        itens: ops.filter((o) => valor(o) > 0).map((o) => ({ itemId: o.itemId, fardoCodigo: o.fardoCodigo, quantidade: valor(o) })),
+        itens: ops.filter((o) => valor(o) > 0).map((o) => ({ itemId: o.itemId, fardoCodigo: o.fardoCodigo, quantidade: valor(o), dormentes: pecas(o) })),
         justificativa: diferente ? justificativa.trim() : undefined,
       });
       aoConcluir(r);
@@ -104,8 +120,9 @@ export function SeparacaoModal({ rme, aoFechar, aoConcluir }: Props) {
         {passo === 0 && (
           <>
             <p className="mudo">
-              Para <strong>{rme.destinatario}</strong>. A sugestão já vem preenchida: fardos abertos primeiro, do mais antigo ao mais novo, depois os fechados pelo lote mais antigo.
-              Só aparecem lotes aprovados e sem divergência; o que está separado em outra RME fica reservado.
+              Para <strong>{rme.destinatario}</strong>. A sugestão já vem marcada: fardos abertos primeiro, do mais antigo ao mais novo, depois os fechados pelo lote mais antigo.
+              Toque nos números para marcar as peças que saem de verdade (são as etiquetas dos dormentes). Só aparecem fardos aprovados
+              e sem divergência; o que está separado em outra RME fica reservado.
             </p>
             {opcoes.carregando ? <Carregando /> : opcoes.erro ? <div className="aviso aviso-critico" role="alert">{mensagemSegura(opcoes.erro)}</div> : rme.itens.map((item) => {
               const lista = ops.filter((o) => o.itemId === item.id);
@@ -129,7 +146,12 @@ export function SeparacaoModal({ rme, aoFechar, aoConcluir }: Props) {
                           <div className="cartao-topo"><strong>{o.fardoCodigo}</strong><BadgeDe mapa={ESTADO_FARDO} valor={o.estado} />{o.sugerido > 0 && <Badge tom="verde">Sugerido: {o.sugerido}</Badge>}</div>
                           <div className="mudo">Recebido em {data(o.recebidoEm)} · {o.local} · disponível {un(o.disponivel)}</div>
                         </div>
-                        <Contador valor={qtd[chave(o)] ?? '0'} aoMudar={(v) => setQtd((q) => ({ ...q, [chave(o)]: v }))} rotulo={`Separar do fardo ${o.fardoCodigo}`} min={0} max={o.disponivel} invalido={invalido(o)} />
+                        <Contador valor={String(valor(o))} aoMudar={(v) => mudarQuantidade(o, v)} rotulo={`Separar do fardo ${o.fardoCodigo}`} min={0} max={o.disponivel} invalido={invalido(o)} />
+                        <div className="pecas" role="group" aria-label={`Dormentes do fardo ${o.fardoCodigo}`}>
+                          {o.dormentesDisponiveis.map((d) => (
+                            <button key={d} type="button" className="peca" aria-pressed={pecas(o).includes(d)} title={d} onClick={() => alternar(o, d)}>{seqPeca(d)}</button>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -137,7 +159,7 @@ export function SeparacaoModal({ rme, aoFechar, aoConcluir }: Props) {
                 </fieldset>
               );
             })}
-            {diferente && <div className="aviso aviso-alerta">Separação diferente da sugestão FIFO: será pedida uma justificativa. <button type="button" className="btn btn-sec btn-peq" onClick={() => setQtd(sugestao(ops))}>Restaurar sugestão</button></div>}
+            {diferente && <div className="aviso aviso-alerta">Separação diferente da sugestão FIFO: será pedida uma justificativa. <button type="button" className="btn btn-sec btn-peq" onClick={() => setSel(sugestao(ops))}>Restaurar sugestão</button></div>}
           </>
         )}
 
@@ -150,7 +172,7 @@ export function SeparacaoModal({ rme, aoFechar, aoConcluir }: Props) {
                   const sobra = o.disponivel - valor(o);
                   return (
                     <li key={chave(o)}>
-                      <strong>{o.fardoCodigo}</strong>: retirar {un(valor(o))} · {sobra > 0 ? `sobram ${un(sobra)} (fardo fica aberto)` : 'o fardo fica sem saldo disponível'}
+                      <strong>{o.fardoCodigo}</strong>: retirar {un(valor(o))} ({pecas(o).map(seqPeca).join(', ')}) · {sobra > 0 ? `sobram ${un(sobra)} (fardo fica aberto)` : 'o fardo fica sem saldo disponível'}
                     </li>
                   );
                 })}

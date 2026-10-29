@@ -1,9 +1,10 @@
 import type {
-  DivergenciaInventario, Documento, Especie, Fardo, Fornecedor, ItemNf, LocalPatio, Lote, Movimentacao, NotaFiscal, ProcessamentoImagem,
+  DivergenciaInventario, Documento, Dormente, Especie, Fardo, Fornecedor, InspecaoPeca, ItemNf, LocalPatio, Lote, Movimentacao, NotaFiscal, ProcessamentoImagem,
   ParametrosNegocio, Recebimento, RegistroAuditoria, Relatorio, Rme, SaldoEstoque, SessaoInventario, Tamanho, Transferencia, Usuario, VolumetriaLote,
 } from '../../types/models';
-import { sugerirFardos } from '../../dominio/parametros';
 import { chaveComDigito } from '../../utils/nfeXml';
+import { fardoLiberado } from './estoque';
+import { codigoPeca, formarFardos, receberDoInspector, sugestaoFardos } from './inspecao';
 import { receber } from './recebimento';
 import { abrirRme, cancelarRme, conferirRme, entregarRme, opcoesSeparacao, separarRme } from './rme';
 import { decidirMovimentacao, registrarPerdaAjuste } from './ajustes';
@@ -15,7 +16,7 @@ export function criarDados() {
 
   const usuarioDemo: Usuario = {
     id: 'u1', nome: 'Usuário de Demonstração', email: 'demo@exemplo.invalid', perfil: 'Administrador (simulado)',
-    permissoes: ['recebimento:registrar', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'nf:cadastrar', 'dof:declarar', 'movimentacoes:aprovar', 'rme:abrir', 'rme:separar', 'rme:conferir', 'visao:enviar', 'relatorios:exportar', 'admin'],
+    permissoes: ['recebimento:registrar', 'inspecao:concluir', 'movimentacoes:registrar', 'inventario:criar', 'cadastros:editar', 'nf:cadastrar', 'dof:declarar', 'movimentacoes:aprovar', 'rme:abrir', 'rme:separar', 'rme:conferir', 'visao:enviar', 'relatorios:exportar', 'admin'],
     ativo: true, ultimoAcesso: '2026-10-09T10:15:00-03:00',
   };
 
@@ -24,7 +25,7 @@ export function criarDados() {
   const perfisDemo: Record<string, Usuario> = {
     almoxarife: {
       id: 'u-alm', nome: 'Almoxarife 1', email: 'almoxarife@exemplo.invalid', perfil: 'Almoxarife (simulado)', ativo: true,
-      permissoes: ['nf:cadastrar', 'dof:declarar', 'recebimento:registrar', 'rme:separar', 'movimentacoes:registrar', 'relatorios:exportar'],
+      permissoes: ['nf:cadastrar', 'dof:declarar', 'recebimento:registrar', 'inspecao:concluir', 'rme:separar', 'movimentacoes:registrar', 'relatorios:exportar'],
     },
     operador: {
       id: 'u-op', nome: 'Operador de Pátio 1', email: 'operador@exemplo.invalid', perfil: 'Operador de pátio (simulado)', ativo: true,
@@ -32,7 +33,7 @@ export function criarDados() {
     },
     supervisor: {
       id: 'u-sup', nome: 'Supervisor de Conferência 1', email: 'supervisor@exemplo.invalid', perfil: 'Supervisor de conferência (simulado)', ativo: true,
-      permissoes: ['rme:conferir', 'movimentacoes:aprovar', 'relatorios:exportar'],
+      permissoes: ['rme:conferir', 'movimentacoes:aprovar', 'inspecao:concluir', 'relatorios:exportar'],
     },
     requisitante: {
       id: 'u-req', nome: 'Requisitante (Via Permanente)', email: 'requisitante@exemplo.invalid', perfil: 'Requisitante (simulado)', ativo: true,
@@ -70,7 +71,10 @@ export function criarDados() {
   }));
 
   // Parâmetros de negócio como ficam guardados no servidor. Valores PROVISÓRIOS, editáveis em Configurações.
-  const parametros: ParametrosNegocio = { limiteIdadeDias: 120, alertaDofCriticoDias: 1, alertaDofAtencaoDias: 3, provisorio: true };
+  // Categoria pelo índice da inspeção: limites a combinar com o projeto de inspeção.
+  const parametros: ParametrosNegocio = {
+    limiteIdadeDias: 120, alertaDofCriticoDias: 1, alertaDofAtencaoDias: 3, categoria1IndiceMin: 80, categoria2IndiceMin: 50, provisorio: true,
+  };
 
   const locais = ['Quadra 1 / Baia 01', 'Quadra 1 / Baia 02', 'Quadra 2 / Baia 01', 'Quadra 2 / Baia 02', 'Quadra 3 / Baia 01'];
   const dia = (n: number) => new Date(Date.UTC(2026, 5, 1 + n, 15)).toISOString();
@@ -83,6 +87,8 @@ export function criarDados() {
   const volumetria: VolumetriaLote[] = [];
   const recebimentos: Recebimento[] = [];
   const movimentacoes: Movimentacao[] = [];
+  const inspecoes: InspecaoPeca[] = [];
+  const dormentes: Dormente[] = [];
 
   // NFs fictícias: as 12 primeiras já recebidas, a 13ª com DOF aguardando recebimento e a 14ª sem DOF.
   // Desvio do volume do DOF em relação ao da NF: a 4ª passa da tolerância de 10%.
@@ -124,35 +130,45 @@ export function criarDados() {
     return nf;
   });
 
-  // As NFs recebidas passam pela mesma regra do serviço, que cria lotes, fardos, saldos, volumetria e movimentações.
-  const base = { especies, tamanhos, lotes, fardos, saldos, volumetria, recebimentos, movimentacoes };
+  // As NFs recebidas passam pela mesma regra do serviço, que cria lotes (em unidades), saldos, volumetria e movimentações.
+  const base = { especies, tamanhos, lotes, fardos, saldos, volumetria, recebimentos, movimentacoes, inspecoes, parametros, dormentes };
   notas.slice(0, 12).forEach((nf, i) => {
-    const itens = nf.itens.map((it, j) => {
-      const fs = sugerirFardos(it.quantidade);
-      if (i === 5 && j === 0) fs[fs.length - 1] -= 3; // falta de 3 dormentes: divergência com a NF, com fotos
-      return { itemId: it.id, fardos: fs };
-    });
+    const itens = nf.itens.map((it, j) => ({
+      // NF 1005: falta de 3 dormentes, divergência com a NF, com fotos
+      itemId: it.id, quantidade: it.quantidade - (i === 5 && j === 0 ? 3 : 0),
+    }));
     receber(base, nf, {
       nfId: nf.id, itens, avaria: i === 8, observacao: i === 8 ? 'Dois dormentes com a ponta lascada.' : undefined,
       justificativa: i === 3 ? 'Carga conferida com o fornecedor; diferença comunicada ao órgão ambiental.' : undefined,
     }, { quando: dia(i * 9 + 2), usuario: ['Conferente 1', 'Conferente 2'][i % 2], fotos: i === 5 || i === 8 ? 2 : 0, novoId });
   });
 
-  // Resultado simulado da inspeção dos lotes mais antigos (os das duas últimas NFs recebidas seguem aguardando).
-  const ultimasNfs = new Set(notas.slice(10, 12).map((n) => n.numero));
-  lotes.forEach((l, k) => {
-    if (ultimasNfs.has(l.nfNumero)) return;
-    const resultado = k % 7 === 3 ? 'quarentena' : k % 7 === 5 ? 'reprovado' : 'aprovado';
-    l.inspecao = resultado;
-    l.categoria = 1 + (k % 3);
-    l.local = locais[k % locais.length];
-    const s = saldos.find((x) => x.loteCodigo === l.codigo)!;
-    Object.assign(s, { categoria: l.categoria, local: l.local });
-    for (const f of fardos) if (f.loteCodigo === l.codigo) f.local = l.local;
-    if (l.estoqueStatus === 'divergente') return; // fora da separação até ser liberado
-    l.status = resultado === 'aprovado' ? 'aprovado' : 'bloqueado';
-    l.estoqueStatus = resultado === 'aprovado' ? 'disponivel' : 'bloqueado';
-    Object.assign(s, { emAnalise: 0, disponivel: resultado === 'aprovado' ? l.quantidade : 0, bloqueado: resultado === 'aprovado' ? 0 : l.quantidade });
+  // Inspeção simulada peça a peça, como chegaria do Inspector (veredito e índice pseudoaleatórios, sempre os mesmos),
+  // e fardos formados pela mesma regra do serviço. Os lotes da penúltima NF recebida ainda não têm fardos: o primeiro com todas
+  // as peças inspecionadas (pronto para formar), os demais no meio da inspeção; os da última NF aguardam. Em um lote, o último
+  // fardo de aprovadas sai com divergência de espécie.
+  const emInspecao = new Set(notas.slice(10, 11).map((n) => n.numero));
+  const aguardando = new Set(notas.slice(11, 12).map((n) => n.numero));
+  const prontoParaFormar = [...lotes].reverse().find((l) => emInspecao.has(l.nfNumero));
+  [...lotes].reverse().forEach((l, k) => {
+    if (aguardando.has(l.nfNumero)) return;
+    const quando = somarDias(l.recebidoEm.slice(0, 10), 2 + (k % 3));
+    const total = emInspecao.has(l.nfNumero) && l !== prontoParaFormar ? Math.floor(l.quantidade / 2) : l.quantidade;
+    for (let p = 1; p <= total; p++) {
+      const r = (p * 37 + k * 11) % 100;
+      const indice = r < 6 ? 30 + r : r < 14 ? 45 + r : 60 + (r % 40);
+      receberDoInspector(base, {
+        codigoPeca: codigoPeca(l.codigo, p), veredito: indice < 45 ? 'REJEITADO' : indice < 60 ? 'ATENCAO' : 'APROVADO', indice,
+        inspetor: 'Inspetor 1', estacao: 'Estação 01', quando: `${quando}T${String(10 + Math.floor(p / 60)).padStart(2, '0')}:${String(p % 60).padStart(2, '0')}:00-03:00`,
+      }, novoId);
+    }
+    if (emInspecao.has(l.nfNumero)) return;
+    const s = sugestaoFardos(base, l.codigo);
+    const ultimoAprovado = s.fardos.map((f) => f.resultado).lastIndexOf('aprovado');
+    const fs = s.fardos.map((f, i) => ({ ...f, divergente: k === 4 && i === ultimoAprovado }));
+    formarFardos(base, l.codigo, {
+      fardos: fs, local: locais[k % locais.length], motivoDivergencia: k === 4 ? 'Peças de espécie diferente da NF, a conferir com o fornecedor.' : undefined,
+    }, { quando: `${quando}T17:00:00-03:00`, usuario: 'Almoxarife 1', novoId });
   });
 
   for (const [i, l] of lotes.filter((x) => x.inspecao === 'aprovado').slice(0, 8).entries()) {
@@ -164,12 +180,14 @@ export function criarDados() {
 
   // RMEs fictícias, uma em cada status, pela mesma regra do serviço. Grupos espécie + tamanho com saldo disponível, do mais antigo.
   const rmes: Rme[] = [];
-  const baseRme = { especies, tamanhos, lotes, fardos, saldos, movimentacoes, rmes };
+  const baseRme = { especies, tamanhos, lotes, fardos, saldos, movimentacoes, rmes, dormentes };
   const grupos = [...new Map([...lotes].reverse().filter((l) => l.estoqueStatus === 'disponivel').map((l) => [`${l.especieDocumental}|${l.tamanho}`, l]))]
     .map(([, l]) => ({ especieId: especies.find((e) => e.nomeCientifico === l.especieDocumental)!.id, tamanhoId: tamanhos.find((t) => t.codigo === l.tamanho)!.id }));
   const pessoa = { requisitante: 'Requisitante (Via Permanente)', almoxarife: 'Almoxarife 1', supervisor: 'Supervisor de Conferência 1' };
   const ctx = (n: number, usuario: string) => ({ quando: dia(n), usuario, novoId });
-  const sugerida = (r: Rme) => ({ itens: opcoesSeparacao(baseRme, r).filter((o) => o.sugerido > 0).map((o) => ({ itemId: o.itemId, fardoCodigo: o.fardoCodigo, quantidade: o.sugerido })) });
+  const sugerida = (r: Rme) => ({
+    itens: opcoesSeparacao(baseRme, r).filter((o) => o.sugerido > 0).map((o) => ({ itemId: o.itemId, fardoCodigo: o.fardoCodigo, quantidade: o.sugerido, dormentes: o.dormentesSugeridos })),
+  });
   const nova = (n: number, destinatario: string, itens: [number, number][], urgencia: 'normal' | 'urgente' = 'normal', limite = n + 45) => abrirRme(baseRme, {
     destinatario, urgencia, dataLimite: dia(limite).slice(0, 10), itens: itens.map(([g, quantidade]) => ({ ...grupos[g % grupos.length], quantidade })),
   }, ctx(n, pessoa.requisitante));
@@ -193,16 +211,19 @@ export function criarDados() {
   nova(140, 'Manutenção da Via Permanente – Linha 13', [[2, 30], [3, 14]], 'urgente', 160);
   nova(130, 'Manutenção da Via Permanente – Linha 10', [[3, 6]], 'normal', 140);
 
-  // Perdas e ajustes fictícios em fardos fechados fora de RME: um aprovado, dois pendentes e um rejeitado.
+  // Perdas e ajustes fictícios em fardos fechados fora de RME, com os códigos dos dormentes: um aprovado, dois pendentes e um rejeitado.
+  // O ajuste positivo devolve ao fardo um dos dormentes dados como perdidos (nenhum código novo é criado).
   const reservados = new Set(rmes.flatMap((r) => r.separacao?.itens.map((s) => s.fardoCodigo) ?? []));
-  const livres = fardos.filter((f) => f.estado === 'fechado' && !reservados.has(f.codigo) && lotes.find((l) => l.codigo === f.loteCodigo)?.estoqueStatus === 'disponivel');
+  const livres = fardos.filter((f) => f.estado === 'fechado' && fardoLiberado(f) && !reservados.has(f.codigo) && lotes.find((l) => l.codigo === f.loteCodigo)?.estoqueStatus === 'disponivel');
   const baseAjustes = { ...baseRme };
   const operador = 'Operador de Pátio 1';
-  const p1 = registrarPerdaAjuste(baseAjustes, { tipo: 'perda', fardoCodigo: livres[0].codigo, quantidade: 2, motivoPerda: 'avaria', motivo: 'Dois dormentes quebrados na movimentação com a empilhadeira.' }, ctx(131, operador));
+  const pecas = (f: Fardo, n: number) => dormentes.filter((d) => d.fardoCodigo === f.codigo && d.estado === 'em_estoque').slice(-n).map((d) => d.codigo);
+  const perdidos = pecas(livres[0], 2);
+  const p1 = registrarPerdaAjuste(baseAjustes, { tipo: 'perda', fardoCodigo: livres[0].codigo, quantidade: 2, dormentes: perdidos, motivoPerda: 'avaria', motivo: 'Dois dormentes quebrados na movimentação com a empilhadeira.' }, ctx(131, operador));
   decidirMovimentacao(baseAjustes, p1, { aprovada: true }, ctx(132, pessoa.supervisor));
-  registrarPerdaAjuste(baseAjustes, { tipo: 'perda', fardoCodigo: livres[1].codigo, quantidade: 3, motivoPerda: 'intemperie', motivo: 'Dormentes rachados após temporal; aguardam vistoria.' }, ctx(141, operador));
-  registrarPerdaAjuste(baseAjustes, { tipo: 'ajuste', fardoCodigo: livres[2].codigo, quantidade: 1, motivo: 'Contagem física encontrou um dormente a mais no fardo.' }, ctx(142, operador));
-  const a2 = registrarPerdaAjuste(baseAjustes, { tipo: 'ajuste', fardoCodigo: livres[3].codigo, quantidade: -2, motivo: 'Contagem física com dois dormentes a menos.' }, ctx(135, operador));
+  registrarPerdaAjuste(baseAjustes, { tipo: 'perda', fardoCodigo: livres[1].codigo, quantidade: 3, dormentes: pecas(livres[1], 3), motivoPerda: 'intemperie', motivo: 'Dormentes rachados após temporal; aguardam vistoria.' }, ctx(141, operador));
+  registrarPerdaAjuste(baseAjustes, { tipo: 'ajuste', fardoCodigo: livres[0].codigo, quantidade: 1, dormentes: perdidos.slice(0, 1), motivo: 'Um dos dormentes dados como quebrados foi recuperado na vistoria.' }, ctx(142, operador));
+  const a2 = registrarPerdaAjuste(baseAjustes, { tipo: 'ajuste', fardoCodigo: livres[3].codigo, quantidade: -2, dormentes: pecas(livres[3], 2), motivo: 'Contagem física com dois dormentes a menos.' }, ctx(135, operador));
   decidirMovimentacao(baseAjustes, a2, { aprovada: false, motivo: 'Recontagem confirmou o saldo do sistema.' }, ctx(136, pessoa.supervisor));
 
   const documentos: Documento[] = Array.from({ length: 20 }, (_, i) => {
@@ -261,7 +282,7 @@ export function criarDados() {
     { id: 'u4', nome: 'Usuário Inativo', email: 'inativo@exemplo.invalid', perfil: 'Consulta', permissoes: [], ativo: false },
   ];
 
-  return { parametros, perfisDemo, usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, rmes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
+  return { parametros, perfisDemo, usuarioDemo, fornecedores, especies, tamanhos, notas, lotes, fardos, inspecoes, dormentes, rmes, recebimentos, saldos, documentos, movimentacoes, sessoesInventario, divergenciasInventario, processamentos, locaisPatio, transferencias, volumetria, relatorios, auditoria, usuarios };
 }
 
 export type DadosSimulados = ReturnType<typeof criarDados>;

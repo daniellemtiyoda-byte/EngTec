@@ -1,6 +1,6 @@
 import { diferencaVolumePct, foraDaTolerancia } from '../../dominio/parametros';
 import type {
-  Especie, Fardo, Lote, Movimentacao, NotaFiscal, NovoRecebimento, Recebimento, ResultadoRecebimento, SaldoEstoque, Tamanho,
+  Especie, Lote, Movimentacao, NotaFiscal, NovoRecebimento, Recebimento, ResultadoRecebimento, SaldoEstoque, Tamanho,
   VolumeRecebidoEspecie, VolumetriaLote,
 } from '../../types/models';
 import { ApiError } from '../http';
@@ -10,7 +10,6 @@ export interface BaseRecebimento {
   especies: Especie[];
   tamanhos: Tamanho[];
   lotes: Lote[];
-  fardos: Fardo[];
   saldos: SaldoEstoque[];
   volumetria: VolumetriaLote[];
   recebimentos: Recebimento[];
@@ -34,7 +33,7 @@ function proximoCodigoLote(B: BaseRecebimento, quando: string) {
 
 /**
  * Regras do recebimento (no modo real, aplicadas pelo servidor):
- * sem DOF não recebe; um lote por espécie + tamanho; código dos fardos a partir do lote;
+ * sem DOF não recebe; um lote por espécie + tamanho, em unidades (os fardos são formados depois da inspeção, em mock/inspecao.ts);
  * divergência de quantidade ou avaria exige foto; volume por espécie comparado ao DOF, acima da tolerância exige justificativa
  * e deixa os lotes "com divergência"; tudo fica aguardando inspeção.
  */
@@ -44,34 +43,32 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
   const dof = nf.dof;
 
   const erros: Record<string, string> = {};
-  const fardosPorItem = new Map(n.itens.map((i) => [i.itemId, i.fardos]));
+  const porItem = new Map(n.itens.map((i) => [i.itemId, i.quantidade]));
   for (const item of nf.itens) {
-    const fs = fardosPorItem.get(item.id);
-    if (!fs?.length) erros[`item-${item.id}`] = 'Informe ao menos um fardo.';
-    else if (fs.some((q) => !Number.isInteger(q) || q < 1)) erros[`item-${item.id}`] = 'Cada fardo precisa ter ao menos 1 dormente.';
+    const q = porItem.get(item.id);
+    if (q === undefined || !Number.isInteger(q) || q < 1) erros[`item-${item.id}`] = 'Informe a quantidade conferida (ao menos 1).';
   }
-  if (Object.keys(erros).length) throw new ApiError(422, 'Confira os fardos informados.', erros);
+  if (Object.keys(erros).length) throw new ApiError(422, 'Confira as quantidades informadas.', erros);
 
-  const conferida = (itemId: string) => (fardosPorItem.get(itemId) ?? []).reduce((a, q) => a + q, 0);
+  const conferida = (itemId: string) => porItem.get(itemId) ?? 0;
   const divergenciaQuantidade = nf.itens.some((i) => conferida(i.id) !== i.quantidade);
   if ((divergenciaQuantidade || n.avaria) && ctx.fotos === 0) {
     throw new ApiError(422, 'Fotos da carga são obrigatórias quando há divergência com a NF ou avaria.', { fotos: 'Anexe ao menos uma foto.' });
   }
 
   // Agrupa os itens da NF por espécie + tamanho: cada grupo vira um lote.
-  const grupos = new Map<string, { especieId: string; tamanhoId: string; fardos: number[] }>();
+  const grupos = new Map<string, { especieId: string; tamanhoId: string; quantidade: number }>();
   for (const item of nf.itens) {
     const k = `${item.especieId}|${item.tamanhoId}`;
-    const g = grupos.get(k) ?? { especieId: item.especieId, tamanhoId: item.tamanhoId, fardos: [] };
-    g.fardos.push(...(fardosPorItem.get(item.id) ?? []));
+    const g = grupos.get(k) ?? { especieId: item.especieId, tamanhoId: item.tamanhoId, quantidade: 0 };
+    g.quantidade += conferida(item.id);
     grupos.set(k, g);
   }
   const calculos = [...grupos.values()].map((g) => {
     const tamanho = B.tamanhos.find((t) => t.id === g.tamanhoId);
     const especie = B.especies.find((e) => e.id === g.especieId);
     if (!tamanho || !especie) throw new ApiError(422, 'Espécie ou tamanho do item não encontrado no cadastro.');
-    const quantidade = g.fardos.reduce((a, q) => a + q, 0);
-    return { ...g, tamanho, especie, quantidade, volumeM3: quantidade * tamanho.volumeM3 };
+    return { ...g, tamanho, especie, volumeM3: g.quantidade * tamanho.volumeM3 };
   });
 
   // Comparação por espécie: soma dos lotes da espécie x volume do DOF da espécie.
@@ -87,7 +84,6 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
   }
 
   const lotes: Lote[] = [];
-  const fardos: Fardo[] = [];
   for (const c of calculos) {
     const codigo = proximoCodigoLote(B, ctx.quando);
     const volEspecie = volumes.find((v) => v.especie === c.especie.nomeCientifico);
@@ -96,18 +92,15 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
     const volumeDocumentalM3 = volEspecie && calcEspecie > 0 ? volEspecie.volumeDofM3 * (c.volumeM3 / calcEspecie) : 0;
     const lote: Lote = {
       id: ctx.novoId('l'), codigo, fornecedor: nf.fornecedor, nfNumero: nf.numero, dofNumero: dof.numero,
-      especieDocumental: c.especie.nomeCientifico, classe: c.especie.classe, inspecao: 'aguardando', tamanho: c.tamanho.codigo,
-      quantidade: c.quantidade, saldo: c.quantidade, fardos: c.fardos.length,
+      especieDocumental: c.especie.nomeCientifico, classe: c.especie.classe, inspecao: 'aguardando', etapaInspecao: 'aguardando',
+      pecasInspecionadas: 0, unidadesSemFardo: c.quantidade, tamanho: c.tamanho.codigo,
+      quantidade: c.quantidade, saldo: c.quantidade, fardos: 0,
       comprimentoM: c.tamanho.comprimentoCm / 100, larguraM: c.tamanho.larguraCm / 100, alturaM: c.tamanho.alturaCm / 100,
       metrosLineares: (c.quantidade * c.tamanho.comprimentoCm) / 100, volumeDocumentalM3, volumeCalculadoM3: c.volumeM3,
       recebidoEm: ctx.quando, idadeDias: 0, acimaLimiteIdade: false, situacao: acimaTolerancia ? 'divergente' : 'aguardando_inspecao', status: 'pendente', estoqueStatus: acimaTolerancia ? 'divergente' : 'em_analise', local: 'A definir',
     };
     B.lotes.unshift(lote);
     lotes.push(lote);
-    c.fardos.forEach((q, i) => fardos.push({
-      id: ctx.novoId('fd'), codigo: `${codigo}-F${String(i + 1).padStart(2, '0')}`, loteCodigo: codigo, sequencia: i + 1,
-      quantidadeInicial: q, saldo: q, estado: 'fechado', local: 'A definir',
-    }));
     B.saldos.unshift({
       id: `s${lote.id}`, loteCodigo: codigo, especieDocumental: lote.especieDocumental, classe: lote.classe,
       disponivel: 0, bloqueado: 0, emAnalise: acimaTolerancia ? 0 : c.quantidade, divergente: acimaTolerancia ? c.quantidade : 0,
@@ -123,17 +116,15 @@ export function receber(B: BaseRecebimento, nf: NotaFiscal, n: NovoRecebimento, 
       dataHora: ctx.quando, usuario: ctx.usuario, status: 'aprovado',
     });
   }
-  B.fardos.unshift(...fardos);
-
   const quantidadeConferida = nf.itens.reduce((a, i) => a + conferida(i.id), 0);
   const recebimento: Recebimento = {
     id: ctx.novoId('r'), nfId: nf.id, nfNumero: nf.numero, dofNumero: dof.numero, fornecedor: nf.fornecedor, recebidoEm: ctx.quando,
     quantidadeDocumental: nf.quantidadeTotal, quantidadeConferida, divergencia: quantidadeConferida - nf.quantidadeTotal, divergenciaQuantidade,
     volumes, divergenciaVolumePct: maior, acimaTolerancia, avaria: n.avaria, fotos: ctx.fotos, justificativa: justificativa || undefined,
-    observacao: n.observacao?.trim() || undefined, lotes: lotes.map((l) => l.codigo), fardos: fardos.length, conferente: ctx.usuario,
+    observacao: n.observacao?.trim() || undefined, lotes: lotes.map((l) => l.codigo), conferente: ctx.usuario,
   };
   B.recebimentos.unshift(recebimento);
   nf.situacao = 'recebida';
   for (const e of B.especies) e.lotesAtivos = B.lotes.filter((l) => l.especieDocumental === e.nomeCientifico).length;
-  return { recebimento, lotes, fardos };
+  return { recebimento, lotes };
 }

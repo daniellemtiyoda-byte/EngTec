@@ -7,4 +7,11 @@ export const env = {
   UPLOAD_MAX_MB: Number((import.meta.env.VITE_UPLOAD_MAX_MB as string | undefined) ?? 10) || 10,
 };
 
+/**
+ * Endereço que abre o sistema de inspeção (Railway Edge Inspector, app de desktop) com os dados do lote (RF05).
+ * Fixo no código, nunca vindo da API. Só funciona onde o Inspector estiver instalado e registrado para este protocolo
+ * (pendente na equipe do Inspector: ver docs/INTEGRACAO-INSPECAO.md).
+ */
+export const PROTOCOLO_INSPECTOR = 'railway-inspector://inspecionar';
+
 export const SUFIXO_SIMULADO = env.USE_MOCK ? ' (modo simulado: nada foi gravado em servidor)' : '';

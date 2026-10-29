@@ -14,7 +14,12 @@ import { MOTIVO_PERDA, TIPO_MOVIMENTACAO } from '../dominio/rotulos';
 import { servicos } from '../services';
 import { mensagemSegura } from '../services/http';
 import type { MotivoPerda, Movimentacao } from '../types/models';
+import { codigosDePecas, seqPeca } from '../utils/busca';
 import { dataHora, paraNumero, un } from '../utils/format';
+
+/** Códigos dos dormentes do formulário: o lote vem do código do fardo (LT26-0012-F03 → LT26-0012). */
+const dormentesDoForm = (v: Record<string, string>) => codigosDePecas(v.dormentes ?? '', v.fardoCodigo.trim().replace(/-F\d+$/i, ''));
+const AJUDA_DORMENTES = 'Códigos das etiquetas, separados por vírgula. Basta a sequência: "7, 12" vira LT26-0012-0007 e LT26-0012-0012.';
 
 const pendenteDeAprovacao = (m: Movimentacao) => (m.tipo === 'perda' || m.tipo === 'ajuste') && m.status === 'pendente';
 const quantidade = (m: Movimentacao) => (m.tipo === 'ajuste' && m.quantidade > 0 ? `+${un(m.quantidade)}` : m.tipo === 'perda' ? `−${un(m.quantidade)}` : un(m.quantidade));
@@ -53,6 +58,7 @@ export default function Movimentacoes() {
     { chave: 'quantidade', titulo: 'Quantidade', alinhar: 'right', ordenavel: true, render: quantidade },
     { chave: 'referencia', titulo: 'Referência', ordenavel: true, render: (m) => <CodigoLink codigo={m.referencia} /> },
     { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true, opcional: true, render: (m) => <CodigoLink codigo={m.loteCodigo} /> },
+    { chave: 'dormentes', titulo: 'Dormentes', opcional: true, render: (m) => (m.dormentes?.length ? <span title={m.dormentes.join(', ')}>{m.dormentes.map(seqPeca).join(', ')}</span> : '—') },
     { chave: 'origem', titulo: 'Origem', opcional: true }, { chave: 'destino', titulo: 'Destino', opcional: true },
     { chave: 'motivo', titulo: 'Motivo', opcional: true, render: (m) => (m.motivo ? <span title={m.motivo}>{m.motivoPerda ? `${MOTIVO_PERDA[m.motivoPerda][1]}: ` : ''}{m.motivo.slice(0, 40)}{m.motivo.length > 40 ? '…' : ''}</span> : '—') },
     { chave: 'usuario', titulo: 'Usuário' },
@@ -107,13 +113,14 @@ export default function Movimentacoes() {
         titulo="Registrar perda" aberto={form === 'perda'} aoFechar={() => setForm(null)} rotuloEnviar="Registrar perda"
         campos={[
           { nome: 'fardoCodigo', rotulo: 'Código do fardo', obrigatorio: true, ajuda: 'Ex.: LT26-0012-F03' },
-          { nome: 'quantidade', rotulo: 'Quantidade perdida (un.)', tipo: 'number', obrigatorio: true, inteiro: true, min: 1 },
+          { nome: 'dormentes', rotulo: 'Dormentes perdidos', obrigatorio: true, ajuda: AJUDA_DORMENTES },
           { nome: 'motivoPerda', rotulo: 'Motivo', tipo: 'select', obrigatorio: true, opcoes: MOTIVO_PERDA_OPCOES, ajuda: 'Perdas, incêndios e intempéries devem ser informados ao órgão ambiental (IN Ibama 21/2014, art. 42).' },
           { nome: 'motivo', rotulo: 'Descrição', tipo: 'textarea', obrigatorio: true },
         ]}
         aoEnviar={async (v) => {
+          const dormentes = dormentesDoForm(v);
           await servicos.movimentacoes.registrar({
-            tipo: 'perda', fardoCodigo: v.fardoCodigo.trim(), quantidade: paraNumero(v.quantidade, true), motivoPerda: v.motivoPerda as MotivoPerda, motivo: v.motivo.trim(),
+            tipo: 'perda', fardoCodigo: v.fardoCodigo.trim(), quantidade: dormentes.length, dormentes, motivoPerda: v.motivoPerda as MotivoPerda, motivo: v.motivo.trim(),
           });
           atualizado('Perda registrada; o saldo só muda após a aprovação');
         }}
@@ -122,19 +129,26 @@ export default function Movimentacoes() {
         titulo="Registrar ajuste" aberto={form === 'ajuste'} aoFechar={() => setForm(null)} rotuloEnviar="Registrar ajuste"
         campos={[
           { nome: 'fardoCodigo', rotulo: 'Código do fardo', obrigatorio: true, ajuda: 'Ex.: LT26-0012-F03' },
-          { nome: 'quantidade', rotulo: 'Ajuste (un.)', tipo: 'number', obrigatorio: true, inteiro: true, min: -500, max: 500, ajuda: 'Positivo acrescenta dormentes ao fardo; negativo retira (ex.: -2).' },
+          {
+            nome: 'sentido', rotulo: 'Ajuste', tipo: 'select', obrigatorio: true,
+            opcoes: [{ valor: 'retirar', rotulo: 'Tirar do fardo (falta na contagem)' }, { valor: 'devolver', rotulo: 'Voltar ao fardo (peça com baixa por perda ou ajuste encontrada)' }],
+            ajuda: 'Nenhum código novo é criado: só voltam peças do lote que tiveram baixa por perda ou ajuste.',
+          },
+          { nome: 'dormentes', rotulo: 'Dormentes', obrigatorio: true, ajuda: AJUDA_DORMENTES },
           { nome: 'motivo', rotulo: 'Motivo', tipo: 'textarea', obrigatorio: true },
         ]}
-        validar={(v): Record<string, string> => (paraNumero(v.quantidade, true) === 0 ? { quantidade: 'O ajuste não pode ser zero.' } : {})}
         aoEnviar={async (v) => {
-          await servicos.movimentacoes.registrar({ tipo: 'ajuste', fardoCodigo: v.fardoCodigo.trim(), quantidade: paraNumero(v.quantidade, true), motivo: v.motivo.trim() });
+          const dormentes = dormentesDoForm(v);
+          await servicos.movimentacoes.registrar({
+            tipo: 'ajuste', fardoCodigo: v.fardoCodigo.trim(), quantidade: v.sentido === 'devolver' ? dormentes.length : -dormentes.length, dormentes, motivo: v.motivo.trim(),
+          });
           atualizado('Ajuste registrado; o saldo só muda após a aprovação');
         }}
       />
       <ConfirmModal
         titulo={aprovar ? `Aprovar ${TIPO_MOVIMENTACAO[aprovar.tipo][1].toLowerCase()}` : 'Aprovar'} aberto={!!aprovar} carregando={enviando} rotuloConfirmar="Aprovar e alterar o saldo"
         mensagem={aprovar ? [
-          `${TIPO_MOVIMENTACAO[aprovar.tipo][1]} de ${quantidade(aprovar)} no fardo ${aprovar.fardoCodigo} (lote ${aprovar.loteCodigo}). Motivo: ${aprovar.motivo ?? '—'}.`,
+          `${TIPO_MOVIMENTACAO[aprovar.tipo][1]} de ${quantidade(aprovar)} no fardo ${aprovar.fardoCodigo} (lote ${aprovar.loteCodigo})${aprovar.dormentes?.length ? `, dormentes ${aprovar.dormentes.map(seqPeca).join(', ')}` : ''}. Motivo: ${aprovar.motivo ?? '—'}.`,
           aprovar.usuario === usuario?.nome ? 'Atenção: você registrou esta movimentação. Pela regra de duas pessoas, outra pessoa deve aprovar e o servidor recusa; no modo simulado o fluxo fica liberado para teste.' : '',
           erro ? `Erro: ${erro}` : '',
         ].filter(Boolean).join(' ') : ''}
