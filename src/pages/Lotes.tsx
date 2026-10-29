@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Aviso } from '../components/Estados';
+import { ComoFunciona } from '../components/Estados';
 import { BadgeDe, StatusEstoqueBadge } from '../components/Badge';
 import { CodigoLink } from '../components/Codigos';
 import { FardosModal } from '../components/FardosModal';
@@ -9,7 +9,7 @@ import { CATEGORIA_OPCOES, CLASSE_OPCOES, IDADE_LOTE_OPCOES, SITUACAO_LOTE_OPCOE
 import { RESULTADO_INSPECAO, SITUACAO_LOTE } from '../dominio/rotulos';
 import { servicos } from '../services';
 import type { Lote } from '../types/models';
-import { data, dias, m3, metros, rotuloCategoria, rotuloClasse, un } from '../utils/format';
+import { classeCategoria, data, dias, m3, metros, un } from '../utils/format';
 
 export default function Lotes() {
   const nav = useNavigate();
@@ -19,7 +19,7 @@ export default function Lotes() {
     { chave: 'codigo', titulo: 'Lote', ordenavel: true, render: (l) => <CodigoLink codigo={l.codigo} /> },
     {
       chave: 'especieDocumental', titulo: 'Espécie', ordenavel: true,
-      render: (l) => <><em>{l.especieDocumental}</em><div className="mudo">{rotuloClasse(l.classe)} · {rotuloCategoria(l.categoria)}</div></>,
+      render: (l) => <><em>{l.especieDocumental}</em>{classeCategoria(l.classe, l.categoria) && <div className="mudo">{classeCategoria(l.classe, l.categoria)}</div>}</>,
     },
     { chave: 'tamanho', titulo: 'Tamanho', ordenavel: true },
     { chave: 'saldo', titulo: 'Saldo', alinhar: 'right', ordenavel: true, render: (l) => <>{un(l.saldo)}{l.saldo !== l.quantidade && <div className="mudo">de {un(l.quantidade)}</div>}</> },
@@ -42,8 +42,14 @@ export default function Lotes() {
     <>
       <ListPage<Lote>
         titulo="Lotes e fardos"
-        descricao="Um lote por NF, espécie e tamanho, criado pelo sistema ao confirmar o recebimento. Volume documental (parte do DOF da espécie) e volume calculado aparecem separados."
-        aviso={<Aviso>Lotes não são cadastrados à mão: nascem do recebimento, com os fardos. Material aguardando inspeção, em quarentena, reprovado ou com divergência não fica disponível para separação.</Aviso>}
+        descricao="Um lote por NF, espécie e tamanho, criado ao confirmar o recebimento."
+        aviso={
+          <ComoFunciona>
+            Lotes não são cadastrados à mão: nascem do recebimento, com os fardos. Material aguardando inspeção, em quarentena, reprovado
+            ou com divergência não fica disponível para separação. Volume documental (parte do DOF da espécie) e volume calculado aparecem
+            separados, em "Colunas".
+          </ComoFunciona>
+        }
         listar={(q) => servicos.lotes.listar(q)}
         colunas={colunas}
         filtros={[
@@ -53,7 +59,7 @@ export default function Lotes() {
           { chave: 'categoria', rotulo: 'Categoria', opcoes: CATEGORIA_OPCOES },
         ]}
         acoesLinha={[
-          { rotulo: 'Abrir', aoClicar: (l) => nav(`/lotes/${encodeURIComponent(l.codigo)}`), principal: true },
+          { rotulo: 'Abrir', aoClicar: (l) => nav(`/lotes/${encodeURIComponent(l.codigo)}`) },
           { rotulo: 'Fardos e etiquetas', aoClicar: setFardosDe },
         ]}
       />

@@ -33,6 +33,16 @@ export function Aviso({ tom = 'info', children }: { tom?: 'info' | 'alerta' | 'c
   return <div className={`aviso aviso-${tom}`} role={tom === 'critico' ? 'alert' : undefined}>{children}</div>;
 }
 
+/** Regras da tela, recolhidas: a pessoa abre quando precisa (avisos que pedem atenção continuam com `Aviso`). */
+export function ComoFunciona({ children }: { children: ReactNode }) {
+  return (
+    <details className="como-funciona">
+      <summary>Como funciona</summary>
+      <div className="como-funciona-texto">{children}</div>
+    </details>
+  );
+}
+
 export function BannerSimulado() {
   if (!env.USE_MOCK) return null;
   return (

@@ -6,10 +6,10 @@ import type { Permissao } from '../dominio/permissoes';
 import { GRUPOS_MENU, ROTAS, type Rota } from '../rotas';
 import { destinoBusca } from '../utils/busca';
 import { linkInterno } from '../utils/format';
-import { BandeiraSP } from './BandeiraSP';
 import { ErroTela } from './ErroTela';
 import { BannerSimulado, Vazio } from './Estados';
 import { Icone } from './Icone';
+import { Logo } from './Logo';
 
 const permite = (pode: (p: Permissao) => boolean, r: Pick<Rota, 'permissoes'>) => !r.permissoes || r.permissoes.some(pode);
 
@@ -88,7 +88,7 @@ function Layout() {
       <a className="pular" href="#conteudo">Ir para o conteúdo</a>
       <aside className="sidebar" aria-label="Navegação principal">
         <div className="marca">
-          <BandeiraSP tamanho="pequena" />
+          <Logo />
           <div className="marca-texto"><strong>Holz Trilho</strong><span>Gestão de dormentes</span></div>
         </div>
         <nav>

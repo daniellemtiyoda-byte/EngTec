@@ -1,4 +1,4 @@
-import { Aviso } from '../components/Estados';
+import { Aviso, ComoFunciona } from '../components/Estados';
 import { Badge } from '../components/Badge';
 import { CodigoLink } from '../components/Codigos';
 import { StatCard } from '../components/Graficos';
@@ -7,7 +7,7 @@ import { CATEGORIA_OPCOES, CLASSE_OPCOES, IDADE_LOTE_OPCOES } from '../dominio/o
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import type { SaldoEstoque } from '../types/models';
-import { dias, m3, mLineares, rotuloCategoria, rotuloClasse, un } from '../utils/format';
+import { classeCategoria, dias, m3, mLineares, un } from '../utils/format';
 
 const nz = (v: number, tom: 'verde' | 'azul' | 'cinza' | 'vermelho') => (v > 0 ? <Badge tom={tom}>{un(v)}</Badge> : <span className="mudo">—</span>);
 
@@ -19,7 +19,7 @@ export default function Estoque() {
     { chave: 'loteCodigo', titulo: 'Lote', ordenavel: true, render: (s) => <CodigoLink codigo={s.loteCodigo} /> },
     {
       chave: 'especieDocumental', titulo: 'Espécie', ordenavel: true,
-      render: (s) => <><em>{s.especieDocumental}</em><div className="mudo">{rotuloClasse(s.classe)} · {rotuloCategoria(s.categoria)}</div></>,
+      render: (s) => <><em>{s.especieDocumental}</em>{classeCategoria(s.classe, s.categoria) && <div className="mudo">{classeCategoria(s.classe, s.categoria)}</div>}</>,
     },
     { chave: 'disponivel', titulo: 'Disponível', alinhar: 'right', ordenavel: true, render: (s) => nz(s.disponivel, 'verde') },
     { chave: 'emAnalise', titulo: 'Em análise', alinhar: 'right', ordenavel: true, render: (s) => nz(s.emAnalise, 'azul') },
@@ -31,7 +31,8 @@ export default function Estoque() {
     { chave: 'idadeDias', titulo: 'Idade', alinhar: 'right', ordenavel: true, render: (s) => (s.acimaLimiteIdade ? <span className="val-erro" title="Acima do limite de dias definido em Configurações">{dias(s.idadeDias)}</span> : dias(s.idadeDias)) },
   ];
 
-  return (
+  // Totais logo abaixo do título, como nas outras telas.
+  const resumo = (
     <>
       {ind.erro && <Aviso tom="alerta">Não foi possível carregar os totais do estoque. A lista abaixo continua disponível.</Aviso>}
       {d && (
@@ -42,10 +43,21 @@ export default function Estoque() {
           <StatCard rotulo="Com divergência" valor={un(d.divergente)} tom="vermelho" />
         </div>
       )}
+    </>
+  );
+
+  return (
+    <>
       <ListPage<SaldoEstoque>
         titulo="Estoque de dormentes"
-        descricao="Somente o saldo disponível pode ser considerado utilizável; pendentes, bloqueados e divergentes são exibidos à parte."
-        aviso={<Aviso>O saldo oficial é o informado pelo sistema responsável. Contagens estimadas por imagem não alteram este saldo.</Aviso>}
+        descricao="Só o saldo disponível pode ser usado; o resto aparece à parte."
+        resumo={resumo}
+        aviso={
+          <ComoFunciona>
+            Pendentes de inspeção, bloqueados e com divergência são exibidos em colunas próprias. O saldo oficial é o informado pelo
+            sistema responsável; contagens estimadas por imagem não alteram este saldo.
+          </ComoFunciona>
+        }
         listar={(q) => servicos.estoque.listar(q)}
         colunas={colunas}
         filtros={[{ chave: 'acimaLimiteIdade', rotulo: 'Idade', opcoes: IDADE_LOTE_OPCOES }, { chave: 'classe', rotulo: 'Classe', opcoes: CLASSE_OPCOES }, { chave: 'categoria', rotulo: 'Categoria', opcoes: CATEGORIA_OPCOES }]}

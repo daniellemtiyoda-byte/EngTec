@@ -24,7 +24,8 @@ function Pendencias() {
           {!!p.exemplos?.length && (
             <ul>{p.exemplos.map((e) => <li key={e.codigo}><CodigoLink codigo={e.codigo} /> · {e.texto}</li>)}</ul>
           )}
-          <Link className="btn btn-pri" to={linkInterno(p.acao.link)}>{p.acao.rotulo}</Link>
+          {/* Só o que é crítico ganha o laranja; o resto usa o botão de ação, para o destaque continuar valendo. */}
+          <Link className={`btn ${p.nivel === 'critico' ? 'btn-pri' : 'btn-acao'}`} to={linkInterno(p.acao.link)}>{p.acao.rotulo}</Link>
         </article>
       ))}
     </div>

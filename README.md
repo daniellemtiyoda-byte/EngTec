@@ -22,11 +22,10 @@ npm run build                # typecheck + build em dist/
 No modo simulado qualquer usuário/senha preenchidos entram (nenhuma autenticação real).
 Para testar estados de erro/vazio: `http://localhost:5173/?simular=erro` ou `?simular=vazio`.
 
-## Bandeira do Estado de São Paulo
+## Logo
 
-A bandeira **não é desenhada** pelo código. Coloque o arquivo oficial em `public/assets/bandeira-sp.svg`
-(veja `public/assets/LEIA-ME.txt`). Sem o arquivo, aparece um espaço reservado identificado.
-Confirme com a equipe/orientação a autorização de uso institucional da bandeira.
+O logo do Holz Trilho ainda está em desenvolvimento. Quando estiver pronto, coloque o arquivo em `public/assets/logo.svg`
+(veja `public/assets/LEIA-ME.txt`). Sem o arquivo, a barra lateral e o login mostram o monograma "HT" no mesmo tamanho.
 
 ## Variáveis de ambiente (`.env.local`)
 
@@ -34,7 +33,7 @@ Confirme com a equipe/orientação a autorização de uso institucional da bande
 |---|---|
 | `VITE_API_URL` | URL base do back-end (sem barra final) |
 | `VITE_USE_MOCK` | `true` = serviços simulados; ausente ou qualquer outro valor = API real (falha segura) |
-| `VITE_BANDEIRA_URL` | caminho do arquivo da bandeira |
+| `VITE_LOGO_URL` | caminho do arquivo do logo |
 | `VITE_UPLOAD_MAX_MB` | limite de upload no navegador (o servidor valida de novo) |
 
 Tudo com prefixo `VITE_` vai para o navegador: **nunca** coloque senhas, chaves ou credenciais da fornecedora.

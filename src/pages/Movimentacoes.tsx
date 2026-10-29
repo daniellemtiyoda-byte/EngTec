@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BadgeDe, StatusRegistroBadge } from '../components/Badge';
 import { CodigoLink } from '../components/Codigos';
-import { Aviso } from '../components/Estados';
+import { ComoFunciona } from '../components/Estados';
 import { FormModal } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { ConfirmModal } from '../components/Modal';
@@ -67,7 +67,7 @@ export default function Movimentacoes() {
       <ListPage<Movimentacao>
         titulo="Movimentações de estoque"
         descricao="Registro imutável de entradas, saídas, transferências, perdas e ajustes."
-        aviso={<Aviso>A entrada acontece só pelo <strong>recebimento</strong> e a saída só pela <strong>RME</strong>. Perda e ajuste são lançados por fardo, com motivo, e só alteram o saldo depois da aprovação do supervisor ou gestor. Nada é apagado: correção é um novo registro.</Aviso>}
+        aviso={<ComoFunciona>A entrada acontece só pelo <strong>recebimento</strong> e a saída só pela <strong>RME</strong>. Perda e ajuste são lançados por fardo, com motivo, e só alteram o saldo depois da aprovação do supervisor ou gestor. Nada é apagado: correção é um novo registro.</ComoFunciona>}
         listar={(q) => servicos.movimentacoes.listar(q)}
         recarregar={rec}
         colunas={colunas}

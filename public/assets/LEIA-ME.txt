@@ -1,9 +1,8 @@
-BANDEIRA DO ESTADO DE SÃO PAULO
+LOGO DO HOLZ TRILHO
 
-Coloque aqui o arquivo OFICIAL da bandeira com o nome "bandeira-sp.svg"
-(ou ajuste VITE_BANDEIRA_URL no .env.local).
+Coloque aqui o arquivo do logo com o nome "logo.svg"
+(ou ajuste VITE_LOGO_URL no .env.local).
 
-- Use a versão oficial publicada pelo Governo do Estado de São Paulo / Assembleia Legislativa,
-  sem recolorir, distorcer ou alterar proporções (a interface já fixa a proporção 7:10 via CSS).
-- Enquanto o arquivo não existir, a interface mostra um espaço reservado identificado.
-- Confirme com a equipe/orientação se o uso institucional da bandeira neste sistema está autorizado.
+- O espaço é quadrado: use um arquivo de proporção 1:1 que fique legível em 36 px (barra lateral)
+  e em 56 px (tela de login), sobre fundo claro.
+- Enquanto o arquivo não existir, a interface mostra o monograma "HT" no mesmo tamanho.

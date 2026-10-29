@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '../components/Badge';
 import { CodigoLink, CodigosLink } from '../components/Codigos';
-import { Aviso } from '../components/Estados';
+import { Aviso, ComoFunciona } from '../components/Estados';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { Modal } from '../components/Modal';
 import { mensagemRecebimento, RecebimentoModal } from '../components/RecebimentoModal';
@@ -52,8 +52,14 @@ export default function RecebimentoPage() {
     <>
       <ListPage<Recebimento>
         titulo="Recebimento"
-        descricao="Conferência da carga contra a NF e o DOF. Ao confirmar, o sistema cria um lote por espécie e tamanho e os fardos, todos aguardando inspeção."
-        aviso={<Aviso>Sem DOF não há recebimento. Divergência de quantidade ou avaria exige fotos; divergência de volume acima de {TOLERANCIA_VOLUME_PCT}% exige justificativa e deixa os lotes "Com divergência".</Aviso>}
+        descricao="Conferência da carga contra a NF e o DOF."
+        aviso={
+          <ComoFunciona>
+            Sem DOF não há recebimento. Ao confirmar, o sistema cria um lote por espécie e tamanho e os fardos, todos aguardando inspeção.
+            Divergência de quantidade ou avaria exige fotos; divergência de volume acima de {TOLERANCIA_VOLUME_PCT}% exige justificativa e
+            deixa os lotes "Com divergência".
+          </ComoFunciona>
+        }
         listar={(q) => servicos.recebimentos.listar(q)}
         recarregar={rec}
         colunas={colunas}

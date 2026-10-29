@@ -29,6 +29,8 @@ export const SITUACAO_MEDIDAS_OPCOES = opcoesDe(SITUACAO_MEDIDAS);
 export const SITUACAO_NF_OPCOES = opcoesDe(SITUACAO_NF);
 export const ETAPA_ENTRADA_OPCOES = opcoesDe(ETAPA_ENTRADA);
 export const STATUS_RME_OPCOES = opcoesDe(STATUS_RME);
+/** Só os status de quem já saiu do quadro (histórico embaixo dele). */
+export const STATUS_RME_ENCERRADA_OPCOES = opcoesDe(STATUS_RME, ['entregue', 'cancelada']);
 export const URGENCIA_OPCOES = opcoesDe(URGENCIA_RME);
 export const TIPO_MOVIMENTACAO_OPCOES = opcoesDe(TIPO_MOVIMENTACAO);
 export const STATUS_MOVIMENTACAO_OPCOES = opcoesDe(STATUS_REGISTRO, ['pendente', 'aprovado', 'rejeitado']);

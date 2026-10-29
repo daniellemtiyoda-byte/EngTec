@@ -30,6 +30,8 @@ interface Props<T> {
   titulo: string;
   descricao?: string;
   aviso?: ReactNode;
+  /** Totais logo abaixo do título (ex.: cartões do saldo de estoque). */
+  resumo?: ReactNode;
   listar: (q: ListQuery) => Promise<Paginado<T>>;
   colunas: Coluna<T>[];
   filtros?: Filtro[];
@@ -38,6 +40,8 @@ interface Props<T> {
   recarregar?: number;
   secao?: boolean;
   semBusca?: boolean;
+  /** Ordem usada enquanto a pessoa não escolhe uma coluna (ex.: em andamento primeiro, depois a mais recente). */
+  ordemPadrao?: { campo: string; dir: 'asc' | 'desc' }[];
 }
 
 const TAMANHO = 10;
@@ -55,7 +59,7 @@ function AcoesDaLinha<T>({ acoes, linha }: { acoes: AcaoLinha<T>[]; linha: T }) 
   const [primeira, ...resto] = visiveis;
   return (
     <div className="acoes-linha">
-      <button className={`btn ${primeira.principal ? 'btn-pri' : 'btn-sec'} btn-peq`} onClick={() => primeira.aoClicar(linha)}>{primeira.rotulo}</button>
+      <button className={`btn ${primeira.principal ? 'btn-acao' : 'btn-sec'} btn-peq`} onClick={() => primeira.aoClicar(linha)}>{primeira.rotulo}</button>
       {resto.length > 0 && <MenuAcoes itens={resto.map((a) => ({ rotulo: a.rotulo, aoClicar: () => a.aoClicar(linha) }))} />}
     </div>
   );
@@ -104,7 +108,7 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
   }, [buscaAtraso, filtros]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const r = useAsync(
-    () => p.listar({ page: pagina, pageSize: TAMANHO, search: buscaAtraso, sortBy: ordem?.chave, sortDir: ordem?.dir, filters: filtros }),
+    () => p.listar({ page: pagina, pageSize: TAMANHO, search: buscaAtraso, sortBy: ordem?.chave, sortDir: ordem?.dir, sort: ordem ? undefined : p.ordemPadrao, filters: filtros }),
     [pagina, buscaAtraso, filtros, ordem, p.recarregar],
   );
 
@@ -136,6 +140,7 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
   return (
     <section className="painel">
       <PageHeader titulo={p.titulo} descricao={p.descricao} acoes={p.acoes} nivel={p.secao ? 2 : 1} />
+      {p.resumo}
       {p.aviso}
       <div className="toolbar">
         {!p.semBusca && (

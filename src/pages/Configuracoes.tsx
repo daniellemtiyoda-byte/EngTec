@@ -37,7 +37,7 @@ export default function Configuracoes() {
           <dt>Modo</dt><dd>{env.USE_MOCK ? <Badge tom="simulado">Simulado (VITE_USE_MOCK=true)</Badge> : <Badge tom="verde">API real</Badge>}</dd>
           <dt>URL do back-end</dt><dd>{env.API_URL || <span className="mudo">não configurada (VITE_API_URL)</span>}</dd>
           <dt>Limite de upload</dt><dd>{env.UPLOAD_MAX_MB} MB (o servidor valida novamente)</dd>
-          <dt>Bandeira</dt><dd>{env.BANDEIRA_URL}</dd>
+          <dt>Logo</dt><dd>{env.LOGO_URL}</dd>
         </dl>
         {env.USE_MOCK && <Aviso tom="alerta">Para testar estados de erro e vazio no modo simulado, acrescente <code>?simular=erro</code> ou <code>?simular=vazio</code> à URL (antes do <code>#</code>).</Aviso>}
       </section>

@@ -24,6 +24,8 @@ export interface ListQuery {
   search?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
+  /** Ordenação por vários campos (ex.: em andamento primeiro, depois a mais recente); usada quando não há `sortBy`. */
+  sort?: { campo: string; dir: 'asc' | 'desc' }[];
   filters?: Record<string, string>;
 }
 
@@ -168,6 +170,8 @@ export interface NotaFiscal {
   situacao: SituacaoNf;
   /** Calculados pelo serviço na consulta: etapa do quadro de Entrada e, na etapa "declarar", o prazo do DOF. */
   etapa: EtapaEntrada;
+  /** Falso só quando a entrada está concluída (DOF declarado); ordena a lista de acompanhamento. */
+  emAndamento: boolean;
   diasParaPrazo?: number;
   nivelPrazo?: DofPendente['nivel'];
 }
@@ -456,6 +460,8 @@ export interface Rme {
   entregueEm?: string;
   motivoCancelamento?: string;
   historico: EventoRme[];
+  /** Falso quando entregue ou cancelada; ordena a lista de acompanhamento. */
+  emAndamento: boolean;
 }
 
 export interface NovaRme {

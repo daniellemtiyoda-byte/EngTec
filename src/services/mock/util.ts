@@ -37,14 +37,15 @@ export async function paginar<T extends { id: string }>(todos: T[], q: ListQuery
   for (const [k, v] of Object.entries(q.filters ?? {})) {
     if (v) r = r.filter((x) => String((x as unknown as Record<string, unknown>)[k]) === v);
   }
-  if (q.sortBy) {
-    const k = q.sortBy;
-    const d = q.sortDir === 'desc' ? -1 : 1;
+  const criterios = q.sortBy ? [{ campo: q.sortBy, dir: q.sortDir ?? 'asc' }] : q.sort ?? [];
+  if (criterios.length) {
+    const comparar = (va: unknown, vb: unknown) => (typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va ?? '').localeCompare(String(vb ?? ''), 'pt-BR'));
     r.sort((a, b) => {
-      const va = (a as unknown as Record<string, unknown>)[k];
-      const vb = (b as unknown as Record<string, unknown>)[k];
-      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * d;
-      return String(va ?? '').localeCompare(String(vb ?? ''), 'pt-BR') * d;
+      for (const { campo, dir } of criterios) {
+        const c = comparar((a as unknown as Record<string, unknown>)[campo], (b as unknown as Record<string, unknown>)[campo]);
+        if (c) return dir === 'desc' ? -c : c;
+      }
+      return 0;
     });
   }
   const pageSize = q.pageSize ?? 10;

@@ -11,7 +11,10 @@ const caminho = (k: ChaveEndpoint, id?: string) => ENDPOINTS[k].caminho.replace(
 
 function consulta(q: ListQuery = {}) {
   // Nomes de parâmetros provisórios (pendentes de confirmação com o back-end).
-  return { pagina: q.page ?? 1, tamanho: q.pageSize ?? 10, busca: q.search, ordenarPor: q.sortBy, ordem: q.sortDir, ...(q.filters ?? {}) };
+  // Vários campos: ordenarPor=a,b&ordem=desc,asc (mesma posição).
+  const ordenarPor = q.sortBy ?? q.sort?.map((s) => s.campo).join(',');
+  const ordem = q.sortBy ? q.sortDir : q.sort?.map((s) => s.dir).join(',');
+  return { pagina: q.page ?? 1, tamanho: q.pageSize ?? 10, busca: q.search, ordenarPor, ordem, ...(q.filters ?? {}) };
 }
 
 async function lista<T>(k: ChaveEndpoint, q?: ListQuery, id?: string): Promise<Paginado<T>> {

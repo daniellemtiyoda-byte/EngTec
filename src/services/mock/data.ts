@@ -103,7 +103,7 @@ export function criarDados() {
     const nf: NotaFiscal = {
       id: `nf${i + 1}`, numero, serie: '1', fornecedorId: f.id, fornecedor: f.razaoSocial, emissao, origem: xml ? 'xml' : 'manual', xmlAnexado: xml,
       chaveAcesso: xml ? chaveComDigito(`35${emissao.slice(2, 4)}${emissao.slice(5, 7)}${f.cnpj.replace(/\D/g, '')}55001${numero.padStart(9, '0')}1${String(i + 1).padStart(8, '0')}`) : undefined,
-      itens, quantidadeTotal: itens.reduce((a, x) => a + x.quantidade, 0), situacao: 'aguardando_dof', etapa: 'aguardando_dof',
+      itens, quantidadeTotal: itens.reduce((a, x) => a + x.quantidade, 0), situacao: 'aguardando_dof', etapa: 'aguardando_dof', emAndamento: true,
     };
     if (i < 13) {
       const porEspecie = new Map<string, number>();

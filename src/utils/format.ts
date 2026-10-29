@@ -51,6 +51,9 @@ export function dataHora(iso?: string): string {
 /** Classe e categoria são campos diferentes e sempre aparecem com o nome do campo (regra do PRD). */
 export const rotuloClasse = (c?: string) => (c ? `Classe ${c}` : 'Classe a definir');
 export const rotuloCategoria = (c?: number) => (c ? `Categoria ${c}` : 'Categoria a definir');
+/** Para tabelas: só o que já foi definido ("Classe 1ª · Categoria 2"); vazio quando nenhum dos dois foi lançado, para não repetir "a definir" em toda linha. */
+export const classeCategoria = (classe?: string, categoria?: number) =>
+  [classe && rotuloClasse(classe), categoria && rotuloCategoria(categoria)].filter(Boolean).join(' · ');
 export const dias = (n: number) => `${NUMERO.format(Math.round(n))} ${Math.round(n) === 1 ? 'dia' : 'dias'}`;
 export const cm = (v: number) => `${NUMERO.format(v)} cm`;
 

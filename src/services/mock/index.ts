@@ -63,10 +63,10 @@ export function criarServicosSimulados(): Servicos {
   }
   /** Etapa do quadro de Entrada, calculada na consulta. */
   function comEtapa(n: NotaFiscal): NotaFiscal {
-    if (n.situacao !== 'recebida') return { ...n, etapa: n.situacao, diasParaPrazo: undefined, nivelPrazo: undefined };
-    if (n.dof?.declaracao !== 'pendente') return { ...n, etapa: 'concluida', diasParaPrazo: undefined, nivelPrazo: undefined };
+    if (n.situacao !== 'recebida') return { ...n, etapa: n.situacao, emAndamento: true, diasParaPrazo: undefined, nivelPrazo: undefined };
+    if (n.dof?.declaracao !== 'pendente') return { ...n, etapa: 'concluida', emAndamento: false, diasParaPrazo: undefined, nivelPrazo: undefined };
     const p = prazo(n.dof.prazoDeclaracao);
-    return { ...n, etapa: 'declarar', diasParaPrazo: p.diasParaPrazo, nivelPrazo: p.nivel };
+    return { ...n, etapa: 'declarar', emAndamento: true, diasParaPrazo: p.diasParaPrazo, nivelPrazo: p.nivel };
   }
   const permissoesAtuais = () => (sessao ?? D.usuarioDemo).permissoes;
   /** Primeiros registros de uma fila, para a tela inicial. */
@@ -245,7 +245,7 @@ export function criarServicosSimulados(): Servicos {
         const nf: NotaFiscal = {
           id, numero: n.numero, serie: n.serie, chaveAcesso: chave, fornecedorId: f.id, fornecedor: f.razaoSocial, emissao: n.emissao,
           origem: xml ? 'xml' : 'manual', xmlAnexado: !!xml, dofSugerido: n.dofSugerido, itens, quantidadeTotal: itens.reduce((a, x) => a + x.quantidade, 0),
-          situacao: 'aguardando_dof', etapa: 'aguardando_dof',
+          situacao: 'aguardando_dof', etapa: 'aguardando_dof', emAndamento: true,
         };
         D.notas.unshift(nf);
         return comEtapa(nf);

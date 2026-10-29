@@ -90,7 +90,7 @@ export function AlternarVisao({ visao, aoMudar }: { visao: 'quadro' | 'lista'; a
   return (
     <div className="alternar-visao" role="group" aria-label="Visualização">
       {(['quadro', 'lista'] as const).map((v) => (
-        <button key={v} type="button" className={`btn btn-peq ${visao === v ? 'btn-pri' : 'btn-sec'}`} aria-pressed={visao === v} onClick={() => aoMudar(v)}>
+        <button key={v} type="button" className="alternar-opcao" aria-pressed={visao === v} onClick={() => aoMudar(v)}>
           {v === 'quadro' ? 'Quadro' : 'Lista'}
         </button>
       ))}

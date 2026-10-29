@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BadgeDe } from '../components/Badge';
 import { DeclararDofModal, type AlvoDeclaracao } from '../components/DeclararDofModal';
-import { Aviso, PageHeader } from '../components/Estados';
+import { Aviso, ComoFunciona, PageHeader } from '../components/Estados';
 import { Etapas } from '../components/Etapas';
 import { FormModal, type Campo } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
@@ -54,9 +54,9 @@ export default function NotasFiscais() {
   const mudarVisao = (v: 'quadro' | 'lista') => setParams(v === 'quadro' ? {} : { visao: 'lista' });
   const alvoDeclaracao = (n: NotaFiscal): AlvoDeclaracao => ({ nfId: n.id, nfNumero: n.numero, dofNumero: n.dof!.numero, prazoDeclaracao: n.dof!.prazoDeclaracao });
   const proximaAcao = (n: NotaFiscal) => (
-    n.etapa === 'aguardando_dof' && pode('nf:cadastrar') ? <button className="btn btn-pri btn-peq" onClick={() => setDofDe(n)}>Cadastrar DOF</button>
-      : n.etapa === 'aguardando_recebimento' && pode('recebimento:registrar') ? <button className="btn btn-pri btn-peq" onClick={() => setReceber(n)}>Receber</button>
-        : n.etapa === 'declarar' && pode('dof:declarar') ? <button className="btn btn-pri btn-peq" onClick={() => setDeclarar(alvoDeclaracao(n))}>Marcar como declarado</button>
+    n.etapa === 'aguardando_dof' && pode('nf:cadastrar') ? <button className="btn btn-acao btn-peq" onClick={() => setDofDe(n)}>Cadastrar DOF</button>
+      : n.etapa === 'aguardando_recebimento' && pode('recebimento:registrar') ? <button className="btn btn-acao btn-peq" onClick={() => setReceber(n)}>Receber</button>
+        : n.etapa === 'declarar' && pode('dof:declarar') ? <button className="btn btn-acao btn-peq" onClick={() => setDeclarar(alvoDeclaracao(n))}>Marcar como declarado</button>
           : null
   );
   const coluna = (etapa: EtapaEntrada, tom: ColunaQuadro<NotaFiscal>['tom'], vazio: string, extra: Partial<ColunaQuadro<NotaFiscal>> = {}): ColunaQuadro<NotaFiscal> => ({
@@ -66,9 +66,6 @@ export default function NotasFiscais() {
     coluna('aguardando_dof', 'vermelho', 'Nenhuma NF sem DOF.'),
     coluna('aguardando_recebimento', 'laranja', 'Nenhuma NF esperando a carga.'),
     coluna('declarar', 'azul', 'Nenhum DOF pendente no Sinaflor.', { ordenar: (a, b) => (a.diasParaPrazo ?? 0) - (b.diasParaPrazo ?? 0) }),
-    coluna('concluida', 'verde', 'Nenhuma entrada concluída ainda.', {
-      verTodas: '/notas?visao=lista&etapa=concluida', carregar: () => servicos.notas.listar({ filters: { etapa: 'concluida' }, sortBy: 'emissao', sortDir: 'desc', pageSize: 8 }),
-    }),
   ];
   const cartaoNf = (n: NotaFiscal) => (
     <Cartao
@@ -107,33 +104,47 @@ export default function NotasFiscais() {
     </>
   );
   const titulo = 'Entrada: NF e DOF';
-  const descricao = 'Da nota fiscal (manual ou pelo XML da NF-e) à declaração do DOF no Sinaflor. O recebimento só avança com o DOF cadastrado.';
-  const aviso = <Aviso>Um DOF por NF. O volume do DOF é informado por espécie, como no documento, e comparado ao volume recebido.</Aviso>;
+  const descricao = 'Da nota fiscal à declaração do DOF no Sinaflor.';
+  const aviso = (
+    <ComoFunciona>
+      A NF é cadastrada à mão ou pelo XML da NF-e. O recebimento só avança com o DOF cadastrado: um DOF por NF, com o volume
+      informado por espécie, como no documento, e comparado ao volume recebido.
+    </ComoFunciona>
+  );
+
+  // Visão Lista: tudo, em andamento primeiro, concluídas depois (mais recentes antes). Embaixo do quadro vão só as concluídas (sem o que já está no quadro).
+  const lista = {
+    listar: (q: Parameters<typeof servicos.notas.listar>[0]) => servicos.notas.listar(q),
+    recarregar: rec,
+    colunas,
+    filtros: [{ chave: 'etapa', rotulo: 'Etapa', opcoes: ETAPA_ENTRADA_OPCOES }],
+    ordemPadrao: [{ campo: 'emAndamento', dir: 'desc' as const }, { campo: 'emissao', dir: 'desc' as const }],
+    acoesLinha: [
+      { rotulo: 'Ver', aoClicar: setVer },
+      { rotulo: 'Cadastrar DOF', principal: true, aoClicar: setDofDe, visivel: (n: NotaFiscal) => n.etapa === 'aguardando_dof' && pode('nf:cadastrar') },
+      { rotulo: 'Receber', principal: true, aoClicar: setReceber, visivel: (n: NotaFiscal) => n.etapa === 'aguardando_recebimento' && pode('recebimento:registrar') },
+      { rotulo: 'Marcar como declarado', principal: true, aoClicar: (n: NotaFiscal) => setDeclarar(alvoDeclaracao(n)), visivel: (n: NotaFiscal) => n.etapa === 'declarar' && pode('dof:declarar') },
+    ],
+  };
 
   return (
     <>
       {visao === 'quadro' ? (
-        <section className="painel">
-          <PageHeader titulo={titulo} descricao={descricao} acoes={acoesTopo} />
-          {aviso}
-          <Quadro rotulo="Etapas da entrada" colunas={colunasQuadro} cartao={cartaoNf} recarregar={rec} />
-          <p className="mudo">A etapa de inspeção dos lotes entra neste quadro junto com a tela de Inspeção.</p>
-        </section>
+        <>
+          <section className="painel">
+            <PageHeader titulo={titulo} descricao={descricao} acoes={acoesTopo} />
+            {aviso}
+            <Quadro rotulo="Etapas da entrada" colunas={colunasQuadro} cartao={cartaoNf} recarregar={rec} />
+          </section>
+          <ListPage<NotaFiscal>
+            {...lista} secao titulo="Entradas concluídas" descricao="Só as que já saíram do quadro (DOF declarado), mais recentes primeiro."
+            listar={(q) => servicos.notas.listar({ ...q, filters: { ...q.filters, emAndamento: 'false' } })}
+            filtros={[]}
+            ordemPadrao={[{ campo: 'emissao', dir: 'desc' }]}
+          />
+        </>
       ) : (
-        <ListPage<NotaFiscal>
-          titulo={titulo} descricao={descricao} aviso={aviso}
-          listar={(q) => servicos.notas.listar(q)}
-          recarregar={rec}
-          colunas={colunas}
-          filtros={[{ chave: 'etapa', rotulo: 'Etapa', opcoes: ETAPA_ENTRADA_OPCOES }]}
-          acoes={acoesTopo}
-          acoesLinha={[
-            { rotulo: 'Ver', aoClicar: setVer },
-            { rotulo: 'Cadastrar DOF', principal: true, aoClicar: setDofDe, visivel: (n) => n.etapa === 'aguardando_dof' && pode('nf:cadastrar') },
-            { rotulo: 'Receber', principal: true, aoClicar: setReceber, visivel: (n) => n.etapa === 'aguardando_recebimento' && pode('recebimento:registrar') },
-            { rotulo: 'Marcar como declarado', principal: true, aoClicar: (n) => setDeclarar(alvoDeclaracao(n)), visivel: (n) => n.etapa === 'declarar' && pode('dof:declarar') },
-          ]}
-        />
+        <ListPage<NotaFiscal> {...lista} titulo={titulo} descricao={descricao} aviso={aviso} acoes={acoesTopo} />
       )}
       <NfModal
         aberto={novaNf} aoFechar={() => setNovaNf(false)}

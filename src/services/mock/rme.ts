@@ -88,7 +88,7 @@ export function abrirRme(B: BaseRme, n: NovaRme, ctx: Contexto): Rme {
   const id = ctx.novoId('rme');
   const rme: Rme = {
     id, numero: proximoNumero(B, ctx.quando), requisitante: ctx.usuario, destinatario: n.destinatario.trim(), urgencia: n.urgencia, dataLimite: n.dataLimite,
-    observacao: n.observacao?.trim() || undefined, abertaEm: ctx.quando, status: 'aberta', historico: [],
+    observacao: n.observacao?.trim() || undefined, abertaEm: ctx.quando, status: 'aberta', historico: [], emAndamento: true,
     itens: n.itens.map((it, i) => {
       const e = B.especies.find((x) => x.id === it.especieId);
       const t = B.tamanhos.find((x) => x.id === it.tamanhoId);
@@ -170,6 +170,7 @@ export function entregarRme(B: BaseRme, rme: Rme, ctx: Contexto): Rme {
     item.quantidadeEntregue += s.quantidade;
   }
   rme.status = 'entregue';
+  rme.emAndamento = false;
   rme.entreguePor = ctx.usuario;
   rme.entregueEm = ctx.quando;
   registrar(rme, ctx, 'Entrega confirmada e baixa no estoque');
@@ -180,6 +181,7 @@ export function cancelarRme(rme: Rme, motivo: string, ctx: Contexto): Rme {
   exigirStatus(rme, 'aberta', 'em_separacao', 'conferida');
   if (!motivo.trim()) throw new ApiError(422, 'Informe o motivo do cancelamento.', { motivo: 'Campo obrigatório.' });
   rme.status = 'cancelada';
+  rme.emAndamento = false;
   rme.motivoCancelamento = motivo.trim();
   registrar(rme, ctx, 'RME cancelada', motivo.trim());
   return rme;

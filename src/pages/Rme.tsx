@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Badge, BadgeDe } from '../components/Badge';
 import { CodigoLink } from '../components/Codigos';
-import { Aviso, PageHeader } from '../components/Estados';
+import { Aviso, ComoFunciona, PageHeader } from '../components/Estados';
 import { Etapas } from '../components/Etapas';
 import { FormModal } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
@@ -14,7 +14,7 @@ import { useToast } from '../components/Toast';
 import { SUFIXO_SIMULADO } from '../config/env';
 import { useAlertas } from '../contexts/AlertasContext';
 import { useAuth } from '../contexts/AuthContext';
-import { STATUS_RME_OPCOES, URGENCIA_OPCOES } from '../dominio/opcoes';
+import { STATUS_RME_ENCERRADA_OPCOES, STATUS_RME_OPCOES, URGENCIA_OPCOES } from '../dominio/opcoes';
 import { STATUS_RME, URGENCIA_RME } from '../dominio/rotulos';
 import { servicos } from '../services';
 import { mensagemSegura } from '../services/http';
@@ -78,19 +78,15 @@ export default function RmePage() {
   const verRme = (r: Rme, conferir = false) => { setErro(undefined); setVer({ rme: r, conferir }); };
   /** A próxima ação de cada etapa, conforme o perfil (a mesma das linhas da lista). */
   const proximaAcao = (r: Rme) => (
-    r.status === 'aberta' && pode('rme:separar') ? <button className="btn btn-pri btn-peq" onClick={() => setSeparar(r)}>Separar</button>
-      : r.status === 'em_separacao' && pode('rme:conferir') ? <button className="btn btn-pri btn-peq" onClick={() => verRme(r, true)}>Conferir</button>
-        : r.status === 'conferida' && pode('rme:separar') ? <button className="btn btn-pri btn-peq" onClick={() => { setErro(undefined); setEntregar(r); }}>Confirmar entrega</button>
+    r.status === 'aberta' && pode('rme:separar') ? <button className="btn btn-acao btn-peq" onClick={() => setSeparar(r)}>Separar</button>
+      : r.status === 'em_separacao' && pode('rme:conferir') ? <button className="btn btn-acao btn-peq" onClick={() => verRme(r, true)}>Conferir</button>
+        : r.status === 'conferida' && pode('rme:separar') ? <button className="btn btn-acao btn-peq" onClick={() => { setErro(undefined); setEntregar(r); }}>Confirmar entrega</button>
           : null
   );
   const colunasQuadro: ColunaQuadro<Rme>[] = [
     { chave: 'aberta', titulo: 'Aberta', tom: 'azul', ordenar: porUrgencia, carregar: () => servicos.rme.listar({ filters: { status: 'aberta' }, pageSize: 50 }), vazio: 'Nenhuma RME aguardando separação.' },
     { chave: 'em_separacao', titulo: 'Em separação', tom: 'laranja', ordenar: porUrgencia, carregar: () => servicos.rme.listar({ filters: { status: 'em_separacao' }, pageSize: 50 }), vazio: 'Nada aguardando conferência.' },
     { chave: 'conferida', titulo: 'Conferida', tom: 'verde', ordenar: porUrgencia, carregar: () => servicos.rme.listar({ filters: { status: 'conferida' }, pageSize: 50 }), vazio: 'Nada aguardando entrega.' },
-    {
-      chave: 'entregue', titulo: 'Entregue (recentes)', tom: 'cinza', vazio: 'Nenhuma entrega ainda.', verTodas: '/rme?visao=lista&status=entregue',
-      carregar: () => servicos.rme.listar({ filters: { status: 'entregue' }, sortBy: 'entregueEm', sortDir: 'desc', pageSize: 8 }),
-    },
   ];
   const cartaoRme = (r: Rme) => {
     const prazo = diasAte(r.dataLimite);
@@ -103,9 +99,7 @@ export default function RmePage() {
         <div className="cartao-topo"><strong>{r.numero}</strong>{r.urgencia === 'urgente' && <BadgeDe mapa={URGENCIA_RME} valor="urgente" />}</div>
         <div>{r.destinatario}</div>
         <div className="mudo">{r.itens.map((i) => `${un(i.quantidade)} ${i.tamanho}`).join(' + ')}</div>
-        {ativa
-          ? <div className={prazo < 0 ? 'val-erro' : undefined}>Até {data(r.dataLimite)} · {prazoTexto(prazo)}</div>
-          : <div className="mudo">Entregue em {data(r.entregueEm)}{r.entreguePor && ` por ${r.entreguePor}`}</div>}
+        <div className={prazo < 0 ? 'val-erro' : undefined}>Até {data(r.dataLimite)} · {prazoTexto(prazo)}</div>
         {r.status === 'em_separacao' && r.separacao && (
           <div className="mudo">Separada por {r.separacao.almoxarife}{!r.separacao.seguiuSugestao && <> · <Badge tom="laranja">Fora do FIFO</Badge></>}</div>
         )}
@@ -120,34 +114,48 @@ export default function RmePage() {
       {pode('rme:abrir') && <button className="btn btn-pri" onClick={() => setAbrir(true)}>Abrir RME</button>}
     </>
   );
-  const descricao = 'Requisição de material: única forma de saída do estoque. Fluxo: aberta → em separação → conferida → entregue (baixa).';
-  const aviso = <Aviso>A baixa só acontece depois da separação pelo almoxarife e da conferência do supervisor (duas pessoas). Até a entrega, os fardos separados ficam reservados.</Aviso>;
+  const descricao = 'Requisição de material: a única forma de saída do estoque.';
+  const aviso = (
+    <ComoFunciona>
+      Fluxo: aberta → em separação → conferida → entregue (baixa). A baixa só acontece depois da separação pelo almoxarife e da
+      conferência do supervisor (duas pessoas). Até a entrega, os fardos separados ficam reservados.
+    </ComoFunciona>
+  );
+
+  // Visão Lista: tudo, em andamento primeiro, entregues e canceladas depois (mais recentes antes). Embaixo do quadro vai só o histórico (sem o que já está no quadro).
+  const lista = {
+    listar: (q: Parameters<typeof servicos.rme.listar>[0]) => servicos.rme.listar(q),
+    recarregar: rec,
+    colunas,
+    filtros: [{ chave: 'status', rotulo: 'Status', opcoes: STATUS_RME_OPCOES }, { chave: 'urgencia', rotulo: 'Urgência', opcoes: URGENCIA_OPCOES }],
+    ordemPadrao: [{ campo: 'emAndamento', dir: 'desc' as const }, { campo: 'abertaEm', dir: 'desc' as const }],
+    acoesLinha: [
+      { rotulo: 'Ver', aoClicar: (r: Rme) => verRme(r) },
+      { rotulo: 'Separar', principal: true, aoClicar: setSeparar, visivel: (r: Rme) => r.status === 'aberta' && pode('rme:separar') },
+      { rotulo: 'Conferir', principal: true, aoClicar: (r: Rme) => verRme(r, true), visivel: (r: Rme) => r.status === 'em_separacao' && pode('rme:conferir') },
+      { rotulo: 'Confirmar entrega', principal: true, aoClicar: (r: Rme) => { setErro(undefined); setEntregar(r); }, visivel: (r: Rme) => r.status === 'conferida' && pode('rme:separar') },
+      { rotulo: 'Cancelar', aoClicar: setCancelar, visivel: (r: Rme) => emAndamento(r) && pode('rme:abrir') },
+    ],
+  };
 
   return (
     <>
       {visao === 'quadro' ? (
-        <section className="painel">
-          <PageHeader titulo="RME" descricao={descricao} acoes={acoesTopo} />
-          {aviso}
-          <Quadro rotulo="Etapas da RME" colunas={colunasQuadro} cartao={cartaoRme} recarregar={rec} />
-          <p className="mudo">RMEs canceladas aparecem só na lista.</p>
-        </section>
+        <>
+          <section className="painel">
+            <PageHeader titulo="RME" descricao={descricao} acoes={acoesTopo} />
+            {aviso}
+            <Quadro rotulo="Etapas da RME" colunas={colunasQuadro} cartao={cartaoRme} recarregar={rec} />
+          </section>
+          <ListPage<Rme>
+            {...lista} secao titulo="Histórico das RMEs" descricao="Só as que já saíram do quadro (entregues e canceladas), mais recentes primeiro."
+            listar={(q) => servicos.rme.listar({ ...q, filters: { ...q.filters, emAndamento: 'false' } })}
+            filtros={[{ chave: 'status', rotulo: 'Status', opcoes: STATUS_RME_ENCERRADA_OPCOES }, { chave: 'urgencia', rotulo: 'Urgência', opcoes: URGENCIA_OPCOES }]}
+            ordemPadrao={[{ campo: 'abertaEm', dir: 'desc' }]}
+          />
+        </>
       ) : (
-        <ListPage<Rme>
-          titulo="RME" descricao={descricao} aviso={aviso}
-          listar={(q) => servicos.rme.listar(q)}
-          recarregar={rec}
-          colunas={colunas}
-          filtros={[{ chave: 'status', rotulo: 'Status', opcoes: STATUS_RME_OPCOES }, { chave: 'urgencia', rotulo: 'Urgência', opcoes: URGENCIA_OPCOES }]}
-          acoes={acoesTopo}
-          acoesLinha={[
-            { rotulo: 'Ver', aoClicar: (r) => verRme(r) },
-            { rotulo: 'Separar', principal: true, aoClicar: setSeparar, visivel: (r) => r.status === 'aberta' && pode('rme:separar') },
-            { rotulo: 'Conferir', principal: true, aoClicar: (r) => verRme(r, true), visivel: (r) => r.status === 'em_separacao' && pode('rme:conferir') },
-            { rotulo: 'Confirmar entrega', principal: true, aoClicar: (r) => { setErro(undefined); setEntregar(r); }, visivel: (r) => r.status === 'conferida' && pode('rme:separar') },
-            { rotulo: 'Cancelar', aoClicar: setCancelar, visivel: (r) => emAndamento(r) && pode('rme:abrir') },
-          ]}
-        />
+        <ListPage<Rme> {...lista} titulo="RME" descricao={descricao} aviso={aviso} acoes={acoesTopo} />
       )}
       <RmeModal aberto={abrir} aoFechar={() => setAbrir(false)} aoSalvar={(r) => atualizado(`RME ${r.numero} aberta`)} />
       <SeparacaoModal

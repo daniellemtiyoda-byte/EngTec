@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { BandeiraSP } from '../components/BandeiraSP';
+import { Logo } from '../components/Logo';
 import { env } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
 import { mensagemSegura } from '../services/http';
@@ -41,7 +41,7 @@ export default function Login() {
         <div className="login-marca-bloco">
           <h1 className="login-nome">Holz Trilho</h1>
           <div className="login-linha">
-            <BandeiraSP tamanho="pequena" />
+            <Logo tamanho="medio" />
             <p className="login-lema">Gestão de dormentes ferroviários</p>
           </div>
         </div>
