@@ -14,6 +14,10 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
   - **Página do lote** fica com origem e documentos, e a tabela de fardos do lote tem link para cada fardo.
   - Serviço: `fardos.listar` devolve `FardoEstoque` e ganhou `fardos.obter` (`GET /fardos/{id}`, provisório); `estoque.listar` continua para a visão por lote. A linha do tempo virou o componente `LinhaTempo`.
   - Arquivos: `src/pages/Estoque.tsx`, `src/pages/Saldo.tsx`, `src/pages/FardoDetalhe.tsx`, `src/components/Quadro.tsx`, `src/pages/LoteDetalhe.tsx`, `src/pages/Lotes.tsx`, `src/components/LinhaTempo.tsx`, `src/types/models.ts`, `src/services/contracts.ts`, `src/services/mock/index.ts`, `src/services/mock/estoque.ts`, `src/services/real/index.ts`, `src/services/endpoints.ts`, `src/utils/busca.ts`, `src/dominio/opcoes.ts`, `src/rotas.tsx`, `docs/CONTRATOS-API.md`, `docs/PRD.md`, `CLAUDE.md`.
+- 2026-10-29: **Cadastros numa tela só, com abas**: Espécies, Tamanhos, Fornecedores e Documentos (`/cadastros?aba=…`), no grupo Sistema do menu.
+  - **Por quê:** eram três itens de menu para telas pouco usadas no dia a dia; o PRD já descreve Cadastros como uma tela.
+  - Os endereços `/especies`, `/tamanhos` e `/fornecedores` saíram (nenhuma tela apontava para eles).
+  - Arquivos: `src/pages/Cadastros.tsx`, `src/pages/Especies.tsx`, `src/pages/Tamanhos.tsx`, `src/pages/Fornecedores.tsx`, `src/rotas.tsx`, `CLAUDE.md`.
 - 2026-10-28: **rastreio por dormente**: cada peça tem um ID e o sistema sabe em qual fardo ela está e por onde saiu.
   - **Por quê:** faltava rastreabilidade. O sistema guardava só quantas peças iam em cada fardo, não quais.
   - **Etiqueta:** o ID é o código da etiqueta impressa na inspeção (lote + sequência, `LT26-0042-0007`), pelo botão "Imprimir etiquetas das peças".

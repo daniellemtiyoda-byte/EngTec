@@ -27,6 +27,7 @@ const paraTamanho = (v: Record<string, string>): NovoTamanho => ({
 
 const paraTexto = (n: number) => String(n).replace('.', ',');
 
+/** Aba Tamanhos da tela Cadastros. */
 export default function Tamanhos() {
   const { pode } = useAuth();
   const notificar = useToast();
@@ -46,7 +47,7 @@ export default function Tamanhos() {
   return (
     <>
       <ListPage<Tamanho>
-        titulo="Tamanhos"
+        secao titulo="Tamanhos"
         descricao="Dimensões de cada tamanho de dormente. O volume em m³ é calculado pelo sistema e usado na conferência com o DOF e nos relatórios do IBAMA."
         aviso={<Aviso tom="alerta">Medidas <strong>provisórias</strong> aguardam confirmação da CPTM (só o comprimento de 2,80 m foi visto na plaqueta). Volumes calculados com elas também são provisórios.</Aviso>}
         listar={(q) => servicos.tamanhos.listar(q)}

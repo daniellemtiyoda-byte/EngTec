@@ -12,6 +12,7 @@ import { servicos } from '../services';
 import type { Especie, UsoEspecie } from '../types/models';
 import { rotuloClasse } from '../utils/format';
 
+/** Aba Espécies da tela Cadastros. */
 export default function Especies() {
   const { pode } = useAuth();
   const notificar = useToast();
@@ -32,7 +33,7 @@ export default function Especies() {
   return (
     <>
       <ListPage<Especie>
-        titulo="Espécies"
+        secao titulo="Espécies"
         descricao="Lista de espécies da RME, identificadas pelo nome científico. A classe de cada dormente é a classe da sua espécie."
         aviso={<Aviso>A espécie de cada lote é a <strong>declarada em documento</strong>. O sistema não identifica espécie por imagem. Classes "a definir" aguardam confirmação da CPTM.</Aviso>}
         listar={(q) => servicos.especies.listar(q)}

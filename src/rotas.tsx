@@ -2,12 +2,11 @@ import type { ComponentType } from 'react';
 import type { NomeIcone } from './components/Icone';
 import type { Permissao } from './dominio/permissoes';
 import Administracao from './pages/Administracao';
+import Cadastros from './pages/Cadastros';
 import Configuracoes from './pages/Configuracoes';
 import Dashboard from './pages/Dashboard';
-import Especies from './pages/Especies';
 import Estoque from './pages/Estoque';
 import FardoDetalhe from './pages/FardoDetalhe';
-import Fornecedores from './pages/Fornecedores';
 import Inspecao from './pages/Inspecao';
 import Inventario from './pages/Inventario';
 import LoteDetalhe from './pages/LoteDetalhe';
@@ -19,11 +18,10 @@ import Recebimento from './pages/Recebimento';
 import Relatorios from './pages/Relatorios';
 import RmePage from './pages/Rme';
 import Saldo from './pages/Saldo';
-import Tamanhos from './pages/Tamanhos';
 import VisaoComputacional from './pages/VisaoComputacional';
 
 /** Grupos do menu na ordem do fluxo do dormente (PRD): entrada → estoque → saída → controle. */
-export const GRUPOS_MENU = ['Início', 'Entrada', 'Estoque', 'Saída', 'Controle', 'Cadastros', 'Sistema'] as const;
+export const GRUPOS_MENU = ['Início', 'Entrada', 'Estoque', 'Saída', 'Controle', 'Sistema'] as const;
 
 export interface Rota {
   caminho: string;
@@ -61,9 +59,8 @@ export const ROTAS: Rota[] = [
   { caminho: '/rme', tela: RmePage, rotulo: 'RME', icone: 'pedido', grupo: 'Saída', permissoes: ['rme:abrir', 'rme:separar', 'rme:conferir'] },
   { caminho: '/movimentacoes', tela: Movimentacoes, rotulo: 'Movimentações', icone: 'swap', grupo: 'Controle', permissoes: ['movimentacoes:registrar', 'movimentacoes:aprovar'] },
   { caminho: '/relatorios', tela: Relatorios, rotulo: 'Relatórios e IBAMA', icone: 'chart', grupo: 'Controle', permissoes: ['relatorios:exportar', 'dof:declarar'] },
-  { caminho: '/fornecedores', tela: Fornecedores, rotulo: 'Fornecedores', icone: 'building', grupo: 'Cadastros', permissoes: CADASTROS },
-  { caminho: '/especies', tela: Especies, rotulo: 'Espécies', icone: 'leaf', grupo: 'Cadastros', permissoes: CADASTROS },
-  { caminho: '/tamanhos', tela: Tamanhos, rotulo: 'Tamanhos', icone: 'medida', grupo: 'Cadastros', permissoes: CADASTROS },
+  // Espécies, tamanhos, fornecedores e documentos em abas (?aba=).
+  { caminho: '/cadastros', tela: Cadastros, rotulo: 'Cadastros', icone: 'building', grupo: 'Sistema', permissoes: CADASTROS },
   { caminho: '/administracao', tela: Administracao, rotulo: 'Usuários e auditoria', icone: 'shield', grupo: 'Sistema', permissoes: ['admin'] },
   { caminho: '/configuracoes', tela: Configuracoes, rotulo: 'Configurações', icone: 'gear', grupo: 'Sistema', permissoes: ['admin'] },
   // Fora do MVP: continua acessível pelo endereço, mas não aparece no menu.
