@@ -6,6 +6,7 @@ import Configuracoes from './pages/Configuracoes';
 import Dashboard from './pages/Dashboard';
 import Especies from './pages/Especies';
 import Estoque from './pages/Estoque';
+import FardoDetalhe from './pages/FardoDetalhe';
 import Fornecedores from './pages/Fornecedores';
 import Inspecao from './pages/Inspecao';
 import Inventario from './pages/Inventario';
@@ -17,6 +18,7 @@ import Patio from './pages/Patio';
 import Recebimento from './pages/Recebimento';
 import Relatorios from './pages/Relatorios';
 import RmePage from './pages/Rme';
+import Saldo from './pages/Saldo';
 import Tamanhos from './pages/Tamanhos';
 import VisaoComputacional from './pages/VisaoComputacional';
 
@@ -48,9 +50,12 @@ export const ROTAS: Rota[] = [
   { caminho: '/notas', tela: NotasFiscais, rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: ['nf:cadastrar', 'dof:declarar', 'recebimento:registrar'] },
   { caminho: '/recebimento', tela: Recebimento, rotulo: 'Recebimento', icone: 'truck', grupo: 'Entrada', permissoes: ['recebimento:registrar'] },
   { caminho: '/inspecao', tela: Inspecao, rotulo: 'Inspeção', icone: 'inspecao', grupo: 'Entrada', permissoes: ['inspecao:concluir', 'recebimento:registrar'] },
-  { caminho: '/lotes', tela: Lotes, rotulo: 'Lotes e fardos', icone: 'layers', grupo: 'Estoque' },
+  { caminho: '/estoque', tela: Estoque, rotulo: 'Estoque', icone: 'box', grupo: 'Estoque' },
+  { caminho: '/saldo', tela: Saldo, rotulo: 'Saldo de estoque', icone: 'layers', grupo: 'Estoque' },
+  { caminho: '/fardos/:codigo', tela: FardoDetalhe, rotulo: 'Fardo', icone: 'box', grupo: 'Estoque', foraDoMenu: true },
+  // A lista de lotes é a visão "Por lote" do Estoque; /lotes só redireciona (links antigos e alertas do servidor).
+  { caminho: '/lotes', tela: Lotes, rotulo: 'Lotes', icone: 'layers', grupo: 'Estoque', foraDoMenu: true },
   { caminho: '/lotes/:codigo', tela: LoteDetalhe, rotulo: 'Lote', icone: 'layers', grupo: 'Estoque', foraDoMenu: true },
-  { caminho: '/estoque', tela: Estoque, rotulo: 'Saldo de estoque', icone: 'box', grupo: 'Estoque' },
   { caminho: '/patio', tela: Patio, rotulo: 'Pátio', icone: 'map', grupo: 'Estoque' },
   { caminho: '/inventario', tela: Inventario, rotulo: 'Inventário físico', icone: 'clipboard', grupo: 'Estoque', permissoes: ['inventario:criar', 'movimentacoes:aprovar'] },
   { caminho: '/rme', tela: RmePage, rotulo: 'RME', icone: 'pedido', grupo: 'Saída', permissoes: ['rme:abrir', 'rme:separar', 'rme:conferir'] },

@@ -1,42 +1,36 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { BadgeDe, StatusEstoqueBadge, StatusRegistroBadge } from '../components/Badge';
+import { BadgeDe, StatusEstoqueBadge } from '../components/Badge';
 import { CodigoLink } from '../components/Codigos';
 import { Aviso, Carregando, Erro, PageHeader, Vazio } from '../components/Estados';
 import { FardosModal } from '../components/FardosModal';
 import { StatCard } from '../components/Graficos';
-import { DECLARACAO_DOF, ESTADO_FARDO, ETAPA_INSPECAO, ORIGEM_INSPECAO, RESULTADO_INSPECAO, TIPO_MOVIMENTACAO, VEREDITO_INSPECTOR } from '../dominio/rotulos';
+import { LinhaTempo } from '../components/LinhaTempo';
+import { DECLARACAO_DOF, ESTADO_FARDO, ETAPA_INSPECAO, ORIGEM_INSPECAO, RESULTADO_INSPECAO, VEREDITO_INSPECTOR } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import { ApiError } from '../services/http';
-import type { Dormente, EventoLote } from '../types/models';
-import { seqPeca } from '../utils/busca';
+import type { Dormente } from '../types/models';
 import { data, dataHora, dias, m3, metros, numero, rotuloCategoria, rotuloClasse, un, urlSegura } from '../utils/format';
-
-const ICONE_EVENTO: Record<EventoLote['tipo'], string> = {
-  nf: 'NF', recebimento: 'REC', declaracao: 'DOF', inspecao: 'INS', entrada: 'ENT', saida: 'SAÍ', transferencia: 'TRF', perda: 'PER', ajuste: 'AJU',
-};
 
 /** Página do lote (RF09/RF23): situação, inspeção das peças, fardos com saldo e local, origem (NF, DOF, recebimento) e linha do tempo da NF ao destino. */
 export default function LoteDetalhe() {
   const { codigo = '' } = useParams();
   const [params] = useSearchParams();
-  const fardoDestaque = params.get('fardo')?.toUpperCase();
   const pecaDestaque = params.get('peca')?.toUpperCase();
   const r = useAsync(() => servicos.lotes.obter(codigo), [codigo]);
   const [etiquetas, setEtiquetas] = useState(false);
 
-  // Fardo ou dormente vindo da busca (LT26-0042-F03, LT26-0042-0007): rola até ele.
+  // Dormente vindo da busca (LT26-0042-0007): rola até ele.
   useEffect(() => {
-    const alvo = fardoDestaque ? `fardo-${fardoDestaque}` : pecaDestaque ? `peca-${pecaDestaque}` : null;
-    if (r.dados && alvo) document.getElementById(alvo)?.scrollIntoView({ block: 'center' });
-  }, [r.dados, fardoDestaque, pecaDestaque]);
+    if (r.dados && pecaDestaque) document.getElementById(`peca-${pecaDestaque}`)?.scrollIntoView({ block: 'center' });
+  }, [r.dados, pecaDestaque]);
 
-  const voltar = <Link to="/lotes" className="btn btn-sec">← Lotes e fardos</Link>;
+  const voltar = <Link to="/estoque?visao=lote" className="btn btn-sec">← Estoque</Link>;
   if (r.carregando && !r.dados) return <Carregando />;
   if (r.erro) {
     return r.erro instanceof ApiError && r.erro.status === 404
-      ? <section className="painel"><Vazio mensagem={`Lote ${codigo} não encontrado.`} dica="Confira o código (ex.: LT26-0042) ou pesquise na lista de lotes." />{voltar}</section>
+      ? <section className="painel"><Vazio mensagem={`Lote ${codigo} não encontrado.`} dica="Confira o código (ex.: LT26-0042) ou pesquise no estoque, na visão por lote." />{voltar}</section>
       : <Erro erro={r.erro} aoTentar={r.recarregar} />;
   }
   if (!r.dados) return null;
@@ -46,12 +40,11 @@ export default function LoteDetalhe() {
   const situacaoPeca = (d?: Dormente) => (!d ? <span className="mudo">Sem fardo</span>
     : d.estado === 'em_estoque' ? 'Em estoque'
       : d.baixa?.tipo === 'saida' ? <>Saiu na <CodigoLink codigo={d.baixa.referencia} /></> : `Baixa por ${d.baixa?.tipo === 'perda' ? 'perda' : 'ajuste'}`);
-  const pecasDoFardo = (codigo: string) => dormentes.filter((d) => d.fardoCodigo === codigo && d.estado === 'em_estoque').map((d) => seqPeca(d.codigo));
   const dof = nf?.dof;
 
   return (
     <>
-      <nav className="migalhas" aria-label="Você está em"><Link to="/lotes">Lotes e fardos</Link> <span aria-hidden="true">›</span> <span>{l.codigo}</span></nav>
+      <nav className="migalhas" aria-label="Você está em"><Link to="/estoque?visao=lote">Estoque</Link> <span aria-hidden="true">›</span> <span>{l.codigo}</span></nav>
       <PageHeader
         titulo={`Lote ${l.codigo}`}
         descricao={`${l.especieDocumental} · ${rotuloClasse(l.classe)} · ${rotuloCategoria(l.categoria)} · Tamanho ${l.tamanho}`}
@@ -87,21 +80,21 @@ export default function LoteDetalhe() {
           </dl>
         </section>
         <section className="painel">
-          <PageHeader titulo="Fardos" nivel={2} descricao="Formados depois da inspeção, um por resultado e categoria. Saída parcial deixa o fardo aberto com o saldo restante." />
+          <PageHeader titulo="Fardos" nivel={2} descricao="Formados depois da inspeção, um por resultado e categoria. Abra um fardo para ver os seus dormentes." />
           {!fardos.length ? <Vazio mensagem="Ainda sem fardos." dica="Os fardos são formados na tela Inspeção, depois que todas as peças têm resultado." /> : (
             <div className="tabela-wrap">
               <table className="tabela">
                 <thead><tr><th>Fardo</th><th>Inspeção</th><th className="al-right">Inicial</th><th className="al-right">Saldo</th><th>Estado</th><th>Local</th></tr></thead>
                 <tbody>
                   {fardos.map((f) => (
-                    <tr key={f.id} id={`fardo-${f.codigo}`} className={f.codigo === fardoDestaque ? 'linha-destaque' : undefined} aria-current={f.codigo === fardoDestaque ? 'true' : undefined}>
-                      <td>{f.codigo}</td>
+                    <tr key={f.id}>
+                      <td><CodigoLink codigo={f.codigo} /></td>
                       <td>
                         <BadgeDe mapa={RESULTADO_INSPECAO} valor={f.resultado} />{f.resultado === 'aprovado' && <div className="mudo">{rotuloCategoria(f.categoria)}</div>}
                         {f.motivoBloqueio && <div className="val-erro">{f.motivoBloqueio}</div>}
                       </td>
                       <td className="al-right">{un(f.quantidadeInicial)}</td>
-                      <td className="al-right">{un(f.saldo)}{f.saldo > 0 && <div className="mudo" title="Dormentes em estoque no fardo">{pecasDoFardo(f.codigo).join(', ')}</div>}</td>
+                      <td className="al-right">{un(f.saldo)}</td>
                       <td><BadgeDe mapa={ESTADO_FARDO} valor={f.estado} /></td><td>{f.local}</td>
                     </tr>
                   ))}
@@ -150,23 +143,7 @@ export default function LoteDetalhe() {
 
       <section className="painel">
         <PageHeader titulo="Linha do tempo" nivel={2} descricao="Da NF ao destino: cada evento com data e usuário." />
-        {!historico.length ? <Vazio mensagem="Sem eventos registrados." /> : (
-          <ol className="linha-tempo">
-            {historico.map((e, i) => (
-              <li key={i} className={`evento evento-${e.tipo}`}>
-                <span className="evento-marca" aria-hidden="true">{ICONE_EVENTO[e.tipo]}</span>
-                <div>
-                  <div className="evento-topo">
-                    <strong>{e.titulo}</strong>
-                    {e.tipo in TIPO_MOVIMENTACAO && e.status && e.status !== 'aprovado' && <StatusRegistroBadge s={e.status} />}
-                  </div>
-                  <div className="mudo">{dataHora(e.quando)}{e.usuario && ` · ${e.usuario}`}{e.referencia && <> · <CodigoLink codigo={e.referencia} /></>}</div>
-                  {e.detalhe && <div>{e.detalhe}</div>}
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
+        <LinhaTempo eventos={historico} />
       </section>
       <FardosModal lote={etiquetas ? l : null} aoFechar={() => setEtiquetas(false)} />
     </>

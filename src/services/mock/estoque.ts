@@ -1,4 +1,4 @@
-import type { Dormente, Fardo, Lote, SaldoEstoque, SituacaoLote } from '../../types/models';
+import type { Dormente, Fardo, Lote, SaldoEstoque, SituacaoFardo, SituacaoLote } from '../../types/models';
 import { ApiError } from '../http';
 
 /** O que uma alteração de saldo lê e altera nos dados simulados. */
@@ -25,6 +25,15 @@ export function situacaoDoLote(l: Lote, fardos: Fardo[]): SituacaoLote {
   if (comSaldo.some((f) => f.resultado === 'quarentena')) return 'quarentena';
   if (comSaldo.some((f) => f.resultado === 'reprovado')) return 'reprovado';
   return 'bloqueado';
+}
+
+/** Situação do fardo para a tela, na ordem do que impede o uso (mesma ordem da do lote). */
+export function situacaoDoFardo(f: Fardo, l: Lote): SituacaoFardo {
+  if (f.saldo <= 0) return 'sem_saldo';
+  if (l.estoqueStatus === 'divergente') return 'divergente';
+  if (f.motivoBloqueio) return 'bloqueado';
+  if (f.resultado === 'quarentena' || f.resultado === 'reprovado') return f.resultado;
+  return 'disponivel';
 }
 
 /**

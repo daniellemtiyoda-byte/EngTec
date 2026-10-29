@@ -220,6 +220,38 @@ export interface Fardo {
   formadoPor: string;
 }
 
+/** Situação do fardo para a tela (mesmos rótulos da do lote): fardo só existe depois da inspeção, então não há "aguardando". */
+export type SituacaoFardo = Exclude<SituacaoLote, 'aguardando_inspecao'>;
+
+/** Fardo na consulta de estoque: o fardo com os dados do lote de origem e a situação, calculados pelo serviço. */
+export interface FardoEstoque extends Fardo {
+  especieDocumental: string;
+  classe?: Classe;
+  tamanho: string;
+  nfNumero: string;
+  fornecedor: string;
+  /** Data de entrada do lote (base do FIFO) e idade, calculadas na consulta. */
+  recebidoEm: string;
+  idadeDias: number;
+  acimaLimiteIdade: boolean;
+  /** Ordem de prioridade: sem saldo, divergência de volume do lote, espécie/tamanho divergente (bloqueado), quarentena, reprovado, disponível. */
+  situacao: SituacaoFardo;
+  /** Saldo maior que zero (para listar os com saldo primeiro). */
+  emEstoque: boolean;
+  volumeM3: number;
+}
+
+/** Tudo sobre um fardo numa consulta só: lote de origem, dormentes (em estoque e baixados), inspeção de cada peça e histórico. */
+export interface FardoDetalhe {
+  fardo: FardoEstoque;
+  lote: Lote;
+  /** Dormentes que estão ou estiveram no fardo, pela sequência. */
+  dormentes: Dormente[];
+  /** Inspeção vigente de cada dormente do fardo. */
+  inspecoes: InspecaoPeca[];
+  historico: EventoLote[];
+}
+
 /** Inspeção de uma peça (dormente), vinda do sistema de inspeção ou lançada à mão. Só o resultado: o detalhe fica no Inspector. */
 export interface InspecaoPeca {
   id: string;

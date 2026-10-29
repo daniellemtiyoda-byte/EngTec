@@ -1,6 +1,6 @@
 /**
  * Reconhece os códigos do sistema e diz para onde levar (busca global e links das tabelas).
- *  LT26-0042-F03 → lote com o fardo em destaque · LT26-0042-0007 (dormente) → lote com a peça em destaque · LT26-0042 → lote
+ *  LT26-0042-F03 → fardo · LT26-0042-0007 (dormente) → lote com a peça em destaque · LT26-0042 → lote
  *  RME26-0007 → RME · "NF 1000" ou só números → NF
  */
 const FARDO = /^LT\d{2}-\d{4}-F\d{2,}$/i;
@@ -9,11 +9,9 @@ const LOTE = /^LT\d{2}-\d{4}$/i;
 const RME = /^RME\d{2}-\d{4}$/i;
 const NF = /^(?:NF\s*)?(\d{1,9})$/i;
 
-export const loteDoFardo = (fardo: string) => fardo.replace(/-F\d+$/i, '');
-
 export function rotaDoCodigo(texto: string): string | null {
   const t = texto.trim();
-  if (FARDO.test(t)) return `/lotes/${encodeURIComponent(loteDoFardo(t).toUpperCase())}?fardo=${encodeURIComponent(t.toUpperCase())}`;
+  if (FARDO.test(t)) return `/fardos/${encodeURIComponent(t.toUpperCase())}`;
   const peca = PECA.exec(t);
   if (peca) return `/lotes/${encodeURIComponent(peca[1].toUpperCase())}?peca=${encodeURIComponent(t.toUpperCase())}`;
   if (LOTE.test(t)) return `/lotes/${encodeURIComponent(t.toUpperCase())}`;
@@ -23,8 +21,8 @@ export function rotaDoCodigo(texto: string): string | null {
   return null;
 }
 
-/** Busca global: código conhecido vai direto ao registro; texto livre pesquisa nos lotes. */
-export const destinoBusca = (texto: string) => rotaDoCodigo(texto) ?? `/lotes?q=${encodeURIComponent(texto.trim())}`;
+/** Busca global: código conhecido vai direto ao registro; texto livre pesquisa nos lotes (Estoque, visão por lote). */
+export const destinoBusca = (texto: string) => rotaDoCodigo(texto) ?? `/estoque?visao=lote&q=${encodeURIComponent(texto.trim())}`;
 
 /** Sequência da peça para exibir de forma curta: LT26-0042-0007 → 0007. */
 export const seqPeca = (codigo: string) => codigo.slice(-4);

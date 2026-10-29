@@ -6,6 +6,14 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Adicionado
+- 2026-10-29: **estoque controlado por fardo e dormente**.
+  - **Por quê:** o fardo é a unidade física que se movimenta no pátio e cada dormente já é rastreado, mas as telas giravam em torno do lote; os dormentes de um fardo apareciam espremidos (e cortados) dentro da tabela do lote.
+  - **Tela Estoque** (`/estoque`, novo item do menu): duas visões, **Por fardo** (padrão) e **Por lote** (`?visao=lote`). Por fardo tem a tabela dos fardos (espécie, tamanho, saldo, situação, local e idade, os com saldo primeiro e do mais antigo ao mais novo, FIFO; filtros por situação, fechado/aberto, idade, classe e categoria) e, embaixo, **"Lotes ainda sem fardo"** (aguardando ou em inspeção, com o progresso das peças), para nada do pátio ficar fora da lista. Por lote é a lista de lotes que antes ficava no menu "Lotes e fardos". O seletor `AlternarVisao` passou a aceitar outras opções além de Quadro/Lista.
+  - **Menu:** "Lotes e fardos" saiu (a lista virou a visão por lote do Estoque; `/lotes` redireciona para ela com a busca e os filtros) e **Saldo de estoque** continua no menu, agora em `/saldo`, com o saldo por lote separado em disponível, em análise, bloqueado e com divergência. A busca de texto livre e o "← Estoque" da página do lote levam à visão por lote.
+  - **Página do fardo** (`/fardos/LT26-0042-F03`): saldo, local, situação, os dormentes (em estoque e os que já saíram, com a inspeção de cada um e por onde saíram), origem e linha do tempo. A busca por código de fardo e os links de fardo levam a ela.
+  - **Página do lote** fica com origem e documentos, e a tabela de fardos do lote tem link para cada fardo.
+  - Serviço: `fardos.listar` devolve `FardoEstoque` e ganhou `fardos.obter` (`GET /fardos/{id}`, provisório); `estoque.listar` continua para a visão por lote. A linha do tempo virou o componente `LinhaTempo`.
+  - Arquivos: `src/pages/Estoque.tsx`, `src/pages/Saldo.tsx`, `src/pages/FardoDetalhe.tsx`, `src/components/Quadro.tsx`, `src/pages/LoteDetalhe.tsx`, `src/pages/Lotes.tsx`, `src/components/LinhaTempo.tsx`, `src/types/models.ts`, `src/services/contracts.ts`, `src/services/mock/index.ts`, `src/services/mock/estoque.ts`, `src/services/real/index.ts`, `src/services/endpoints.ts`, `src/utils/busca.ts`, `src/dominio/opcoes.ts`, `src/rotas.tsx`, `docs/CONTRATOS-API.md`, `docs/PRD.md`, `CLAUDE.md`.
 - 2026-10-28: **rastreio por dormente**: cada peça tem um ID e o sistema sabe em qual fardo ela está e por onde saiu.
   - **Por quê:** faltava rastreabilidade. O sistema guardava só quantas peças iam em cada fardo, não quais.
   - **Etiqueta:** o ID é o código da etiqueta impressa na inspeção (lote + sequência, `LT26-0042-0007`), pelo botão "Imprimir etiquetas das peças".

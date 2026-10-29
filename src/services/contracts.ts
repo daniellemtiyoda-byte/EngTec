@@ -1,5 +1,5 @@
 import type {
-  Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Dormente, Especie, Fardo, Fornecedor, Indicadores,
+  Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Dormente, Especie, FardoDetalhe, FardoEstoque, Fornecedor, Indicadores,
   ListQuery, LocalPatio, Lote, LoteDetalhe, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoRecebimento, NovoTamanho,
   DofPendente, FiltroMovimentacoes, InspecaoPeca, NovaFormacaoFardos, NovaInspecaoManual, Pendencia, SugestaoFardos, LinhaSaldoIbama, OpcaoSeparacao, Paginado, ParametrosNegocio, RelatorioMovimentacoes, Rme,
   ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, ResultadoRecebimento, SaldoEstoque,
@@ -61,10 +61,15 @@ export interface Servicos {
     /** Lançamento manual (RF06 sem o Inspector), registrando quem lançou. Só antes da conclusão da inspeção do lote. */
     lancar(loteCodigo: string, d: NovaInspecaoManual): Promise<InspecaoPeca[]>;
   };
-  fardos: ServicoLista<Fardo>;
+  /** Estoque por fardo (a unidade física do pátio). Filtros: `loteCodigo`, `situacao`, `estado`, `classe`, `categoria`, `acimaLimiteIdade`. */
+  fardos: ServicoLista<FardoEstoque> & {
+    /** Detalhe pelo código (ex. LT26-0042-F03): lote, dormentes, inspeção de cada peça e histórico. 404 se não existir. */
+    obter(codigo: string): Promise<FardoDetalhe>;
+  };
+  /** Saldo por lote, separado em disponível, em análise, bloqueado e com divergência (visão "Por lote" do Estoque). */
+  estoque: ServicoLista<SaldoEstoque>;
   /** Dormentes individuais (rastreio por peça), criados na formação dos fardos. Filtros: `loteCodigo`, `fardoCodigo`, `estado`. */
   dormentes: ServicoLista<Dormente>;
-  estoque: ServicoLista<SaldoEstoque>;
   movimentacoes: ServicoLista<Movimentacao> & {
     /** Transferência, perda ou ajuste. Perda e ajuste ficam pendentes e não alteram o saldo até a aprovação. */
     registrar(d: NovaMovimentacao): Promise<Movimentacao>;

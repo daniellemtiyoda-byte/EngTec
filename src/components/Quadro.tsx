@@ -85,13 +85,17 @@ export function Cartao({ destaque, children, acoes }: { destaque?: 'critico' | '
   );
 }
 
-/** Alternância Quadro / Lista; a escolha fica no endereço (?visao=). */
-export function AlternarVisao({ visao, aoMudar }: { visao: 'quadro' | 'lista'; aoMudar: (v: 'quadro' | 'lista') => void }) {
+const QUADRO_LISTA = { quadro: 'Quadro', lista: 'Lista' };
+
+/** Alternância de visualização (Quadro / Lista, ou as `opcoes` passadas); a escolha fica no endereço (?visao=). */
+export function AlternarVisao<V extends string = keyof typeof QUADRO_LISTA>({ visao, aoMudar, opcoes = QUADRO_LISTA as Record<V, string> }: {
+  visao: V; aoMudar: (v: V) => void; opcoes?: Record<V, string>;
+}) {
   return (
     <div className="alternar-visao" role="group" aria-label="Visualização">
-      {(['quadro', 'lista'] as const).map((v) => (
+      {(Object.keys(opcoes) as V[]).map((v) => (
         <button key={v} type="button" className="alternar-opcao" aria-pressed={visao === v} onClick={() => aoMudar(v)}>
-          {v === 'quadro' ? 'Quadro' : 'Lista'}
+          {opcoes[v]}
         </button>
       ))}
     </div>

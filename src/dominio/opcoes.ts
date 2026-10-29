@@ -1,6 +1,6 @@
 import type { Documento, StatusRegistro } from '../types/models';
 import {
-  ETAPA_ENTRADA, ETAPA_INSPECAO, MOTIVO_PERDA, RESULTADO_INSPECAO, SITUACAO_LOTE, SITUACAO_MEDIDAS, SITUACAO_NF, SITUACAO_VOLUMETRIA, STATUS_REGISTRO, STATUS_RME, TIPO_MOVIMENTACAO, URGENCIA_RME, USO_ESPECIE,
+  ESTADO_FARDO, ETAPA_ENTRADA, ETAPA_INSPECAO, MOTIVO_PERDA, RESULTADO_INSPECAO, SITUACAO_LOTE, SITUACAO_MEDIDAS, SITUACAO_NF, SITUACAO_VOLUMETRIA, STATUS_REGISTRO, STATUS_RME, TIPO_MOVIMENTACAO, URGENCIA_RME, USO_ESPECIE,
   type Rotulos,
 } from './rotulos';
 
@@ -27,6 +27,9 @@ export const RESULTADO_INSPECAO_OPCOES = opcoesDe(RESULTADO_INSPECAO);
 export const RESULTADO_PECA_OPCOES = opcoesDe(RESULTADO_INSPECAO, ['aprovado', 'quarentena', 'reprovado']);
 export const ETAPA_INSPECAO_OPCOES = opcoesDe(ETAPA_INSPECAO);
 export const SITUACAO_LOTE_OPCOES = opcoesDe(SITUACAO_LOTE);
+/** Fardo só existe depois da inspeção: sem "aguardando inspeção". */
+export const SITUACAO_FARDO_OPCOES = opcoesDe(SITUACAO_LOTE, ['disponivel', 'quarentena', 'reprovado', 'bloqueado', 'divergente', 'sem_saldo']);
+export const ESTADO_FARDO_OPCOES = opcoesDe(ESTADO_FARDO);
 export const USO_OPCOES = opcoesDe(USO_ESPECIE);
 export const SITUACAO_MEDIDAS_OPCOES = opcoesDe(SITUACAO_MEDIDAS);
 export const SITUACAO_NF_OPCOES = opcoesDe(SITUACAO_NF);

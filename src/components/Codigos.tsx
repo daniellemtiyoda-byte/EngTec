@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { rotaDoCodigo } from '../utils/busca';
 
 /**
- * Códigos clicáveis nas tabelas: lote e fardo abrem a página do lote, RME e NF abrem a lista já filtrada.
+ * Códigos clicáveis nas tabelas: lote e fardo abrem a sua página, RME e NF abrem a lista já filtrada.
  * Texto que não é código conhecido aparece sem link.
  */
 export function CodigoLink({ codigo }: { codigo?: string }) {

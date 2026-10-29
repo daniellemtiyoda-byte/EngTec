@@ -72,7 +72,7 @@ export function criarServicosReais(): Servicos {
       formarFardos: (codigo, d) => post('lotes.formarFardos', d, codigo),
     },
     inspecoes: { ...servicoLista('inspecoes.listar'), lancar: (loteCodigo, d) => post('inspecoes.lancar', d, loteCodigo) },
-    fardos: servicoLista('fardos.listar'),
+    fardos: { ...servicoLista('fardos.listar'), obter: (codigo) => http(caminho('fardos.obter', codigo)) },
     dormentes: servicoLista('dormentes.listar'),
     estoque: servicoLista('estoque.listar'),
     movimentacoes: {

@@ -32,15 +32,16 @@
 | NF e DOF | Marcar DOF como declarado no Sinaflor | POST | /notas-fiscais/{id}/dof/declaracao |
 | Recebimento | Listar | GET | /recebimentos |
 | Recebimento | Confirmar (multipart: `dados` em JSON + `fotos`, várias) → `{ recebimento, lotes }` | POST | /recebimentos |
-| Lotes | Listar (lotes só nascem do recebimento) | GET | /lotes |
+| Lotes | Listar (lotes só nascem do recebimento). A tela pede os lotes ainda sem fardo com o filtro `fardos=0` | GET | /lotes |
 | Lotes | Detalhe pelo código: `{ lote, fardos, inspecoes, nf, recebimento, historico }` | GET | /lotes/{id} |
 | Inspeção | Resumo das inspeções vigentes e sugestão de fardos → `SugestaoFardos` | GET | /lotes/{id}/sugestao-fardos |
 | Inspeção | Concluir a inspeção e formar os fardos (`NovaFormacaoFardos`) → detalhe do lote | POST | /lotes/{id}/fardos |
 | Inspeção | Listar inspeções por peça (filtro `loteCodigo`) | GET | /inspecoes |
 | Inspeção | Lançar resultado manual (`{ quantidade, resultado, categoria? }`) → peças criadas | POST | /lotes/{id}/inspecoes |
-| Fardos | Listar (filtro `loteCodigo`) | GET | /fardos |
+| Estoque | Listar fardos com os dados do lote e a situação → `FardoEstoque` (filtros `loteCodigo`, `situacao`, `estado`, `classe`, `categoria`, `acimaLimiteIdade`) | GET | /fardos |
+| Estoque | Detalhe do fardo: `{ fardo, lote, dormentes, inspecoes, historico }` | GET | /fardos/{id} |
+| Estoque | Saldo por lote (`disponivel`, `emAnalise`, `bloqueado`, `divergente`), visão "Por lote" | GET | /estoque/saldos |
 | Fardos | Listar dormentes (filtros `loteCodigo`, `fardoCodigo`, `estado`) | GET | /dormentes |
-| Estoque | Consultar saldos | GET | /estoque/saldos |
 | Movimentações | Listar / Registrar (`transferencia`, `perda` ou `ajuste`; perda e ajuste por `fardoCodigo`, com `dormentes` e `motivo`) | GET / POST | /movimentacoes |
 | Movimentações | Aprovar ou rejeitar perda/ajuste (`{ aprovada, motivo? }`) | POST | /movimentacoes/{id}/decisao |
 | RME | Listar / Abrir | GET / POST | /rmes |
@@ -110,6 +111,7 @@ Os modelos de dados esperados estão em `src/types/models.ts`.
 - NF: o servidor recusa chave de acesso repetida (409, campo `chaveAcesso`) e NF repetida do mesmo fornecedor (mesmo número e série, 409, campo `numero`). Confirmar se o XML é validado (assinatura, schema) e guardado no servidor.
 - DOF: um por NF no MVP; volumes por espécie (`[{ especieId, volumeM3 }]`). Erros por campo usam `vol_<especieId>`.
 - Recebimento: `dados` = `{ nfId, itens: [{ itemId, quantidade }], avaria, observacao?, justificativa? }`. O servidor cria um lote por espécie + tamanho (código `LTaa-NNNN` sequencial por ano), em unidades e sem fardos (`etapaInspecao: 'aguardando'`, tudo em `emAnalise`), aplica as regras de fotos (divergência de quantidade ou avaria) e de justificativa (divergência de volume por espécie acima de 10%) e devolve erros por campo `item-<itemId>`, `fotos`, `justificativa`. Lotes de recebimento acima da tolerância ficam `estoqueStatus: 'divergente'`. Falta combinar como o lote é liberado depois.
+- Fardo (`GET /fardos`): cada item é o fardo com `especieDocumental`, `classe?`, `tamanho`, `nfNumero`, `fornecedor`, `recebidoEm` (entrada do lote, base do FIFO), `idadeDias`, `acimaLimiteIdade`, `emEstoque` (saldo > 0, para ordenar), `volumeM3` (do saldo) e `situacao` (`disponivel`, `quarentena`, `reprovado`, `bloqueado`, `divergente`, `sem_saldo`), calculada nesta ordem: sem saldo, lote com divergência de volume, `motivoBloqueio` (bloqueado), quarentena, reprovado, disponível. Detalhe (`GET /fardos/{codigo}`): `dormentes` que estão ou estiveram no fardo, `inspecoes` vigentes dessas peças e `historico` (formação do fardo e as movimentações com `fardoCodigo`). 404 quando o código não existe.
 - Rastreio por dormente: `Dormente` = `{ codigo (lote + sequência), loteCodigo, sequencia, fardoCodigo, resultado, categoria?, estado: 'em_estoque' | 'baixado', baixa?: { tipo: 'saida' | 'perda' | 'ajuste', referencia?, quando, usuario } }`, criado na formação dos fardos. O saldo de um fardo é sempre o número de dormentes em estoque nele. `GET /lotes/{codigo}` devolve `dormentes` do lote.
 - Separação: cada item traz `dormentes` (códigos, tantos quanto `quantidade`), livres no fardo; `opcoes-separacao` devolve `dormentesDisponiveis` e `dormentesSugeridos` (as primeiras sequências livres). Reserva por peça. `seguiuSugestao` compara fardos e quantidades, não as peças escolhidas dentro do fardo. A entrega baixa exatamente esses dormentes e a movimentação `saida` leva `dormentes`.
 - Perda e ajuste: `dormentes` obrigatório (um código por peça; `quantidade` = número de peças, negativa no ajuste que retira). Perda e ajuste negativo exigem peças em estoque no fardo; ajuste positivo só aceita peças do lote com baixa por perda ou ajuste, que voltam ao fardo. A aprovação recusa peça reservada em RME. Erro por campo `dormentes`.

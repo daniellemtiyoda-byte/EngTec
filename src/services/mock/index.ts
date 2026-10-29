@@ -1,14 +1,14 @@
 import type { Servicos } from '../contracts';
 import { TOLERANCIA_VOLUME_PCT } from '../../dominio/parametros';
 import type {
-  DofPendente, EventoLote, Fardo, Indicadores, Pendencia, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
+  DofPendente, EventoLote, Fardo, FardoEstoque, Indicadores, Pendencia, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
   TipoMovimentacao, Usuario,
 } from '../../types/models';
 import { data, pct, rotuloClasse } from '../../utils/format';
 import { chaveAcessoValida } from '../../utils/nfeXml';
 import { ApiError } from '../http';
 import { decidirMovimentacao, registrarPerdaAjuste } from './ajustes';
-import { situacaoDoLote } from './estoque';
+import { situacaoDoFardo, situacaoDoLote } from './estoque';
 import { rotuloGrupo } from '../../dominio/inspecao';
 import { formarFardos, lancarManual, sugestaoFardos, vigentes } from './inspecao';
 import { criarDados } from './data';
@@ -89,6 +89,23 @@ export function criarServicosSimulados(): Servicos {
     }
     return [...g].map(([k, x]) => `${k}: ${x.n} fardo(s), ${x.q} un.`).join(' · ');
   }
+
+  /** Fardo com os dados do lote de origem e a situação, calculados na consulta (no modo real, pelo servidor). */
+  function comLote(f: Fardo): FardoEstoque {
+    const l = comIdade(D.lotes.find((x) => x.codigo === f.loteCodigo)!);
+    return {
+      ...f, especieDocumental: l.especieDocumental, classe: l.classe, tamanho: l.tamanho, nfNumero: l.nfNumero, fornecedor: l.fornecedor,
+      recebidoEm: l.recebidoEm, idadeDias: l.idadeDias, acimaLimiteIdade: f.saldo > 0 && l.idadeDias > D.parametros.limiteIdadeDias,
+      situacao: situacaoDoFardo(f, l), emEstoque: f.saldo > 0, volumeM3: (l.volumeCalculadoM3 / l.quantidade) * f.saldo,
+    };
+  }
+
+  const TITULO_MOVIMENTACAO: Record<TipoMovimentacao, string> = { entrada: 'Entrada no estoque', saida: 'Saída por RME', transferencia: 'Transferência', perda: 'Perda', ajuste: 'Ajuste de saldo' };
+  /** Movimentação como evento da linha do tempo do lote ou do fardo. */
+  const eventoDaMovimentacao = (m: Movimentacao): EventoLote => ({
+    quando: m.dataHora, tipo: m.tipo, titulo: `${TITULO_MOVIMENTACAO[m.tipo]}${m.fardoCodigo ? ` · ${m.fardoCodigo}` : ''}`, usuario: m.usuario, referencia: m.referencia, status: m.status,
+    detalhe: `${m.tipo === 'ajuste' && m.quantidade > 0 ? '+' : ''}${m.quantidade} un. · ${m.origem} → ${m.destino}${m.motivo ? ` · ${m.motivo}` : ''}${m.dormentes?.length ? ` · dormentes ${m.dormentes.map((d) => d.slice(-4)).join(', ')}` : ''}`,
+  });
 
   const servicos: Servicos = {
     auth: {
@@ -235,7 +252,7 @@ export function criarServicosSimulados(): Servicos {
           ...vencidas.map((r) => ({ id: `al-rme-${r.id}`, nivel: 'critico' as const, titulo: `RME ${r.numero} com data limite vencida`, descricao: `Destinatário: ${r.destinatario}. Ainda não entregue.`, link: '/rme' })),
           ...urgentes.map((r) => ({ id: `al-urg-${r.id}`, nivel: 'critico' as const, titulo: `RME urgente ${r.numero}`, descricao: `${r.destinatario}: data limite ${data(r.dataLimite)}.`, link: '/rme' })),
           ...se(aConferir, { id: 'al-conferir', nivel: 'atencao' as const, titulo: `${aConferir} RME aguardando conferência`, descricao: 'A entrega e a baixa só acontecem após a conferência do supervisor.', link: '/rme' }),
-          ...se(velhos, { id: 'al-idade', nivel: 'atencao' as const, titulo: `${velhos} lote(s) acima de ${p.limiteIdadeDias} dias em estoque`, descricao: `Limite ${p.provisorio ? 'provisório ' : ''}definido em Configurações.`, link: '/lotes' }),
+          ...se(velhos, { id: 'al-idade', nivel: 'atencao' as const, titulo: `${velhos} lote(s) acima de ${p.limiteIdadeDias} dias em estoque`, descricao: `Limite ${p.provisorio ? 'provisório ' : ''}definido em Configurações.`, link: '/estoque?visao=lote&acimaLimiteIdade=true' }),
           ...se(aguardando, { id: 'al-inspecao', nivel: 'atencao' as const, titulo: `${aguardando} lote(s) aguardando inspeção`, descricao: 'Material fora do estoque disponível até a inspeção e a formação dos fardos.', link: '/inspecao' }),
           ...se(pendentesAprov, { id: 'al-aprovar', nivel: 'atencao' as const, titulo: `${pendentesAprov} perda/ajuste aguardando aprovação`, descricao: 'O saldo só muda após a aprovação do supervisor ou gestor.', link: '/movimentacoes' }),
           ...se(semDof, { id: 'al-sem-dof', nivel: 'atencao' as const, titulo: `${semDof} NF aguardando DOF`, descricao: 'O recebimento não avança sem o DOF cadastrado.', link: '/notas' }),
@@ -324,7 +341,6 @@ export function criarServicosSimulados(): Servicos {
         const nf = D.notas.find((n) => n.numero === l.nfNumero && n.fornecedor === l.fornecedor);
         const recebimento = nf && D.recebimentos.find((r) => r.nfId === nf.id);
         const fardos = D.fardos.filter((f) => f.loteCodigo === l.codigo).sort((a, b) => a.sequencia - b.sequencia);
-        const titulos: Record<string, string> = { entrada: 'Entrada no estoque', saida: 'Saída por RME', transferencia: 'Transferência', perda: 'Perda', ajuste: 'Ajuste de saldo' };
         const historico: EventoLote[] = [
           ...(nf ? [{ quando: `${nf.emissao}T12:00:00-03:00`, tipo: 'nf' as const, titulo: `NF ${nf.numero} emitida`, detalhe: `${nf.fornecedor} · ${nf.origem === 'xml' ? 'importada do XML' : 'cadastro manual'}`, referencia: `NF ${nf.numero}` }] : []),
           ...(recebimento ? [{
@@ -336,10 +352,7 @@ export function criarServicosSimulados(): Servicos {
             detalhe: resumoFardos(fardos),
           }] : []),
           ...(nf?.dof?.declaradoEm ? [{ quando: nf.dof.declaradoEm, tipo: 'declaracao' as const, titulo: `DOF ${nf.dof.numero} declarado no Sinaflor`, usuario: nf.dof.declaradoPor }] : []),
-          ...D.movimentacoes.filter((m) => m.loteCodigo === l.codigo && m.tipo !== 'entrada').map((m) => ({
-            quando: m.dataHora, tipo: m.tipo, titulo: `${titulos[m.tipo]}${m.fardoCodigo ? ` · ${m.fardoCodigo}` : ''}`, usuario: m.usuario, referencia: m.referencia, status: m.status,
-            detalhe: `${m.tipo === 'ajuste' && m.quantidade > 0 ? '+' : ''}${m.quantidade} un. · ${m.origem} → ${m.destino}${m.motivo ? ` · ${m.motivo}` : ''}${m.dormentes?.length ? ` · dormentes ${m.dormentes.map((d) => d.slice(-4)).join(', ')}` : ''}`,
-          })),
+          ...D.movimentacoes.filter((m) => m.loteCodigo === l.codigo && m.tipo !== 'entrada').map(eventoDaMovimentacao),
         ].sort((a, b) => a.quando.localeCompare(b.quando));
         const inspecoes = D.inspecoes.filter((x) => x.loteCodigo === l.codigo)
           .sort((a, b) => Number(b.vigente) - Number(a.vigente) || a.sequencia - b.sequencia || b.inspecionadoEm.localeCompare(a.inspecionadoEm));
@@ -354,16 +367,34 @@ export function criarServicosSimulados(): Servicos {
       },
     },
     dormentes: { listar: (q) => paginar(D.dormentes, q) },
-    inspecoes: {
-      listar: (q) => paginar(D.inspecoes, q),
-      lancar: async (loteCodigo, d) => { await atraso(500); return lancarManual(D, loteCodigo, d, agora()); },
-    },
-    fardos: { listar: (q) => paginar(D.fardos, q) },
     estoque: {
       listar: (q) => paginar(D.saldos.map((s) => {
         const l = comIdade(D.lotes.find((x) => x.codigo === s.loteCodigo)!);
         return { ...s, idadeDias: l.idadeDias, acimaLimiteIdade: l.acimaLimiteIdade };
       }), q),
+    },
+    inspecoes: {
+      listar: (q) => paginar(D.inspecoes, q),
+      lancar: async (loteCodigo, d) => { await atraso(500); return lancarManual(D, loteCodigo, d, agora()); },
+    },
+    fardos: {
+      listar: (q) => paginar(D.fardos.map(comLote), q),
+      obter: async (codigo) => {
+        await simularRede();
+        const f = D.fardos.find((x) => x.codigo.toLowerCase() === codigo.trim().toLowerCase());
+        if (!f) throw new ApiError(404, `Fardo ${codigo} não encontrado.`);
+        const lote = comIdade(D.lotes.find((l) => l.codigo === f.loteCodigo)!);
+        const dormentes = D.dormentes.filter((d) => d.fardoCodigo === f.codigo).sort((a, b) => a.sequencia - b.sequencia);
+        const codigos = new Set(dormentes.map((d) => d.codigo));
+        const historico: EventoLote[] = [
+          {
+            quando: f.formadoEm, tipo: 'inspecao' as const, titulo: `Fardo formado com ${f.quantidadeInicial} dormente(s)`, usuario: f.formadoPor,
+            detalhe: `${rotuloGrupo(f)} · ${f.local}${f.motivoBloqueio ? ` · ${f.motivoBloqueio}` : ''}`,
+          },
+          ...D.movimentacoes.filter((m) => m.fardoCodigo === f.codigo).map(eventoDaMovimentacao),
+        ].sort((a, b) => a.quando.localeCompare(b.quando));
+        return { fardo: comLote(f), lote, dormentes, inspecoes: D.inspecoes.filter((x) => x.vigente && codigos.has(x.codigoPeca)), historico };
+      },
     },
     movimentacoes: {
       listar: (q) => paginar(D.movimentacoes, q),
