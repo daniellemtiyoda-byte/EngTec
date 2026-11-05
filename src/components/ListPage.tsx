@@ -30,6 +30,8 @@ interface Props<T> {
   titulo: string;
   descricao?: string;
   aviso?: ReactNode;
+  /** Formulário de inclusão em linha (FormLinha), logo abaixo do título, como nos cadastros. */
+  inclusao?: ReactNode;
   /** Totais logo abaixo do título (ex.: cartões do saldo de estoque). */
   resumo?: ReactNode;
   listar: (q: ListQuery) => Promise<Paginado<T>>;
@@ -140,6 +142,7 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
   return (
     <section className="painel">
       <PageHeader titulo={p.titulo} descricao={p.descricao} acoes={p.acoes} nivel={p.secao ? 2 : 1} />
+      {p.inclusao}
       {p.resumo}
       {p.aviso}
       <div className="toolbar">

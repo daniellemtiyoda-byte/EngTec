@@ -54,6 +54,14 @@ export interface Fornecedor {
   status: StatusRegistro;
 }
 
+/** CNPJ só com os 14 dígitos ou formatado; o sistema guarda formatado. */
+export interface NovoFornecedor {
+  razaoSocial: string;
+  cnpj: string;
+  cidadeUf: string;
+  status: StatusRegistro;
+}
+
 export interface Documento {
   id: string;
   tipo: 'NF-e' | 'DOF' | 'Romaneio' | 'Laudo';
@@ -77,10 +85,16 @@ export interface Especie {
   lotesAtivos: number;
 }
 
-/** `classe: null` volta a classe para "a definir". */
+/** `classe: null` volta a classe para "a definir". O nome científico não muda depois do cadastro (os lotes guardam a espécie declarada). */
 export interface AtualizacaoEspecie {
   classe: Classe | null;
   uso: UsoEspecie;
+  observacao?: string;
+}
+
+/** O número na lista é dado pelo sistema (o próximo da lista). */
+export interface NovaEspecie extends AtualizacaoEspecie {
+  nomeCientifico: string;
 }
 
 export type SituacaoMedidas = 'provisorio' | 'confirmado';
@@ -691,6 +705,14 @@ export interface LocalPatio {
   capacidade: number;
   ocupacao: number;
   status: 'liberado' | 'bloqueado' | 'em_inventario';
+}
+
+/** "Em inventário" é dado pelo inventário, não pelo cadastro. */
+export interface NovoLocalPatio {
+  codigo: string;
+  descricao: string;
+  capacidade: number;
+  status: 'liberado' | 'bloqueado';
 }
 
 export interface Transferencia {

@@ -1,6 +1,6 @@
 import type {
   Alerta, AtualizacaoEspecie, ContagemInventario, Documento, DivergenciaInventario, Dormente, Especie, FardoDetalhe, FardoEstoque, Fornecedor, Indicadores,
-  ListQuery, LocalPatio, Lote, LoteDetalhe, Movimentacao, NotaFiscal, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoRecebimento, NovoTamanho,
+  ListQuery, LocalPatio, Lote, LoteDetalhe, Movimentacao, NotaFiscal, NovaEspecie, NovaMovimentacao, NovaNf, NovaRme, NovaSeparacao, NovoDof, NovoFornecedor, NovoLocalPatio, NovoRecebimento, NovoTamanho,
   DofPendente, FiltroMovimentacoes, InspecaoPeca, NovaFormacaoFardos, NovaInspecaoManual, Pendencia, SugestaoFardos, LinhaSaldoIbama, OpcaoSeparacao, Paginado, ParametrosNegocio, RelatorioMovimentacoes, Rme,
   ProcessamentoImagem, Recebimento, RegistroAuditoria, Relatorio, ResultadoConexao, ResultadoRecebimento, SaldoEstoque,
   SessaoInventario, SolicitacaoExportacao, Tamanho, Transferencia, Usuario, VolumetriaLote,
@@ -27,7 +27,11 @@ export interface Servicos {
     /** "Para fazer agora" do usuário logado (tela inicial por papel). */
     pendencias(): Promise<Pendencia[]>;
   };
-  fornecedores: ServicoLista<Fornecedor>;
+  /** Fornecedores ficam inativos (status bloqueado), nunca são apagados: as NFs antigas apontam para eles. */
+  fornecedores: ServicoLista<Fornecedor> & {
+    cadastrar(d: NovoFornecedor): Promise<Fornecedor>;
+    atualizar(id: string, d: NovoFornecedor): Promise<Fornecedor>;
+  };
   documentos: ServicoLista<Documento>;
   notas: ServicoLista<NotaFiscal> & {
     /** `xml`: arquivo da NF-e importada, guardado junto do registro (RF02). Chave de acesso repetida é recusada. */
@@ -96,7 +100,12 @@ export interface Servicos {
   visao: ServicoLista<ProcessamentoImagem> & {
     enviarImagem(arquivo: File): Promise<ProcessamentoImagem>;
   };
-  patio: ServicoLista<LocalPatio> & { transferencias: ServicoLista<Transferencia> };
+  /** Endereços do pátio (RF10, RF27). Endereço em inventário não é alterado pelo cadastro. */
+  patio: ServicoLista<LocalPatio> & {
+    transferencias: ServicoLista<Transferencia>;
+    cadastrar(d: NovoLocalPatio): Promise<LocalPatio>;
+    atualizar(id: string, d: NovoLocalPatio): Promise<LocalPatio>;
+  };
   relatorios: ServicoLista<Relatorio> & {
     solicitarExportacao(relatorioId: string, formato: string): Promise<SolicitacaoExportacao>;
     /** Saldo físico em m³ por espécie (nome científico) e dimensão, para conferir com o DOF (RF32). */
@@ -110,7 +119,10 @@ export interface Servicos {
     atualizar(d: Omit<ParametrosNegocio, 'provisorio'>): Promise<ParametrosNegocio>;
   };
   auditoria: ServicoLista<RegistroAuditoria>;
-  especies: ServicoLista<Especie> & { atualizar(id: string, d: AtualizacaoEspecie): Promise<Especie> };
+  especies: ServicoLista<Especie> & {
+    cadastrar(d: NovaEspecie): Promise<Especie>;
+    atualizar(id: string, d: AtualizacaoEspecie): Promise<Especie>;
+  };
   tamanhos: ServicoLista<Tamanho> & {
     cadastrar(d: NovoTamanho): Promise<Tamanho>;
     atualizar(id: string, d: NovoTamanho): Promise<Tamanho>;

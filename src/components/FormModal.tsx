@@ -20,6 +20,24 @@ export interface Campo {
   multiplo?: boolean;
 }
 
+/** Validação básica dos campos (obrigatório, número, mínimo e máximo), usada pelo FormModal e pelo FormLinha. */
+export function validarCampos(campos: Campo[], valores: Record<string, string>): Record<string, string> {
+  const e: Record<string, string> = {};
+  for (const c of campos) {
+    const v = (valores[c.nome] ?? '').trim();
+    if (!v) { if (c.obrigatorio) e[c.nome] = 'Campo obrigatório.'; continue; }
+    if (c.tipo === 'number') {
+      // Mesma conversão que a tela usa no envio: o valor validado é o valor enviado.
+      const n = paraNumero(v, c.inteiro);
+      if (Number.isNaN(n)) e[c.nome] = c.inteiro ? 'Informe um número inteiro (ex.: 1000 ou 1.000).' : 'Informe um número válido (ex.: 2,8).';
+      else if (c.inteiro && !Number.isInteger(n)) e[c.nome] = 'Informe um número inteiro.';
+      else if (c.min !== undefined && n < c.min) e[c.nome] = `O valor mínimo é ${c.min}.`;
+      else if (c.max !== undefined && n > c.max) e[c.nome] = `O valor máximo é ${c.max}.`;
+    }
+  }
+  return e;
+}
+
 interface Props {
   titulo: string;
   campos: Campo[];
@@ -59,22 +77,7 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
     setValores((v) => ({ ...v, [c.nome]: erro ? '' : fs.map((f) => f.name).join(', ') }));
   }
 
-  function validarCampos(): Record<string, string> {
-    const e: Record<string, string> = {};
-    for (const c of campos) {
-      const v = (valores[c.nome] ?? '').trim();
-      if (!v) { if (c.obrigatorio) e[c.nome] = 'Campo obrigatório.'; continue; }
-      if (c.tipo === 'number') {
-        // Mesma conversão que a tela usa no envio: o valor validado é o valor enviado.
-        const n = paraNumero(v, c.inteiro);
-        if (Number.isNaN(n)) e[c.nome] = c.inteiro ? 'Informe um número inteiro (ex.: 1000 ou 1.000).' : 'Informe um número válido (ex.: 2,8).';
-        else if (c.inteiro && !Number.isInteger(n)) e[c.nome] = 'Informe um número inteiro.';
-        else if (c.min !== undefined && n < c.min) e[c.nome] = `O valor mínimo é ${c.min}.`;
-        else if (c.max !== undefined && n > c.max) e[c.nome] = `O valor máximo é ${c.max}.`;
-      }
-    }
-    return { ...e, ...(validar ? validar(valores) : {}) };
-  }
+  const validarTudo = () => ({ ...validarCampos(campos, valores), ...(validar ? validar(valores) : {}) });
 
   async function enviar(v: Record<string, string>) {
     setEnviando(true);
@@ -94,7 +97,7 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
 
   function aoSubmeter(ev: React.FormEvent) {
     ev.preventDefault();
-    const e = validarCampos();
+    const e = validarTudo();
     setErros(e);
     if (Object.keys(e).length) return;
     const msg = confirmacao?.(valores);

@@ -55,6 +55,11 @@ export const rotuloCategoria = (c?: number) => (c ? `Categoria ${c}` : 'Categori
 export const classeCategoria = (classe?: string, categoria?: number) =>
   [classe && rotuloClasse(classe), categoria && rotuloCategoria(categoria)].filter(Boolean).join(' · ');
 export const dias = (n: number) => `${NUMERO.format(Math.round(n))} ${Math.round(n) === 1 ? 'dia' : 'dias'}`;
+/** CNPJ com 14 dígitos no formato 00.000.000/0000-00; outro texto volta como veio. */
+export function cnpjFormatado(c: string): string {
+  const d = c.replace(/\D/g, '');
+  return d.length === 14 ? d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : c.trim();
+}
 export const cm = (v: number) => `${NUMERO.format(v)} cm`;
 
 /**

@@ -412,3 +412,34 @@ a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
 .como-funciona summary::before { content: 'i'; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor; font: italic 700 12px/1 Georgia, serif; }
 .como-funciona[open] summary { margin-bottom: 8px; }
 .como-funciona-texto { background: var(--azul-100); border-left: 4px solid var(--azul-600); border-radius: var(--raio); padding: 10px 12px; }
+
+/* Cartão com abas na lateral (Cadastros) */
+.painel-abas { display: grid; grid-template-columns: 220px minmax(0, 1fr); background: var(--branco); border: 1px solid var(--cinza-200); border-radius: 10px; overflow: hidden; }
+.painel-abas-menu { display: flex; flex-direction: column; gap: 2px; padding: 12px 10px; background: var(--cinza-50); border-right: 1px solid var(--cinza-200); }
+.painel-aba { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: none; border: 0; border-radius: var(--raio); padding: 10px 12px; cursor: pointer; font: inherit; color: var(--texto-mudo); }
+.painel-aba:hover { background: var(--cinza-100); color: var(--texto); }
+.painel-aba[aria-selected='true'] { background: var(--branco); color: var(--azul-800); font-weight: 700; box-shadow: 0 1px 3px rgba(15, 33, 66, .12), inset 3px 0 0 var(--laranja); }
+.painel-aba-total { font-size: 12px; font-weight: 600; color: var(--texto-mudo); min-width: 22px; text-align: right; }
+.painel-abas-conteudo { padding: 22px 24px; min-width: 0; }
+/* A lista dentro do cartão não repete borda e espaçamento do cartão. */
+.painel-abas-conteudo > .painel { border: 0; padding: 0; border-radius: 0; }
+/* Nos cadastros a ação da linha é um link discreto ("Editar"), como numa tabela de configuração. */
+.painel-abas-conteudo .tabela .acoes-linha > .btn-sec { background: none; border-color: transparent; color: var(--azul-600); padding: 4px 8px; }
+.painel-abas-conteudo .tabela .acoes-linha > .btn-sec:hover { background: var(--azul-100); text-decoration: underline; }
+
+/* Inclusão em linha acima da tabela de um cadastro */
+.form-linha { display: flex; flex-direction: column; gap: 8px; }
+.form-linha-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: start; }
+.form-linha .campo { margin: 0; }
+.form-linha .campo input, .form-linha .campo select { padding: 10px 12px; }
+.form-linha-campos > .btn { white-space: nowrap; padding: 10px 16px; }
+.form-linha-legenda { margin: 0; font-size: 13px; }
+
+@media (max-width: 760px) {
+  .painel-abas { grid-template-columns: 1fr; }
+  .painel-abas-menu { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--cinza-200); padding: 8px; }
+  .painel-aba { white-space: nowrap; flex: none; }
+  .painel-abas-conteudo { padding: 14px; }
+  .form-linha-campos { grid-template-columns: 1fr; }
+  .form-linha-campos > .btn { padding: 12px; font-size: 15px; }
+}

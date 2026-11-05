@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BadgeDe } from '../components/Badge';
 import { Aviso } from '../components/Estados';
+import { FormLinha } from '../components/FormLinha';
 import { FormModal, type Campo } from '../components/FormModal';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { useToast } from '../components/Toast';
@@ -20,6 +21,9 @@ const CAMPOS: Campo[] = [
   { nome: 'medidas', rotulo: 'Medidas', tipo: 'select', obrigatorio: true, opcoes: SITUACAO_MEDIDAS_OPCOES, ajuda: 'Marque "Confirmado" só depois da confirmação da CPTM.' },
 ];
 
+/** Na inclusão em linha as ajudas viram o texto do campo vazio, então ficam curtas. */
+const CAMPOS_INCLUSAO: Campo[] = CAMPOS.map((c) => ({ ...c, ajuda: c.nome === 'codigo' ? 'ex.: T4' : undefined }));
+
 const paraTamanho = (v: Record<string, string>): NovoTamanho => ({
   codigo: v.codigo.trim().toUpperCase(), larguraCm: paraNumero(v.larguraCm), alturaCm: paraNumero(v.alturaCm), comprimentoCm: paraNumero(v.comprimentoCm),
   medidas: v.medidas as SituacaoMedidas,
@@ -28,12 +32,12 @@ const paraTamanho = (v: Record<string, string>): NovoTamanho => ({
 const paraTexto = (n: number) => String(n).replace('.', ',');
 
 /** Aba Tamanhos da tela Cadastros. */
-export default function Tamanhos() {
+export default function Tamanhos({ aoAlterar }: { aoAlterar?: () => void }) {
   const { pode } = useAuth();
   const notificar = useToast();
-  const [novo, setNovo] = useState(false);
   const [editar, setEditar] = useState<Tamanho | null>(null);
   const [rec, setRec] = useState(0);
+  const alterou = () => { setRec((x) => x + 1); aoAlterar?.(); };
 
   const colunas: Coluna<Tamanho>[] = [
     { chave: 'codigo', titulo: 'Código', ordenavel: true },
@@ -55,17 +59,18 @@ export default function Tamanhos() {
         colunas={colunas}
         filtros={[{ chave: 'medidas', rotulo: 'Medidas', opcoes: SITUACAO_MEDIDAS_OPCOES }]}
         semBusca
-        acoes={pode('cadastros:editar') ? <button className="btn btn-pri" onClick={() => setNovo(true)}>Cadastrar tamanho</button> : undefined}
+        inclusao={pode('cadastros:editar') && (
+          <FormLinha
+            campos={CAMPOS_INCLUSAO} rotuloEnviar="Adicionar tamanho" iniciais={{ medidas: 'provisorio' }}
+            legenda={<>Medidas em centímetros; o volume em m³ por dormente é calculado pelo sistema. · Provisório: aguarda confirmação da CPTM · Confirmado: medida oficial.</>}
+            aoEnviar={async (v) => {
+              const t = await servicos.tamanhos.cadastrar(paraTamanho(v));
+              notificar('sucesso', `Tamanho ${t.codigo} cadastrado: ${m3(t.volumeM3)} por dormente${SUFIXO_SIMULADO}.`);
+              alterou();
+            }}
+          />
+        )}
         acoesLinha={pode('cadastros:editar') ? [{ rotulo: 'Editar', aoClicar: setEditar }] : undefined}
-      />
-      <FormModal
-        titulo="Cadastrar tamanho" aberto={novo} aoFechar={() => setNovo(false)} rotuloEnviar="Cadastrar" campos={CAMPOS}
-        iniciais={{ medidas: 'provisorio' }}
-        aoEnviar={async (v) => {
-          const t = await servicos.tamanhos.cadastrar(paraTamanho(v));
-          notificar('sucesso', `Tamanho ${t.codigo} cadastrado: ${m3(t.volumeM3)} por dormente${SUFIXO_SIMULADO}.`);
-          setRec((x) => x + 1);
-        }}
       />
       <FormModal
         titulo={editar ? `Editar tamanho ${editar.codigo}` : 'Editar tamanho'} aberto={!!editar} aoFechar={() => setEditar(null)} campos={CAMPOS}
@@ -75,7 +80,7 @@ export default function Tamanhos() {
         aoEnviar={async (v) => {
           const t = await servicos.tamanhos.atualizar(editar!.id, paraTamanho(v));
           notificar('sucesso', `Tamanho ${t.codigo} atualizado: ${m3(t.volumeM3)} por dormente${SUFIXO_SIMULADO}.`);
-          setRec((x) => x + 1);
+          alterou();
         }}
       />
     </>

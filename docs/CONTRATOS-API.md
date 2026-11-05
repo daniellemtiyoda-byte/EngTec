@@ -25,6 +25,8 @@
 | Dashboard | Alertas | GET | /dashboard/alertas |
 | Dashboard | Pendências do usuário logado ("Para fazer agora") | GET | /dashboard/pendencias |
 | Fornecedores | Listar | GET | /fornecedores |
+| Fornecedores | Cadastrar (`{ razaoSocial, cnpj, cidadeUf, status }`; CNPJ repetido é recusado com 409) | POST | /fornecedores |
+| Fornecedores | Atualizar (mesmo corpo; inativar = `status: 'bloqueado'`, nunca apagar) | PATCH | /fornecedores/{id} |
 | Documentos | Listar (só leitura) | GET | /documentos |
 | NF e DOF | Listar notas fiscais | GET | /notas-fiscais |
 | NF e DOF | Cadastrar NF (multipart: `dados` em JSON + `xml` opcional) | POST | /notas-fiscais |
@@ -57,6 +59,8 @@
 | Visão computacional | Enviar imagem (multipart, campo `arquivo`) | POST | /visao-computacional/imagens |
 | Pátio | Localizações | GET | /patio/locais |
 | Pátio | Transferências | GET | /patio/transferencias |
+| Pátio | Cadastrar endereço (`{ codigo, descricao, capacidade, status: 'liberado' \| 'bloqueado' }`; código repetido = 409) | POST | /patio/locais |
+| Pátio | Atualizar endereço (mesmo corpo; recusado com o endereço em inventário ou capacidade abaixo da ocupação) | PATCH | /patio/locais/{id} |
 | Relatórios | Listar | GET | /relatorios |
 | Relatórios | Solicitar exportação | POST | /relatorios/{id}/exportacoes |
 | Relatórios | Saldo em m³ por espécie e dimensão (IBAMA) | GET | /relatorios/ibama/saldo |
@@ -65,7 +69,8 @@
 | Configurações | Parâmetros de negócio / atualizar | GET / PATCH | /parametros |
 | Auditoria | Consultar histórico | GET | /auditoria |
 | Espécies | Listar | GET | /especies |
-| Espécies | Atualizar classe e uso (`{ classe: string \| null, uso: 'via' \| 'AMV' }`) | PATCH | /especies/{id} |
+| Espécies | Cadastrar (`{ nomeCientifico, classe: string \| null, uso, observacao? }`; o número na lista é dado pelo servidor; nome repetido = 409) | POST | /especies |
+| Espécies | Atualizar classe, uso e observação (`{ classe: string \| null, uso: 'via' \| 'AMV', observacao? }`; o nome não muda) | PATCH | /especies/{id} |
 | Tamanhos | Listar / Cadastrar | GET / POST | /tamanhos |
 | Tamanhos | Atualizar medidas | PATCH | /tamanhos/{id} |
 | Controle volumétrico | Listar por lote | GET | /volumetria/lotes |

@@ -33,7 +33,7 @@ export default function Patio() {
 
   return (
     <>
-      <PageHeader titulo="Pátio de armazenamento" descricao="Localizações e transferências. Alterações de localização são feitas pelas movimentações." />
+      <PageHeader titulo="Pátio de armazenamento" descricao="Localizações e transferências. Alterações de localização são feitas pelas movimentações; os endereços são cadastrados em Cadastros › Endereços." />
       <ListPage<LocalPatio> secao titulo="Localizações" listar={(q) => servicos.patio.listar(q)} colunas={locais} filtros={[{ chave: 'status', rotulo: 'Situação', opcoes: opcoesDe(STATUS_PATIO) }]} />
       <ListPage<Transferencia> secao titulo="Transferências" listar={(q) => servicos.patio.transferencias.listar(q)} colunas={transf} />
     </>

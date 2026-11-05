@@ -56,7 +56,11 @@ export function criarServicosReais(): Servicos {
       alertas: () => http(caminho('dashboard.alertas')),
       pendencias: () => http(caminho('dashboard.pendencias')),
     },
-    fornecedores: servicoLista('fornecedores.listar'),
+    fornecedores: {
+      ...servicoLista('fornecedores.listar'),
+      cadastrar: (d) => post('fornecedores.cadastrar', d),
+      atualizar: (id, d) => patch('fornecedores.atualizar', id, d),
+    },
     documentos: servicoLista('documentos.listar'),
     notas: {
       ...servicoLista('notas.listar'),
@@ -96,7 +100,12 @@ export function criarServicosReais(): Servicos {
       divergencias: (id, q) => lista('inventario.divergencias', q, id),
     },
     visao: { ...servicoLista('visao.listar'), enviarImagem: (a) => enviarArquivo('visao.enviarImagem', a) },
-    patio: { ...servicoLista('patio.listar'), transferencias: servicoLista('patio.transferencias') },
+    patio: {
+      ...servicoLista('patio.listar'),
+      transferencias: servicoLista('patio.transferencias'),
+      cadastrar: (d) => post('patio.cadastrar', d),
+      atualizar: (id, d) => patch('patio.atualizar', id, d),
+    },
     relatorios: {
       ...servicoLista('relatorios.listar'),
       solicitarExportacao: (id, formato) => post('relatorios.exportar', { formato }, id),
@@ -109,7 +118,11 @@ export function criarServicosReais(): Servicos {
       atualizar: (d) => http(caminho('parametros.atualizar'), { metodo: 'PATCH', corpo: d }),
     },
     auditoria: servicoLista('auditoria.listar'),
-    especies: { ...servicoLista('especies.listar'), atualizar: (id, d) => patch('especies.atualizar', id, d) },
+    especies: {
+      ...servicoLista('especies.listar'),
+      cadastrar: (d) => post('especies.cadastrar', d),
+      atualizar: (id, d) => patch('especies.atualizar', id, d),
+    },
     tamanhos: {
       ...servicoLista('tamanhos.listar'),
       cadastrar: (d) => post('tamanhos.cadastrar', d),

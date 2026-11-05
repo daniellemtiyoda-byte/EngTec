@@ -1,10 +1,10 @@
 import type { Servicos } from '../contracts';
 import { TOLERANCIA_VOLUME_PCT } from '../../dominio/parametros';
 import type {
-  DofPendente, EventoLote, Fardo, FardoEstoque, Indicadores, Pendencia, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
+  DofPendente, EventoLote, Fardo, FardoEstoque, Indicadores, Pendencia, ItemNf, LinhaSaldoIbama, Lote, Movimentacao, NotaFiscal, NovaEspecie, NovoFornecedor, NovoLocalPatio, NovoTamanho, ProcessamentoImagem, SessaoInventario, Tamanho,
   TipoMovimentacao, Usuario,
 } from '../../types/models';
-import { data, pct, rotuloClasse } from '../../utils/format';
+import { cnpjFormatado, data, pct, rotuloClasse } from '../../utils/format';
 import { chaveAcessoValida } from '../../utils/nfeXml';
 import { ApiError } from '../http';
 import { decidirMovimentacao, registrarPerdaAjuste } from './ajustes';
@@ -26,6 +26,18 @@ export function criarServicosSimulados(): Servicos {
   function validarTamanho(n: NovoTamanho, id?: string) {
     if (D.tamanhos.some((t) => t.id !== id && t.codigo.toLowerCase() === n.codigo.toLowerCase())) {
       throw new ApiError(409, 'Já existe um tamanho com este código.', { codigo: 'Código já utilizado.' });
+    }
+  }
+  function validarFornecedor(n: NovoFornecedor, id?: string) {
+    const cnpj = n.cnpj.replace(/\D/g, '');
+    if (cnpj.length !== 14) throw new ApiError(422, 'Confira o CNPJ.', { cnpj: 'O CNPJ tem 14 dígitos.' });
+    if (D.fornecedores.some((f) => f.id !== id && f.cnpj.replace(/\D/g, '') === cnpj)) {
+      throw new ApiError(409, 'Já existe um fornecedor com este CNPJ.', { cnpj: 'CNPJ já cadastrado.' });
+    }
+  }
+  function validarLocal(n: NovoLocalPatio, id?: string) {
+    if (D.locaisPatio.some((l) => l.id !== id && l.codigo.toLowerCase() === n.codigo.trim().toLowerCase())) {
+      throw new ApiError(409, 'Já existe um endereço com este código.', { codigo: 'Código já utilizado.' });
     }
   }
   /** Ações registradas em nome de quem entrou (no login simulado, o perfil escolhido). */
@@ -261,7 +273,24 @@ export function criarServicosSimulados(): Servicos {
         ];
       },
     },
-    fornecedores: { listar: (q) => paginar(D.fornecedores, q) },
+    fornecedores: {
+      listar: (q) => paginar(D.fornecedores, q),
+      cadastrar: async (n) => {
+        await atraso(500);
+        validarFornecedor(n);
+        const f = { id: novoId('f'), razaoSocial: n.razaoSocial.trim(), cnpj: cnpjFormatado(n.cnpj), cidadeUf: n.cidadeUf.trim(), documentosVigentes: 0, status: n.status };
+        D.fornecedores.push(f);
+        return f;
+      },
+      atualizar: async (id, n) => {
+        await atraso(500);
+        const f = D.fornecedores.find((x) => x.id === id);
+        if (!f) throw new ApiError(404, 'Fornecedor não encontrado.');
+        validarFornecedor(n, id);
+        Object.assign(f, { razaoSocial: n.razaoSocial.trim(), cnpj: cnpjFormatado(n.cnpj), cidadeUf: n.cidadeUf.trim(), status: n.status });
+        return f;
+      },
+    },
     documentos: { listar: (q) => paginar(D.documentos, q) },
     notas: {
       listar: (q) => paginar(D.notas.map(comEtapa), q),
@@ -451,7 +480,30 @@ export function criarServicosSimulados(): Servicos {
         return p;
       },
     },
-    patio: { listar: (q) => paginar(D.locaisPatio, q), transferencias: { listar: (q) => paginar(D.transferencias, q) } },
+    patio: {
+      listar: (q) => paginar(D.locaisPatio, q),
+      transferencias: { listar: (q) => paginar(D.transferencias, q) },
+      cadastrar: async (n) => {
+        await atraso(500);
+        validarLocal(n);
+        const l = { id: novoId('lp'), codigo: n.codigo.trim(), descricao: n.descricao.trim(), capacidade: n.capacidade, ocupacao: 0, status: n.status };
+        D.locaisPatio.push(l);
+        return l;
+      },
+      atualizar: async (id, n) => {
+        await atraso(500);
+        const l = D.locaisPatio.find((x) => x.id === id);
+        if (!l) throw new ApiError(404, 'Endereço não encontrado.');
+        if (l.status === 'em_inventario') throw new ApiError(409, 'Endereço em inventário: conclua o inventário antes de alterar o cadastro.');
+        validarLocal(n, id);
+        if (n.capacidade < l.ocupacao) throw new ApiError(422, 'Capacidade abaixo da ocupação atual.', { capacidade: `A ocupação atual é de ${l.ocupacao} dormentes.` });
+        // O endereço é guardado pelo código nos fardos e lotes: renomear acompanha o que está nele.
+        const codigo = n.codigo.trim();
+        for (const x of [...D.fardos, ...D.lotes]) if (x.local === l.codigo) x.local = codigo;
+        Object.assign(l, { codigo, descricao: n.descricao.trim(), capacidade: n.capacidade, status: n.status });
+        return l;
+      },
+    },
     relatorios: {
       listar: (q) => paginar(D.relatorios, q),
       solicitarExportacao: async (relatorioId, formato) => { await atraso(500); return { id: novoId('x'), relatorioId, formato, estado: 'solicitada' as const }; },
@@ -512,12 +564,26 @@ export function criarServicosSimulados(): Servicos {
     auditoria: { listar: (q) => paginar(D.auditoria, q) },
     especies: {
       listar: (q) => paginar(D.especies, q),
+      cadastrar: async (n: NovaEspecie) => {
+        await atraso(500);
+        const nome = n.nomeCientifico.trim().replace(/\s+/g, ' ');
+        if (D.especies.some((e) => e.nomeCientifico.toLowerCase() === nome.toLowerCase())) {
+          throw new ApiError(409, 'Esta espécie já está cadastrada.', { nomeCientifico: 'Espécie já cadastrada.' });
+        }
+        const e = {
+          id: novoId('e'), numero: Math.max(0, ...D.especies.map((x) => x.numero)) + 1, nomeCientifico: nome,
+          observacao: n.observacao?.trim() || undefined, classe: n.classe ?? undefined, uso: n.uso, lotesAtivos: 0,
+        };
+        D.especies.push(e);
+        return e;
+      },
       atualizar: async (id, d) => {
         await atraso(500);
         const e = D.especies.find((x) => x.id === id);
         if (!e) throw new ApiError(404, 'Espécie não encontrada.');
         e.classe = d.classe ?? undefined;
         e.uso = d.uso;
+        if (d.observacao !== undefined) e.observacao = d.observacao.trim() || undefined;
         // A classe exibida em lotes e saldos é a da espécie.
         for (const x of [...D.lotes, ...D.saldos]) if (x.especieDocumental === e.nomeCientifico) x.classe = e.classe;
         return e;
