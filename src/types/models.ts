@@ -154,6 +154,10 @@ export interface Fardo {
   itemContratoId: Id;
   /** Definida quando o fardo entra numa entrega (cadastro de NF e DOF ou leitura no recebimento). */
   entregaId?: Id;
+  /** Emissão do fornecedor que gerou o fardo (no protótipo, o Simulador). */
+  emissaoId?: Id;
+  /** Dormentes que faltavam no fardo, declarados no recebimento (saem do recebido e do volume nominal). */
+  faltaDeclarada?: number;
   quantidadeInicial: number;
   localId?: Id;
   recebidoEm?: string;
@@ -168,6 +172,8 @@ export interface Fardo {
   /** Dias desde o recebimento. */
   idadeDias?: number;
   acimaLimiteDias: boolean;
+  /** Recebido e com a inspeção ainda aberta: quantos dormentes já têm resultado. */
+  progressoInspecao?: { inspecionados: number; total: number };
 }
 
 export type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'nao_localizado';
@@ -285,8 +291,22 @@ export interface PreviaRecebimento {
 }
 
 export type TipoOcorrencia = 'avaria' | 'falta' | 'sobra' | 'fardo_desconhecido';
-export interface Ocorrencia { tipo: TipoOcorrencia; descricao: string; fardoId?: Id; fotos: Anexo[]; automatica: boolean }
-export interface DivergenciaVolume { especieId: Id; documentalM3: number; calculadoM3: number; percentual: number; acimaTolerancia: boolean }
+/** `quantidade`: na falta declarada, os dormentes que faltavam no fardo. */
+export interface Ocorrencia { tipo: TipoOcorrencia; descricao: string; fardoId?: Id; quantidade?: number; fotos: Anexo[]; automatica: boolean }
+/**
+ * Volume por espécie: documental (DOF) × nominal (dormentes recebidos × volume do tamanho, descontada a falta declarada)
+ * e, depois da inspeção de todos os fardos recebidos da espécie, medido (soma das medidas reais dos aprovados e
+ * reprovados). A divergência oficial usa o medido quando existe; antes, é provisória (nominal).
+ */
+export interface DivergenciaVolume {
+  especieId: Id;
+  documentalM3: number;
+  nominalM3: number;
+  medidoM3?: number;
+  base: 'nominal' | 'medido';
+  percentual: number;
+  acimaTolerancia: boolean;
+}
 
 export interface Recebimento {
   id: Id;
@@ -469,6 +489,33 @@ export interface InspecaoFardo {
   dormentes: (Dormente & { inspecao?: Inspecao })[];
   inspecionados: number;
   pendentes: number;
+  /** Falta de dormentes declarada no recebimento deste fardo. */
+  faltaDeclarada?: number;
+  /** Justificativa que o sistema usa se os não lidos couberem na falta declarada no recebimento. */
+  justificativaSugerida?: string;
+}
+
+export type SituacaoEmissao = 'aguardando_documentos' | 'a_caminho' | 'recebida_parcial' | 'recebida';
+
+/**
+ * Emissão do fornecedor (no protótipo, o Simulador): os fardos e dormentes com QR e a NF e a DOF que acompanham o
+ * material. Com documentos, a entrega já nasce cadastrada; sem, a CPTM cadastra NF e DOF depois, pelo XML.
+ */
+export interface Emissao {
+  id: Id;
+  contratoId: Id;
+  fardosIds: Id[];
+  nf: { numero: string; serie: string; chaveAcesso: string; emissao: string; itens: ItemNf[] };
+  /** Dados da DOF que o fornecedor envia, para a demonstração (a pessoa digita do documento). */
+  dof: { numero: string; validade: string; volumes: VolumeEspecie[] };
+  comDocumentos: boolean;
+  /** Entrega criada quando NF e DOF foram cadastradas (no Simulador ou depois, em NF e DOF). */
+  entregaId?: Id;
+  criadoEm: string;
+  criadoPor: string;
+  // calculados:
+  dormentes: number;
+  situacao: SituacaoEmissao;
 }
 
 /** Página do fornecedor: atas, contratos e taxa de reprovação por espécie (reprovados sobre inspecionados). */
@@ -479,9 +526,9 @@ export interface FornecedorResumo {
   reprovacao: { especieId: Id; inspecionados: number; reprovados: number; percentual: number }[];
 }
 
-/** Etiquetas de uma entrega para impressão: o fardo e os seus dormentes. */
-export interface EtiquetasEntrega {
-  entrega: Entrega;
+/** Etiquetas de uma emissão para impressão: o fardo e os seus dormentes. */
+export interface EtiquetasEmissao {
+  emissao: Emissao;
   contrato: Contrato;
   fardos: { fardo: Fardo; item: ItemDescrito; dormentesIds: Id[] }[];
 }

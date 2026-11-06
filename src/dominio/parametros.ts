@@ -56,10 +56,11 @@ export const foraDaTolerancia = (pct: number) => pct > TOLERANCIA_VOLUME_PCT;
  * Justificativa preenchida pelo sistema quando a divergência de volume vem só dos fardos que faltaram no
  * recebimento. A tela mostra este texto no campo e a pessoa pode complementar.
  */
-export function justificativaPorFalta(fardosIds: string[]): string {
-  if (!fardosIds.length) return '';
-  const lista = fardosIds.join(', ');
-  return `Divergência causada pela falta de ${fardosIds.length === 1 ? 'um fardo' : `${fardosIds.length} fardos`} da entrega, ainda em trânsito: ${lista}.`;
+export function justificativaPorFalta(fardosIds: string[], faltasDormentes: { fardoId: string; quantidade: number }[] = []): string {
+  const partes: string[] = [];
+  if (fardosIds.length) partes.push(`${fardosIds.length === 1 ? 'um fardo' : `${fardosIds.length} fardos`} da entrega, ainda em trânsito: ${fardosIds.join(', ')}`);
+  for (const f of faltasDormentes) partes.push(`${f.quantidade} ${f.quantidade === 1 ? 'dormente' : 'dormentes'} no fardo ${f.fardoId}`);
+  return partes.length ? `Divergência causada pela falta de ${partes.join('; ')}.` : '';
 }
 
 /** Datas AAAA-MM-DD (sem hora) somadas em dias. */

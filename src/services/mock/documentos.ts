@@ -46,8 +46,11 @@ export function cadastrarEntrega(e: Estado, dados: DadosEntrega, origem: Entrega
   if (repetida) falha(409, `Esta chave de acesso já foi cadastrada (NF ${repetida.numero}).`, { 'nf.chaveAcesso': 'Chave de acesso já cadastrada.' });
   if (e.dofs.some((d) => d.numero === dof.numero.trim())) falha(409, `A DOF ${dof.numero} já foi cadastrada.`, { 'dof.numero': 'DOF já cadastrada.' });
 
+  // Emissão do fornecedor com a mesma chave (Simulador): sem fardos indicados, os dela que seguem livres viram os esperados.
+  const emissao = e.emissoes.find((x) => x.nf.chaveAcesso === chave && !x.entregaId);
   // Fardos indicados (opcional): emitidos do contrato, em trânsito e sem entrega.
-  const fardosIds = [...new Set(dados.fardosIds ?? [])];
+  const indicados = dados.fardosIds?.length ? dados.fardosIds : emissao?.fardosIds.filter((id) => e.fardos.some((f) => f.id === id && !f.entregaId && !f.recebidoEm)) ?? [];
+  const fardosIds = [...new Set(indicados)];
   for (const id of fardosIds) {
     const f = e.fardos.find((x) => x.id === id);
     if (!f || f.contratoId !== contrato.id) falha(422, `O fardo ${id} não é deste contrato.`, { fardosIds: `Fardo ${id} fora do contrato.` });
@@ -65,6 +68,7 @@ export function cadastrarEntrega(e: Estado, dados: DadosEntrega, origem: Entrega
   const entrega: EntregaReg = { id: entregaId, contratoId: contrato.id, nfId, dofId, fardosIds, situacao: 'a_caminho', origem, criadoEm: instante(ctx), criadoPor: ctx.quem };
   e.entregas.push(entrega);
   for (const f of e.fardos.filter((x) => fardosIds.includes(x.id))) f.entregaId = entregaId;
+  if (emissao) emissao.entregaId = entregaId;
   return entrega;
 }
 

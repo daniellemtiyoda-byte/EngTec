@@ -17,7 +17,7 @@ const PASSOS = ['Nota fiscal', 'DOF', 'Fardos da entrega', 'Revisar e confirmar'
 const passoDoCampo = (k: string) => (k.startsWith('dof') ? 1 : k.startsWith('fardos') ? 2 : 0);
 
 interface LinhaNf { chave: number; descricao?: string; itemContratoId: string; quantidade: string; volume: string; volumeManual: boolean }
-interface LinhaDof { especieId: string; volume: string; volumeManual: boolean }
+interface LinhaDof { especieId: string; volume: string }
 let seq = 1;
 
 interface Props {
@@ -119,22 +119,18 @@ export function EntregaAssistente({ aberto, cad, origem = 'cadastro', aoFechar, 
     const e: Record<string, string> = {};
     if (!dof.numero.trim()) e['dof.numero'] = 'Informe o número da DOF: sem DOF não há entrega.';
     if (!dof.validade) e['dof.validade'] = 'Informe a validade.';
-    volumes.forEach((v, n) => { if (!(paraNumero(v.volume) > 0)) e[`dof.volumes.${n}`] = 'Volume em m³, maior que zero.'; });
+    volumes.forEach((v, n) => { if (!v.volume.trim()) e[`dof.volumes.${n}`] = 'Digite o volume que está na DOF.'; else if (!(paraNumero(v.volume) > 0)) e[`dof.volumes.${n}`] = 'Volume em m³, maior que zero.'; });
     if (pdf) { const inv = arquivoInvalido(pdf, ['pdf']); if (inv) e['dof.pdf'] = inv; }
     return e;
   }
 
-  /** Volumes da DOF por espécie: um por espécie da NF, já com a soma dos itens (a pessoa confere com o documento). */
+  /**
+   * Volumes da DOF por espécie: um campo por espécie da NF, VAZIO e obrigatório. O volume é digitado do documento,
+   * nunca copiado da NF, senão a comparação da DOF com o recebido perde o sentido.
+   */
   function prepararDof() {
-    const porEspecie = new Map<string, number>();
-    for (const i of itens) {
-      const item = contrato?.itens.find((x) => x.id === i.itemContratoId);
-      if (item) porEspecie.set(item.especieId, (porEspecie.get(item.especieId) ?? 0) + (paraNumero(i.volume) || 0));
-    }
-    setVolumes((atual) => [...porEspecie].map(([especieId, v]) => {
-      const ja = atual.find((x) => x.especieId === especieId);
-      return ja?.volumeManual ? ja : { especieId, volume: String(Math.round(v * 1000) / 1000).replace('.', ','), volumeManual: false };
-    }));
+    const especies = new Set(itens.map((i) => contrato?.itens.find((x) => x.id === i.itemContratoId)?.especieId).filter((x): x is string => !!x));
+    setVolumes((atual) => [...especies].map((especieId) => atual.find((x) => x.especieId === especieId) ?? { especieId, volume: '' }));
   }
 
   async function avancar() {
@@ -277,12 +273,12 @@ export function EntregaAssistente({ aberto, cad, origem = 'cadastro', aoFechar, 
             <legend>Volume por espécie, como no documento</legend>
             {volumes.map((v, n) => (
               <div key={v.especieId} className="campo">
-                <label htmlFor={`ent-dofvol-${v.especieId}`}>{cad.nomeEspecie(v.especieId)} (m³)</label>
-                <input id={`ent-dofvol-${v.especieId}`} value={v.volume} inputMode="decimal" maxLength={12} onChange={(e) => setVolumes((l) => l.map((x) => (x.especieId === v.especieId ? { ...x, volume: e.target.value, volumeManual: true } : x)))} />
+                <label htmlFor={`ent-dofvol-${v.especieId}`}>{cad.nomeEspecie(v.especieId)} (m³)<span className="obrig" aria-hidden="true"> *</span></label>
+                <input id={`ent-dofvol-${v.especieId}`} value={v.volume} inputMode="decimal" maxLength={12} onChange={(e) => setVolumes((l) => l.map((x) => (x.especieId === v.especieId ? { ...x, volume: e.target.value } : x)))} />
                 {erro(`dof.volumes.${n}`)}
               </div>
             ))}
-            <span className="ajuda">Começa com a soma dos itens da NF; digite o volume que está na DOF. A divergência acima de 10% aparece no recebimento.</span>
+            <span className="ajuda">Digite o volume que está na DOF, espécie por espécie (não vem da NF). A diferença para o recebido aparece no recebimento e, depois da inspeção, para o volume medido.</span>
           </fieldset>
           <div className="campo">
             <label htmlFor="ent-pdf">PDF da DOF (opcional)</label>

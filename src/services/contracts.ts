@@ -1,5 +1,5 @@
 import type {
-  Alerta, Ata, Categoria, Contrato, Dof, Dormente, EmpresaInspetora, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
+  Alerta, Ata, Categoria, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros,
   Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
@@ -39,7 +39,8 @@ export interface DadosContrato { numero: string; ataId: Id; empresaInspetoraId: 
 /** Item existente (com `id`) só muda de quantidade; sem `id`, é item novo. */
 export interface DadosAtualizacaoContrato { empresaInspetoraId?: Id; itens?: (DadosItemContrato & { id?: Id })[] }
 
-export interface DadosGerarEntrega { contratoId: Id; itens: { itemContratoId: Id; fardos: number; dormentesPorFardo: number }[] }
+/** `comDocumentos`: com NF e DOF já cadastradas (entrega a caminho); sem, só os fardos (a CPTM cadastra NF e DOF pelo XML). */
+export interface DadosEmissao { contratoId: Id; comDocumentos: boolean; itens: { itemContratoId: Id; fardos: number; dormentesPorFardo: number }[] }
 
 export interface DadosNf { numero: string; serie: string; chaveAcesso: string; contratoId: Id; emissao: string; itens: { itemContratoId: Id; quantidade: number; volumeM3: number }[] }
 export interface DadosDof { numero: string; validade: string; volumes: { especieId: Id; volumeM3: number }[] }
@@ -47,7 +48,10 @@ export interface DadosDof { numero: string; validade: string; volumes: { especie
 export interface DadosEntrega { nf: DadosNf; dof: DadosDof; fardosIds?: Id[]; origem?: 'cadastro' | 'recebimento' }
 export interface ArquivosEntrega { xml?: File; pdf?: File }
 
-export interface DadosOcorrencia { tipo: TipoOcorrencia; descricao: string; fardoId?: Id; fotos: File[] }
+/** Falta declarada: `fardoId` e `quantidade` (dormentes que faltavam no fardo) obrigatórios. */
+export interface DadosOcorrencia { tipo: TipoOcorrencia; descricao: string; fardoId?: Id; quantidade?: number; fotos: File[] }
+/** Falta de dormentes num fardo lido (entra no recebido e no volume nominal). */
+export interface FaltaDormentes { fardoId: Id; quantidade: number }
 export interface DadosRecebimento {
   /** IDs lidos pelo QR ou marcados à mão. */
   fardosLidos: Id[];
@@ -95,11 +99,11 @@ export interface Servicos {
   };
 
   /** Só para demonstração: faz o papel do fornecedor. */
-  simulador: {
-    gerarEntrega(dados: DadosGerarEntrega): Promise<Entrega>;
-    etiquetas(entregaId: Id): Promise<EtiquetasEntrega>;
-    /** XML fictício da NF da entrega, para testar a importação. */
-    xmlNf(entregaId: Id): Promise<string>;
+  simulador: ServicoLista<Emissao> & {
+    emitir(dados: DadosEmissao): Promise<Emissao>;
+    etiquetas(emissaoId: Id): Promise<EtiquetasEmissao>;
+    /** XML fictício da NF da emissão, para a importação em NF e DOF. */
+    xmlNf(emissaoId: Id): Promise<string>;
   };
 
   documentos: {
@@ -119,7 +123,7 @@ export interface Servicos {
     /** Entregas a caminho e recebidas em parte. */
     entregasACaminho(): Promise<Entrega[]>;
     /** Prévia da revisão: aceitos, desconhecidos, faltas, divergência de volume e justificativa automática. Não grava nada. */
-    previa(entregaId: Id, fardosLidos: Id[]): Promise<PreviaRecebimento>;
+    previa(entregaId: Id, fardosLidos: Id[], faltas?: FaltaDormentes[]): Promise<PreviaRecebimento>;
     receber(entregaId: Id, dados: DadosRecebimento): Promise<Recebimento>;
   };
 

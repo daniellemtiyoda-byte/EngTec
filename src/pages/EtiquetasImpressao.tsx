@@ -14,20 +14,20 @@ function baseDosQr() {
 }
 
 /**
- * Folha de etiquetas de uma entrega (seção 9.6 do plano), sem o Layout: primeiro a etiqueta do fardo, depois as dos
+ * Folha de etiquetas de uma emissão do fornecedor (seção 9.6 do plano), sem o Layout: primeiro a etiqueta do fardo, depois as dos
  * seus dormentes. CSS de impressão em A4 sem cortar etiqueta. Com `?fardo=`, só a etiqueta daquele fardo.
  * Avisa quando o link dos QR não é a URL definitiva (VITE_APP_URL), para não imprimir etiqueta que não abre no celular.
  */
 export default function EtiquetasImpressao() {
-  const { entrega = '' } = useParams();
+  const { emissao = '' } = useParams();
   const [params] = useSearchParams();
   const soFardo = params.get('fardo');
-  const r = useAsync(() => servicos.simulador.etiquetas(entrega), [entrega]);
+  const r = useAsync(() => servicos.simulador.etiquetas(emissao), [emissao]);
   const { base, real, configurada } = baseDosQr();
 
   if (r.carregando && !r.dados) return <main className="folha-tela"><Carregando /></main>;
   if (r.erro || !r.dados) return <main className="folha-tela"><Erro erro={r.erro} aoTentar={r.recarregar} /></main>;
-  const { entrega: en, contrato, fardos } = r.dados;
+  const { emissao: em, contrato, fardos } = r.dados;
   const lista = soFardo ? fardos.filter((f) => f.fardo.id === soFardo) : fardos;
   const total = lista.reduce((s, f) => s + 1 + (soFardo ? 0 : f.dormentesIds.length), 0);
 
@@ -35,7 +35,7 @@ export default function EtiquetasImpressao() {
     <main className="folha-tela">
       <div className="folha-barra nao-imprimir">
         <div>
-          <h1 className="titulo">Etiquetas · NF {en.nfNumero}</h1>
+          <h1 className="titulo">Etiquetas · NF {em.nf.numero}</h1>
           <p className="mudo">Contrato <span className="mono">{contrato.numero}</span> · {numero(total)} etiquetas{soFardo ? ` (só o fardo ${soFardo})` : ''}</p>
         </div>
         <div className="acoes">

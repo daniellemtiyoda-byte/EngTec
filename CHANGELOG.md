@@ -6,6 +6,26 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Adicionado
+- 2026-11-06: **Etapa 6 da v2: Inspeção.**
+  - **Por quê:** fechar a entrada: o fardo recebido só vira estoque depois da inspeção peça a peça, e o volume medido nela é o que vale na comparação com a DOF.
+  - **Inspeção** (`/inspecao`): abas Fila (fardos aguardando e em inspeção, com o progresso) e Não localizados (com a justificativa da conclusão).
+  - **Inspeção do fardo** (`/inspecao/:fardo`): dormentes com o estado, último lido, pendências "não pertence a este fardo", **Registrar à mão** pensado para o celular (ler o QR → Aprovado ou Reprovado → categoria → próxima leitura, sem sair da câmera), **Abrir no Inspector** e **Simular inspeção do fardo**; **Concluir** com o local de guarda (select ou QR do local), guarda dos aprovados, segregação dos reprovados e justificativa dos não lidos, que ficam não localizados. O não localizado encontrado depois é inspecionado pela mesma tela.
+  - Página do fardo com **Inspecionar** e o progresso; ficha do dormente com "Inspecionar agora".
+  - Arquivos: `src/pages/{Inspecao,InspecaoFardo}.tsx`, `src/components/LeitorQr.tsx` (`cameraReduzida`), `src/components/Indicadores.tsx` (`unidade`), `src/rotas.tsx`, `src/pages/{FardoDetalhe,FichaDormente}.tsx`, `src/services/mock/inspecao.ts`, `src/styles.css`.
+- 2026-11-06: **Simulador: "Gerar só os fardos (sem NF e DOF)".**
+  - **Por quê:** demonstrar o fluxo completo: o fornecedor emite, a CPTM cadastra NF e DOF pelo XML e o almoxarife recebe.
+  - Assistente **Emitir fardos** com ou sem NF e DOF; lista das **emissões** (situação "Aguardando NF e DOF" até o cadastro) com Imprimir etiquetas, Baixar XML da NF e **Ver DOF**. O cadastro de NF e DOF liga a entrega à emissão pela chave de acesso e usa os fardos dela como esperados.
+  - Serviço: `simulador.emitir`, `simulador.listar`, etiquetas e XML por emissão (`Emissao`, `fardo.emissaoId`). Estado do mock na versão 5.
+  - Arquivos: `src/pages/{Simulador,EtiquetasImpressao}.tsx`, `src/services/mock/{simulador,documentos,data,index}.ts`, `src/types/models.ts`, `src/services/contracts.ts`, `src/dominio/rotulos.ts`.
+
+### Alterado
+- 2026-11-06: **Volume da DOF digitado do documento.** O volume por espécie começa vazio e é obrigatório no cadastro de NF e DOF; não vem mais da soma dos itens da NF, para a comparação ter sentido. Arquivo: `src/components/EntregaAssistente.tsx`.
+- 2026-11-06: **Volume nominal × medido.** A comparação por espécie mostra a DOF, o **volume nominal** (recebidos × volume do tamanho) e, depois da inspeção, o **volume medido** (medidas reais de aprovados e reprovados). A divergência oficial usa o medido quando todos os fardos recebidos da espécie foram inspecionados; antes, a tela marca a diferença como provisória. `DivergenciaVolume` troca `calculadoM3` por `nominalM3`, `medidoM3` e `base`. Arquivos: `src/services/mock/consultas.ts`, `src/components/TabelaVolumes.tsx` (cartões no celular), `src/components/RecebimentoAssistente.tsx`, `src/pages/RecebimentoDetalhe.tsx`.
+- 2026-11-06: **Falta de dormentes com quantidade.** A ocorrência de falta declarada exige o fardo lido e a quantidade de dormentes faltando; ela sai do recebido do item e do volume nominal, entra na justificativa automática da divergência e, na inspeção, justifica sozinha os não lidos que cabem nela. Arquivos: `src/services/mock/{recebimento,consultas,inspecao}.ts`, `src/dominio/parametros.ts` (`justificativaPorFalta`), `src/services/contracts.ts` (`FaltaDormentes`, `previa(..., faltas)`), `src/components/RecebimentoAssistente.tsx`.
+  - Testes: 79 (emissão só com os fardos e cadastro pelo XML, falta com quantidade no recebido e na prévia, volume medido depois da inspeção, conclusão com a justificativa da falta). Verificado no Chrome headless em 360 e 1280 px: fila, inspeção do fardo, registro à mão (Aprovado, categoria, dormente de outro fardo), conclusão, não localizados, emissão só com os fardos, DOF com volume vazio, recebimento com falta de 2 dormentes e a tabela de volumes.
+  - Docs: `docs/PLANO-V2.md` (5.5, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10), `docs/ESPECIFICACAO-FUNCIONAL.md` (seção 5), `CLAUDE.md`.
+
+### Adicionado
 - 2026-11-06: **Etapa 5 da v2: NF e DOF, Recebimento e controle de prazos.**
   - **Por quê:** o material chega com NF e DOF já emitidas; cadastrá-las antes deixa a entrega pronta para o almoxarife só escolher e ler os fardos no pátio, e concentra o prazo da DOF numa tela.
   - **NF e DOF** (`/documentos`): abas A caminho, DOFs a declarar (prazo mais próximo primeiro, nível vencido/crítico/atenção), Declarados e Todas as NFs; assistente **Cadastrar NF e DOF** com importação do XML da NF-e (fornecedor pelo CNPJ, DOF das informações complementares) ou digitação, DOF com volume por espécie e PDF, fardos opcionais e revisão; **Declarar** a DOF no Sinaflor com confirmação.

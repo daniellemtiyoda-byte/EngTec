@@ -127,7 +127,7 @@ a.btn { display: inline-block; text-decoration: none; }
 .modal-corpo { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .modal-rodape { padding: 12px 18px; border-top: 1px solid var(--borda); display: flex; justify-content: flex-end; gap: 8px; }
 .campo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-.campo label { font-weight: 600; font-size: 14px; }
+.campo label, .campo .rotulo-campo { font-weight: 600; font-size: 14px; }
 .campo [aria-invalid='true'] { border-color: var(--critico); }
 .obrig { color: var(--critico); } .ajuda { font-size: 12px; color: var(--texto-2); } .erro-campo { font-size: 13px; color: var(--critico); }
 .previa { max-width: 100%; max-height: 260px; object-fit: contain; border: 1px solid var(--borda); border-radius: var(--raio); }
@@ -580,3 +580,51 @@ span.codigo { font-weight: 600; color: var(--texto); }
 .lista-ocorrencias, .lista-tipos-ocorrencia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-3); }
 .lista-ocorrencias li { border: 1px solid var(--borda); border-radius: var(--raio); padding: var(--esp-3); }
 .campo textarea { border: 1px solid var(--borda-forte); border-radius: var(--raio); padding: 8px 10px; width: 100%; }
+
+/* Inspeção do fardo (Etapa 6): lista dos dormentes à esquerda, último lido e ações à direita */
+.inspecao-grade { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--esp-4); align-items: start; margin-top: var(--esp-4); }
+.inspecao-lado { display: flex; flex-direction: column; gap: var(--esp-3); }
+.titulo-secao { font-size: var(--fs-16); font-weight: 700; margin: 0 0 var(--esp-2); }
+.ficha-cartao h2.titulo-secao { font-size: var(--fs-13); }
+.lista-dormentes-inspecao { list-style: none; margin: var(--esp-3) 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--esp-2); }
+.lista-dormentes-inspecao li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2); padding: var(--esp-2) var(--esp-3); border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); min-height: var(--alvo-toque); }
+.lista-dormentes-inspecao li.destaque { border-color: var(--ok); background: var(--ok-fundo); }
+.ultimo-lido { display: flex; flex-direction: column; gap: var(--esp-1); }
+.ultimo-id { font-size: var(--fs-20); font-weight: 700; word-break: break-all; }
+.cartao-alerta { border-color: var(--atencao); background: var(--atencao-fundo); }
+.lista-simples { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
+.acoes-coluna { display: flex; flex-direction: column; gap: var(--esp-2); }
+.acoes-coluna .btn { width: 100%; text-align: center; min-height: var(--alvo-toque); }
+.btn-link { background: none; border: none; color: var(--cor-primaria); text-decoration: underline; padding: 8px; }
+.linha-com-botao { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+.linha-com-botao select { flex: 1; min-width: 200px; }
+.resumo-conclusao { list-style: none; margin: 0 0 var(--esp-3); padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
+/* Registrar à mão: decisão embaixo da câmera, botões grandes para uso com luva */
+.leitor-camera-reduzida { aspect-ratio: 16 / 9; max-height: 30vh; }
+.decisao-inspecao { display: flex; flex-direction: column; gap: var(--esp-3); }
+.decisao-id { font-size: var(--fs-16); margin: 0; }
+.decisao-id .mono { font-size: var(--fs-20); font-weight: 700; word-break: break-all; }
+.decisao-pergunta { margin: 0; font-weight: 600; font-size: var(--fs-16); }
+.decisao-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--esp-3); }
+.decisao-categorias { grid-template-columns: repeat(3, 1fr); }
+.decisao-botoes .btn { min-height: 64px; font-size: var(--fs-20); margin: 0; }
+.btn-aprovado { background: var(--ok); color: var(--texto-inverso); }
+.btn-reprovado { background: var(--critico); color: var(--texto-inverso); }
+.btn-aprovado:hover:not(:disabled), .btn-reprovado:hover:not(:disabled) { filter: brightness(.92); }
+@media (max-width: 760px) {
+  .inspecao-grade { grid-template-columns: 1fr; }
+  .inspecao-lado { order: -1; }
+  .lista-dormentes-inspecao { grid-template-columns: 1fr; }
+  .lista-dormentes-inspecao .id-codigo, .lista-dormentes-inspecao .mono { font-size: var(--fs-16); }
+}
+
+/* Volume por espécie: no celular, cada espécie vira um cartão (sem tabela larga) */
+@media (max-width: 760px) {
+  .tabela-volumes thead { display: none; }
+  .tabela-volumes, .tabela-volumes tbody { display: block; }
+  .tabela-volumes tr { display: grid; grid-template-columns: 1fr 1fr; gap: var(--esp-2) var(--esp-3); padding: var(--esp-3); border-bottom: 1px solid var(--borda); }
+  .tabela-volumes td { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0; border: 0; text-align: left; }
+  .tabela-volumes td::before { content: attr(data-rotulo); font-size: var(--fs-12); color: var(--texto-2); }
+  .tabela-volumes td:first-child { grid-column: 1 / -1; font-weight: 700; }
+  .tabela-volumes td:first-child::before { content: none; }
+}

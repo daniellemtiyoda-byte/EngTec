@@ -9,7 +9,7 @@ import {
   salvarTamanho, salvarTratamento, situacaoFornecedor,
 } from './cadastros';
 import {
-  contratoView, dofView, entregaView, etiquetasEntrega, fardoDetalhe, fardoView, fichaDormente, fornecedorView, inspecaoFardo, localView, resumoFornecedor, saldoPorItem, tamanhoView,
+  contratoView, dofView, emissaoView, entregaView, etiquetasEmissao, fardoDetalhe, fardoView, fichaDormente, fornecedorView, inspecaoFardo, localView, resumoFornecedor, saldoPorItem, tamanhoView,
 } from './consultas';
 import { criarDados } from './data';
 import { cadastrarEntrega, declararDof } from './documentos';
@@ -20,7 +20,7 @@ import { alertas, indicadores, pendencias } from './painel';
 import { armazenamentoPadrao, carregar, salvar, type Armazenamento } from './persistencia';
 import { previaRecebimento, receber } from './recebimento';
 import { abrirRme, acharRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
-import { gerarEntrega, xmlDaNf } from './simulador';
+import { emitir, xmlDaNf } from './simulador';
 import { paginar, simularRede } from './util';
 
 export interface OpcoesMock {
@@ -168,8 +168,9 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
     },
 
     simulador: {
-      gerarEntrega: (d) => escrever(['simulador:usar'], (e, ctx) => { exigirDemonstracao(e); return entregaView(e, gerarEntrega(e, d, ctx), dia()); }),
-      etiquetas: (id) => ler((e) => etiquetasEntrega(e, id, dia())),
+      listar: (q) => ler((e) => paginar(e.emissoes.map((x) => emissaoView(e, x)), maisRecentes('criadoEm')(q))),
+      emitir: (d) => escrever(['simulador:usar'], (e, ctx) => { exigirDemonstracao(e); return emissaoView(e, emitir(e, d, ctx)); }),
+      etiquetas: (id) => ler((e) => etiquetasEmissao(e, id, dia())),
       xmlNf: (id) => ler((e) => xmlDaNf(e, id)),
     },
 
@@ -191,7 +192,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       listar: (q) => ler((e) => paginar(e.recebimentos, maisRecentes('recebidoEm')(q))),
       obter: (id) => ler((e) => achar(e.recebimentos, (r) => r.id === id, 'Recebimento')),
       entregasACaminho: () => ler((e) => e.entregas.filter((x) => x.situacao !== 'recebida').map((x) => entregaView(e, x, dia()))),
-      previa: (entregaId, fardosLidos) => ler((e) => previaRecebimento(e, entregaId, fardosLidos)),
+      previa: (entregaId, fardosLidos, faltas) => ler((e) => previaRecebimento(e, entregaId, fardosLidos, faltas)),
       receber: (entregaId, d) => escrever(['recebimento:registrar'], (e, ctx) => receber(e, entregaId, d, ctx)),
     },
 

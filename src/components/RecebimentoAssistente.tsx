@@ -4,16 +4,18 @@ import { NIVEL_PRAZO, TIPO_OCORRENCIA } from '../dominio/rotulos';
 import { useAuth } from '../contexts/AuthContext';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import type { DadosOcorrencia } from '../services/contracts';
+import type { DadosOcorrencia, FaltaDormentes } from '../services/contracts';
 import { ApiError, mensagemSegura } from '../services/http';
 import type { Entrega, PreviaRecebimento, Recebimento, TipoOcorrencia } from '../types/models';
-import { arquivoInvalido, data, m3, numero, pct } from '../utils/format';
+import { arquivoInvalido, data, numero, paraNumero } from '../utils/format';
 import { Badge, BadgeDe } from './Badge';
 import { EntregaAssistente } from './EntregaAssistente';
+import { Contador } from './Contador';
 import { Carregando, Vazio } from './Estados';
 import { Icone } from './Icone';
 import { LeitorQr, type RetornoLeitura } from './LeitorQr';
 import { Modal } from './Modal';
+import { TabelaVolumes } from './TabelaVolumes';
 import { ProgressoPassos } from './Passos';
 
 const PASSOS = ['Escolher a entrega', 'Leitura dos fardos', 'Conferência', 'Local de espera', 'Revisar e confirmar'];
@@ -26,7 +28,8 @@ function passoDoCampo(k: string) {
   return 4;
 }
 
-interface LinhaOcorrencia { chave: number; tipo: TipoOcorrencia; fardoId: string; descricao: string; fotos: File[] }
+/** `quantidade`: na falta, quantos dormentes faltam no fardo lido. */
+interface LinhaOcorrencia { chave: number; tipo: TipoOcorrencia; fardoId: string; quantidade: string; descricao: string; fotos: File[] }
 let seq = 1;
 
 interface Props {
@@ -98,6 +101,12 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
   }
   const alternar = (id: string) => setLidos((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
 
+  /** Fardos lidos que entram (esperados ou do contrato): só neles se declara falta de dormentes. */
+  const aceitosLidos = lidos.filter((id) => esperados.includes(id) || avulsos.includes(id));
+  const faltasDeclaradas: FaltaDormentes[] = ocorrencias
+    .filter((o) => o.tipo === 'falta' && aceitosLidos.includes(o.fardoId) && paraNumero(o.quantidade, true) >= 1)
+    .map((o) => ({ fardoId: o.fardoId, quantidade: paraNumero(o.quantidade, true) }));
+
   function validar(p: number): Record<string, string> {
     const e: Record<string, string> = {};
     if (p === 0 && !entrega) e.entrega = 'Escolha a entrega que chegou.';
@@ -105,7 +114,9 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
     if (p === 2 && !conforme) {
       if (!ocorrencias.length) e.ocorrencias = 'Inclua a ocorrência ou marque "Conforme".';
       ocorrencias.forEach((o, n) => {
-        if (!o.descricao.trim()) e[`ocorrencias.${n}`] = 'Descreva a ocorrência.';
+        if (o.tipo === 'falta' && !aceitosLidos.includes(o.fardoId)) e[`ocorrencias.${n}`] = 'Na falta, escolha o fardo lido em que faltam dormentes (fardo não lido o sistema já registra).';
+        else if (o.tipo === 'falta' && !(paraNumero(o.quantidade, true) >= 1)) e[`ocorrencias.${n}`] = 'Informe quantos dormentes faltam no fardo.';
+        else if (!o.descricao.trim()) e[`ocorrencias.${n}`] = 'Descreva a ocorrência.';
         else if (!o.fotos.length) e[`ocorrencias.${n}`] = 'Tire ao menos uma foto.';
         else { const inv = o.fotos.map((f) => arquivoInvalido(f, EXTENSOES_FOTO)).find(Boolean); if (inv) e[`ocorrencias.${n}`] = inv; }
       });
@@ -123,7 +134,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
     if (passo === 3 && entrega) {
       setPrevia(undefined);
       try {
-        const p = await servicos.recebimentos.previa(entrega.id, lidos);
+        const p = await servicos.recebimentos.previa(entrega.id, lidos, conforme ? [] : faltasDeclaradas);
         setPrevia(p);
         setJustificativa((j) => j || p.justificativaAutomatica || '');
       } catch (err) { setErroGeral(mensagemSegura(err)); return; }
@@ -137,7 +148,9 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
     if (Object.keys(e).length || !entrega) return;
     setEnviando(true); setErroGeral(undefined);
     try {
-      const declaradas: DadosOcorrencia[] = conforme ? [] : ocorrencias.map((o) => ({ tipo: o.tipo, descricao: o.descricao, fardoId: o.fardoId || undefined, fotos: o.fotos }));
+      const declaradas: DadosOcorrencia[] = conforme ? [] : ocorrencias.map((o) => ({
+        tipo: o.tipo, descricao: o.descricao, fardoId: o.fardoId || undefined, quantidade: o.tipo === 'falta' ? paraNumero(o.quantidade, true) : undefined, fotos: o.fotos,
+      }));
       const r = await servicos.recebimentos.receber(entrega.id, { fardosLidos: lidos, ocorrencias: declaradas, localEsperaId: localId, justificativaDivergencia: justificativa });
       aoReceber(r);
     } catch (err) {
@@ -153,6 +166,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
   }
 
   const erro = (k: string) => erros[k] && <span className="erro-campo" role="alert">{erros[k]}</span>;
+  const novaOcorrencia = (): LinhaOcorrencia => ({ chave: seq++, tipo: 'avaria', fardoId: '', quantidade: '', descricao: '', fotos: [] });
   const mudarOcorrencia = (chave: number, campo: keyof LinhaOcorrencia, valor: unknown) => setOcorrencias((l) => l.map((o) => (o.chave === chave ? { ...o, [campo]: valor } : o)));
   const visiveis = (entregas ?? []).filter((x) => !busca.trim() || x.nfNumero.includes(busca.trim()) || cad.nomeFornecedor(x.fornecedorId).toLowerCase().includes(busca.trim().toLowerCase()));
 
@@ -239,7 +253,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
           <div className="assistente-passo">
             <div className="opcoes-ata" role="radiogroup" aria-label="Conferência">
               <label className="caixa caixa-grande"><input type="radio" name="rec-conf" checked={conforme} onChange={() => setConforme(true)} /> Conforme</label>
-              <label className="caixa caixa-grande"><input type="radio" name="rec-conf" checked={!conforme} onChange={() => { setConforme(false); if (!ocorrencias.length) setOcorrencias([{ chave: seq++, tipo: 'avaria', fardoId: '', descricao: '', fotos: [] }]); }} /> Com ocorrência</label>
+              <label className="caixa caixa-grande"><input type="radio" name="rec-conf" checked={!conforme} onChange={() => { setConforme(false); if (!ocorrencias.length) setOcorrencias([novaOcorrencia()]); }} /> Com ocorrência</label>
             </div>
             {(esperados.some((id) => !lidos.includes(id)) || extras.some((id) => !avulsos.includes(id))) && (
               <p className="aviso aviso-info">O sistema já registra sozinho: {[
@@ -261,13 +275,20 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
                         </select>
                       </div>
                       <div className="campo">
-                        <label htmlFor={`oc-fardo-${o.chave}`}>Fardo (opcional)</label>
+                        <label htmlFor={`oc-fardo-${o.chave}`}>{o.tipo === 'falta' ? <>Fardo lido<span className="obrig" aria-hidden="true"> *</span></> : 'Fardo (opcional)'}</label>
                         <select id={`oc-fardo-${o.chave}`} value={o.fardoId} onChange={(e) => mudarOcorrencia(o.chave, 'fardoId', e.target.value)}>
                           <option value="">—</option>
-                          {[...new Set([...esperados, ...lidos])].map((id) => <option key={id} value={id}>{id}</option>)}
+                          {(o.tipo === 'falta' ? aceitosLidos : [...new Set([...esperados, ...lidos])]).map((id) => <option key={id} value={id}>{id}</option>)}
                         </select>
                       </div>
                     </div>
+                    {o.tipo === 'falta' && (
+                      <div className="campo">
+                        <span className="rotulo-campo">Dormentes faltando no fardo<span className="obrig" aria-hidden="true"> *</span></span>
+                        <Contador rotulo="Dormentes faltando no fardo" valor={o.quantidade || '0'} min={0} max={50} aoMudar={(v) => mudarOcorrencia(o.chave, 'quantidade', v)} />
+                        <span className="ajuda">Saem do recebido e do volume nominal. Na inspeção, os não lidos até essa quantidade já vêm justificados.</span>
+                      </div>
+                    )}
                     <div className="campo">
                       <label htmlFor={`oc-desc-${o.chave}`}>Descrição<span className="obrig" aria-hidden="true"> *</span></label>
                       <textarea id={`oc-desc-${o.chave}`} rows={2} maxLength={500} value={o.descricao} onChange={(e) => mudarOcorrencia(o.chave, 'descricao', e.target.value)} />
@@ -281,7 +302,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
                     <button type="button" className="btn btn-sec btn-peq" onClick={() => setOcorrencias((l) => l.filter((x) => x.chave !== o.chave))}>Remover ocorrência</button>
                   </fieldset>
                 ))}
-                <button type="button" className="btn btn-sec btn-peq" onClick={() => setOcorrencias((l) => [...l, { chave: seq++, tipo: 'avaria', fardoId: '', descricao: '', fotos: [] }])}>+ Ocorrência</button>
+                <button type="button" className="btn btn-sec btn-peq" onClick={() => setOcorrencias((l) => [...l, novaOcorrencia()])}>+ Ocorrência</button>
               </>
             )}
           </div>
@@ -312,30 +333,16 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
               <p><strong>NF {entrega.nfNumero}</strong> · {cad.nomeFornecedor(entrega.fornecedorId)}</p>
               <p>{previa.aceitos.length} fardo(s) recebidos ({numero(previa.dormentes)} dormentes) ficam aguardando inspeção em <span className="mono">{cad.codigoLocal(localId)}</span>.</p>
               {previa.faltantes.length > 0 && <p>Falta: {previa.faltantes.join(', ')} (continuam em trânsito; podem ser recebidos depois).</p>}
+              {!conforme && faltasDeclaradas.map((f) => <p key={f.fardoId}>Faltam {numero(f.quantidade)} dormente(s) no fardo <span className="mono">{f.fardoId}</span> (fora do recebido).</p>)}
               {previa.desconhecidos.length > 0 && <p>Fardo desconhecido: {previa.desconhecidos.join(', ')} (não entra; vira ocorrência).</p>}
               <p>{conforme && !previa.faltantes.length && !previa.desconhecidos.length ? 'Conforme.' : `Ocorrências: ${(conforme ? 0 : ocorrencias.length) + previa.faltantes.length + previa.desconhecidos.length}.`}</p>
             </div>
-            <div className="tabela-wrap">
-              <table className="tabela">
-                <caption className="sr-only">Volume da DOF por espécie</caption>
-                <thead><tr><th scope="col">Espécie</th><th scope="col" className="al-right">DOF</th><th scope="col" className="al-right">Recebido</th><th scope="col" className="al-right">Diferença</th></tr></thead>
-                <tbody>
-                  {previa.divergenciaVolume.map((d) => (
-                    <tr key={d.especieId}>
-                      <td>{cad.nomeEspecie(d.especieId)}</td>
-                      <td className="al-right">{m3(d.documentalM3)}</td>
-                      <td className="al-right">{m3(d.calculadoM3)}</td>
-                      <td className="al-right">{Number.isFinite(d.percentual) ? pct(d.percentual) : 'sem DOF'} {d.acimaTolerancia && <Badge tom="vermelho">acima de 10%</Badge>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TabelaVolumes volumes={previa.divergenciaVolume} legenda="Volume da DOF por espécie" />
             {(previa.exigeJustificativa || previa.justificativaAutomatica) && (
               <div className="campo">
                 {previa.exigeJustificativa
                   ? <p className="aviso aviso-critico">A divergência de volume passa de 10% (IN Ibama). Não bloqueia, mas exige justificativa e gera alerta.</p>
-                  : <p className="aviso aviso-alerta">A divergência vem só dos fardos que faltaram: a justificativa já vem preenchida. Complemente se quiser.</p>}
+                  : <p className="aviso aviso-alerta">A divergência vem só do que faltou (fardos ou dormentes): a justificativa já vem preenchida. Complemente se quiser.</p>}
                 <label htmlFor="rec-just">Justificativa da divergência{previa.exigeJustificativa && <span className="obrig" aria-hidden="true"> *</span>}</label>
                 <textarea id="rec-just" rows={3} maxLength={500} value={justificativa} onChange={(e) => setJustificativa(e.target.value)} />
                 {erro('justificativaDivergencia')}

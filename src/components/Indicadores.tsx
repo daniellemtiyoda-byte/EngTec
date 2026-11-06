@@ -28,8 +28,11 @@ export function CartaoIndicador({ rotulo, valor, detalhe, tom = 'azul', para }: 
 
 const pct = (v: number, t: number) => (t > 0 ? Math.min(100, Math.max(0, (v / t) * 100)) : 0);
 
-/** Contratado x recebido x aprovado (contratos e itens). O texto diz os números; a barra só ilustra. */
-export function BarraProgresso({ total, recebido, aprovado, rotulo }: { total: number; recebido: number; aprovado?: number; rotulo?: string }) {
+/**
+ * Contratado x recebido x aprovado (contratos e itens). O texto diz os números; a barra só ilustra.
+ * `unidade` troca a palavra do texto (ex. "inspecionados" no progresso da inspeção do fardo).
+ */
+export function BarraProgresso({ total, recebido, aprovado, rotulo, unidade = 'recebidos' }: { total: number; recebido: number; aprovado?: number; rotulo?: string; unidade?: string }) {
   const pAprovado = aprovado === undefined ? 0 : pct(aprovado, total);
   const pRecebido = pct(recebido, total);
   return (
@@ -40,7 +43,7 @@ export function BarraProgresso({ total, recebido, aprovado, rotulo }: { total: n
         <span className="progresso-recebido" style={{ width: `${Math.max(0, pRecebido - pAprovado)}%` }} />
       </div>
       <span className="progresso-texto">
-        {numero(recebido)} de {numero(total)} recebidos ({numero(Math.round(pRecebido))}%)
+        {numero(recebido)} de {numero(total)} {unidade} ({numero(Math.round(pRecebido))}%)
         {aprovado !== undefined && <> · {numero(aprovado)} aprovados</>}
       </span>
     </div>

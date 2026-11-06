@@ -7,7 +7,7 @@ import { VERSAO_ESTADO, type Ctx, type EntregaReg, type Estado } from './estado'
 import { concluirInspecao, registrarInspecao, simularFardo } from './inspecao';
 import { receber } from './recebimento';
 import { abrirRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
-import { gerarEntrega } from './simulador';
+import { emitir } from './simulador';
 import { sequenciaDe } from '../../dominio/identificacao';
 
 /*
@@ -32,7 +32,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     versao: VERSAO_ESTADO, dataBase: base,
     usuarios: PERFIS_LISTA.map(usuarioDemo),
     fornecedores: [], especies: [], tamanhos: [], tratamentos: [], empresasInspetoras: [], locais: [], atas: [], contratos: [], fardos: [], dormentes: [],
-    nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [],
+    emissoes: [], nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [],
     parametros: {
       limiteDiasEstoque: LIMITE_DIAS_ESTOQUE_PADRAO, alertaDofDias: [...ALERTA_DOF_DIAS_PADRAO], toleranciaVolumePct: TOLERANCIA_VOLUME_PCT,
       limitesCategoria: [...LIMITES_CATEGORIA_PADRAO], dormentesPorFardoPadrao: DORMENTES_POR_FARDO_PADRAO, niveis: [], modoDemonstracao: true,
@@ -108,7 +108,8 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   // ---------- Passos reutilizados ----------
   const gerar = (diasAtras: number, contratoId: Id, itens: { itemContratoId: Id; fardos: number; dormentesPorFardo?: number }[], validadeDofDias = 7) => {
     em(diasAtras, 8);
-    return gerarEntrega(e, { contratoId, itens: itens.map((i) => ({ ...i, dormentesPorFardo: i.dormentesPorFardo ?? DORMENTES_POR_FARDO_PADRAO })) }, como('administrador'), validadeDofDias);
+    const emissao = emitir(e, { contratoId, comDocumentos: true, itens: itens.map((i) => ({ ...i, dormentesPorFardo: i.dormentesPorFardo ?? DORMENTES_POR_FARDO_PADRAO })) }, como('administrador'), validadeDofDias);
+    return e.entregas.find((x) => x.id === emissao.entregaId)!;
   };
   const receberEm = (diasAtras: number, entrega: EntregaReg, fardos = entrega.fardosIds, justificativaDivergencia?: string) => {
     em(diasAtras, 10);

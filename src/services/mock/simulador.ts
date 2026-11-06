@@ -2,14 +2,15 @@ import { idDormente, idFardo, sequenciaDe } from '../../dominio/identificacao';
 import { dataSP, somarDias } from '../../dominio/parametros';
 import type { Id } from '../../types/models';
 import { chaveComDigito } from '../../utils/nfeXml';
-import type { DadosGerarEntrega } from '../contracts';
+import type { DadosEmissao } from '../contracts';
 import { contratoView, itemDescrito } from './consultas';
 import { cadastrarEntrega } from './documentos';
-import { achar, evento, falha, proximoNumero, type Ctx, type EntregaReg, type Estado } from './estado';
+import { achar, evento, falha, novoId, proximoNumero, type Ctx, type EmissaoReg, type Estado } from './estado';
 
 /*
- * Simulador do fornecedor (só demonstração): emite fardos e dormentes com IDs sequenciais do contrato e cria a
- * entrega já com NF e DOF de exemplo, como se tivessem sido cadastradas em NF e DOF.
+ * Simulador do fornecedor (só demonstração): emite fardos e dormentes com IDs sequenciais do contrato, com a NF e a
+ * DOF de exemplo que acompanham o material. Com documentos, a entrega já nasce cadastrada; sem, a CPTM cadastra NF e
+ * DOF depois em NF e DOF, importando o XML baixado aqui (a entrega é ligada à emissão pela chave de acesso).
  */
 
 const MAX_FARDOS = 50;
@@ -28,7 +29,7 @@ function chaveFicticia(cnpj: string, emissao: string, numero: number): string {
   return chaveComDigito(base);
 }
 
-export function gerarEntrega(e: Estado, dados: DadosGerarEntrega, ctx: Ctx, validadeDofDias = 7): EntregaReg {
+export function emitir(e: Estado, dados: DadosEmissao, ctx: Ctx, validadeDofDias = 7): EmissaoReg {
   const reg = achar(e.contratos, (c) => c.id === dados.contratoId, 'Contrato');
   const contrato = contratoView(e, reg);
   if (contrato.situacao !== 'vigente') falha(422, `O contrato ${contrato.numero} não está vigente.`, { contratoId: 'Escolha um contrato vigente.' });
@@ -47,6 +48,7 @@ export function gerarEntrega(e: Estado, dados: DadosGerarEntrega, ctx: Ctx, vali
   // Emissão dos fardos e dormentes (situação: em trânsito / emitido).
   const ata = achar(e.atas, (a) => a.id === reg.ataId, 'Ata');
   const fornecedor = achar(e.fornecedores, (f) => f.id === ata.fornecedorId, 'Fornecedor');
+  const emissaoId = novoId(e, 'em');
   let seqFardo = proximaSequencia(e, reg.id, 'fardo');
   let seqDormente = proximaSequencia(e, reg.id, 'dormente');
   const fardosIds: Id[] = [];
@@ -57,7 +59,7 @@ export function gerarEntrega(e: Estado, dados: DadosGerarEntrega, ctx: Ctx, vali
     for (let k = 0; k < i.fardos; k++) {
       const fardoId = idFardo(reg.numero, seqFardo++);
       fardosIds.push(fardoId);
-      e.fardos.push({ id: fardoId, contratoId: reg.id, itemContratoId: i.itemContratoId, quantidadeInicial: i.dormentesPorFardo, historico: [evento(ctx, 'emitido', 'Fardo emitido pelo fornecedor')] });
+      e.fardos.push({ id: fardoId, contratoId: reg.id, itemContratoId: i.itemContratoId, emissaoId, quantidadeInicial: i.dormentesPorFardo, historico: [evento(ctx, 'emitido', 'Fardo emitido pelo fornecedor')] });
       for (let j = 0; j < i.dormentesPorFardo; j++) {
         e.dormentes.push({
           id: idDormente(reg.numero, seqDormente++), contratoId: reg.id, itemContratoId: i.itemContratoId, fardoId,
@@ -71,25 +73,37 @@ export function gerarEntrega(e: Estado, dados: DadosGerarEntrega, ctx: Ctx, vali
     volumePorEspecie.set(desc.especie.id, (volumePorEspecie.get(desc.especie.id) ?? 0) + volume);
   }
 
-  // NF e DOF de exemplo, coerentes com o volume emitido.
-  const emissao = dataSP(ctx.agora());
+  // NF e DOF de exemplo, coerentes com o volume emitido (a DOF declara o volume nominal).
+  const dataEmissao = dataSP(ctx.agora());
   const numeroNf = proximoNumero(e, 'numeroNf', 4500);
   const numeroDof = proximoNumero(e, 'numeroDof', 26_010_001);
-  return cadastrarEntrega(e, {
-    nf: { numero: String(numeroNf), serie: '1', chaveAcesso: chaveFicticia(fornecedor.cnpj, emissao, numeroNf), contratoId: reg.id, emissao, itens: itensNf },
-    dof: { numero: String(numeroDof), validade: somarDias(emissao, validadeDofDias), volumes: [...volumePorEspecie].map(([especieId, v]) => ({ especieId, volumeM3: Math.round(v * 1000) / 1000 })) },
-    fardosIds,
-  }, 'simulador', ctx, { xml: { name: `NF-${numeroNf}.xml` } as File });
+  const emissao: EmissaoReg = {
+    id: emissaoId, contratoId: reg.id, fardosIds, comDocumentos: dados.comDocumentos,
+    nf: { numero: String(numeroNf), serie: '1', chaveAcesso: chaveFicticia(fornecedor.cnpj, dataEmissao, numeroNf), emissao: dataEmissao, itens: itensNf },
+    dof: { numero: String(numeroDof), validade: somarDias(dataEmissao, validadeDofDias), volumes: [...volumePorEspecie].map(([especieId, v]) => ({ especieId, volumeM3: Math.round(v * 1000) / 1000 })) },
+    criadoEm: ctx.agora().toISOString(), criadoPor: ctx.quem,
+  };
+  e.emissoes.push(emissao);
+  // Com documentos: a entrega já nasce cadastrada, como se a CPTM tivesse cadastrado NF e DOF (liga-se pela chave).
+  if (dados.comDocumentos) {
+    cadastrarEntrega(e, {
+      nf: { ...emissao.nf, contratoId: reg.id, itens: itensNf.map((i) => ({ ...i })) },
+      dof: { ...emissao.dof, volumes: emissao.dof.volumes.map((v) => ({ ...v })) },
+      fardosIds,
+    }, 'simulador', ctx, { xml: { name: `NF-${numeroNf}.xml` } as File });
+  }
+  return emissao;
 }
 
 const escaparXml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** XML fictício da NF da entrega, no formato que `lerXmlNfe` lê (para testar a importação em NF e DOF). */
-export function xmlDaNf(e: Estado, entregaId: Id): string {
-  const en = achar(e.entregas, (x) => x.id === entregaId, 'Entrega');
-  const nf = achar(e.nfs, (n) => n.id === en.nfId, 'NF');
-  const dof = achar(e.dofs, (d) => d.id === en.dofId, 'DOF');
-  const forn = achar(e.fornecedores, (f) => f.id === nf.fornecedorId, 'Fornecedor');
+/** XML fictício da NF da emissão, no formato que `lerXmlNfe` lê (para a importação em NF e DOF). */
+export function xmlDaNf(e: Estado, emissaoId: Id): string {
+  const em = achar(e.emissoes, (x) => x.id === emissaoId, 'Emissão');
+  const { nf, dof } = em;
+  const contrato = achar(e.contratos, (c) => c.id === em.contratoId, 'Contrato');
+  const ata = achar(e.atas, (a) => a.id === contrato.ataId, 'Ata');
+  const forn = achar(e.fornecedores, (f) => f.id === ata.fornecedorId, 'Fornecedor');
   const itens = nf.itens.map((i, n) => {
     const d = itemDescrito(e, i.itemContratoId);
     const t = d.tamanho;
@@ -121,7 +135,7 @@ export function xmlDaNf(e: Estado, entregaId: Id): string {
       </emit>
 ${itens}
       <infAdic>
-        <infCpl>Produto florestal acompanhado do DOF n. ${escaparXml(dof.numero)}. Contrato ${escaparXml(e.contratos.find((c) => c.id === nf.contratoId)?.numero ?? '')}.</infCpl>
+        <infCpl>Produto florestal acompanhado do DOF n. ${escaparXml(dof.numero)}. Contrato ${escaparXml(contrato.numero)}.</infCpl>
       </infAdic>
     </infNFe>
   </NFe>

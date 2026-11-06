@@ -9,44 +9,46 @@ import { Modal } from '../components/Modal';
 import { ProgressoPassos } from '../components/Passos';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../contexts/AuthContext';
-import { SITUACAO_ENTREGA } from '../dominio/rotulos';
+import { SITUACAO_EMISSAO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { mensagemSegura } from '../services/http';
-import type { Contrato, Entrega } from '../types/models';
-import { dataHora, numero, paraNumero } from '../utils/format';
+import type { Contrato, Emissao } from '../types/models';
+import { data, dataHora, m3, numero, paraNumero } from '../utils/format';
 
 const PASSOS = ['Contrato', 'Fardos e dormentes', 'Revisar e confirmar'];
 
-/** Baixa o XML fictício da NF da entrega (para testar a importação em NF e DOF). */
-async function baixarXml(en: Entrega) {
-  const xml = await servicos.simulador.xmlNf(en.id);
+/** Baixa o XML fictício da NF da emissão (para a importação em NF e DOF). */
+async function baixarXml(em: Emissao) {
+  const xml = await servicos.simulador.xmlNf(em.id);
   const url = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `NF-${en.nfNumero}.xml`;
+  a.download = `NF-${em.nf.numero}.xml`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-interface PropsAssistente { aberto: boolean; contratos: Contrato[]; inicial?: string; porFardo: number; aoFechar: () => void; aoGerar: (en: Entrega) => void }
+interface PropsAssistente { aberto: boolean; contratos: Contrato[]; inicial?: string; porFardo: number; aoFechar: () => void; aoGerar: (em: Emissao) => void }
 
 /**
- * Assistente "Gerar entrega" (seção 9.5 do plano): contrato, fardos e dormentes por item (sem passar do saldo a emitir)
- * e revisão. O serviço emite fardos e dormentes com IDs sequenciais do contrato e cria NF e DOF de exemplo.
+ * Assistente "Emitir fardos" (seção 9.5 do plano): contrato, fardos e dormentes por item (sem passar do saldo a emitir)
+ * e revisão, onde se escolhe se NF e DOF já entram cadastradas ou se a emissão gera só os fardos (a CPTM cadastra
+ * NF e DOF depois, pelo XML baixado aqui). O serviço emite fardos e dormentes com IDs sequenciais do contrato.
  */
-function GerarEntrega({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar }: PropsAssistente) {
+function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar }: PropsAssistente) {
   const cad = useCadastros();
   const [passo, setPasso] = useState(0);
   const [contratoId, setContratoId] = useState('');
   const [qtd, setQtd] = useState<Record<string, { fardos: string; porFardo: string }>>({});
+  const [comDocumentos, setComDocumentos] = useState(true);
   const [erro, setErro] = useState<string>();
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     if (!aberto) return;
-    setPasso(0); setErro(undefined); setQtd({});
+    setPasso(0); setErro(undefined); setQtd({}); setComDocumentos(true);
     setContratoId(contratos.find((c) => c.numero === inicial)?.id ?? '');
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -75,11 +77,11 @@ function GerarEntrega({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
     if (!contrato) return;
     setEnviando(true); setErro(undefined);
     try {
-      const en = await servicos.simulador.gerarEntrega({
-        contratoId: contrato.id,
+      const em = await servicos.simulador.emitir({
+        contratoId: contrato.id, comDocumentos,
         itens: linhas.filter((l) => l.fardos > 0).map((l) => ({ itemContratoId: l.item.id, fardos: l.fardos, dormentesPorFardo: l.por })),
       });
-      aoGerar(en);
+      aoGerar(em);
     } catch (e) {
       setErro(mensagemSegura(e));
     } finally {
@@ -89,12 +91,12 @@ function GerarEntrega({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
 
   return (
     <Modal
-      largo titulo="Gerar entrega" aberto={aberto} aoFechar={aoFechar}
+      largo titulo="Emitir fardos" aberto={aberto} aoFechar={aoFechar}
       rodape={<>
         {passo > 0 && <button type="button" className="btn btn-sec" onClick={() => setPasso((p) => p - 1)} disabled={enviando}>Voltar</button>}
         {passo < 2
           ? <button type="button" className="btn btn-pri" onClick={avancar}>Avançar</button>
-          : <button type="button" className="btn btn-pri" onClick={() => void confirmar()} disabled={enviando}>{enviando ? 'Gerando…' : 'Gerar entrega'}</button>}
+          : <button type="button" className="btn btn-pri" onClick={() => void confirmar()} disabled={enviando}>{enviando ? 'Emitindo…' : comDocumentos ? 'Emitir com NF e DOF' : 'Emitir só os fardos'}</button>}
       </>}
     >
       <ProgressoPassos passos={PASSOS} atual={passo} />
@@ -135,7 +137,37 @@ function GerarEntrega({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
             {linhas.filter((l) => l.fardos > 0).map((l) => <li key={l.item.id}>{cad.descreverItem(l.item)}: {l.fardos} fardo(s) × {l.por} = {numero(l.total)} dormentes</li>)}
           </ul>
           <p><strong>{numero(totalFardos)} fardos e {numero(totalDormentes)} dormentes</strong>, com IDs sequenciais do contrato, em trânsito.</p>
-          <p className="mudo">Junto, uma NF e uma DOF de exemplo (validade em 7 dias), como se tivessem sido cadastradas em NF e DOF: a entrega aparece "A caminho" em Recebimentos.</p>
+          <fieldset className="opcoes-radio">
+            <legend>NF e DOF</legend>
+            <label className="cartao-escolha">
+              <input type="radio" name="sim-docs" checked={comDocumentos} onChange={() => setComDocumentos(true)} />
+              <span><strong>Com NF e DOF já cadastradas</strong><span className="mudo">A entrega aparece "A caminho" em Recebimentos, como se a CPTM já tivesse cadastrado os documentos.</span></span>
+            </label>
+            <label className="cartao-escolha">
+              <input type="radio" name="sim-docs" checked={!comDocumentos} onChange={() => setComDocumentos(false)} />
+              <span><strong>Gerar só os fardos (sem NF e DOF)</strong><span className="mudo">Para demonstrar o fluxo completo: baixe o XML da NF aqui, cadastre NF e DOF em Entrada › NF e DOF e depois receba.</span></span>
+            </label>
+          </fieldset>
+          <p className="mudo">A NF e a DOF de exemplo têm validade de 7 dias; os dados da DOF ficam em "Ver DOF" na lista.</p>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/** Dados da DOF da emissão, para digitar no cadastro de NF e DOF (o volume vem do documento, não da NF). */
+function VerDof({ emissao, aoFechar }: { emissao?: Emissao; aoFechar: () => void }) {
+  const cad = useCadastros();
+  return (
+    <Modal titulo={`DOF ${emissao?.dof.numero ?? ''}`} aberto={!!emissao} aoFechar={aoFechar} rodape={<button type="button" className="btn btn-sec" onClick={aoFechar}>Fechar</button>}>
+      {emissao && (
+        <div className="resumo-revisao">
+          <p>DOF de exemplo que acompanha a NF {emissao.nf.numero}. No cadastro de NF e DOF, o número vem do XML; a validade e o volume por espécie são digitados deste documento.</p>
+          <dl className="detalhes">
+            <dt>Número</dt><dd className="mono">{emissao.dof.numero}</dd>
+            <dt>Validade</dt><dd>{data(emissao.dof.validade)}</dd>
+            {emissao.dof.volumes.map((v) => [<dt key={`t${v.especieId}`}>{cad.nomeEspecie(v.especieId)}</dt>, <dd key={`d${v.especieId}`} className="al-right">{m3(v.volumeM3)}</dd>])}
+          </dl>
         </div>
       )}
     </Modal>
@@ -152,6 +184,7 @@ export default function Simulador() {
   const todos = useAsync(() => servicos.contratos.listar({ pageSize: 500 }), []);
   const [aberto, setAberto] = useState(false);
   const [rec, setRec] = useState(0);
+  const [verDof, setVerDof] = useState<Emissao>();
   const pedido = params.get('contrato') ?? undefined;
   const contratos = todos.dados?.items ?? [];
   const vigentes = useMemo(() => contratos.filter((c) => c.situacao === 'vigente'), [contratos]);
@@ -161,41 +194,45 @@ export default function Simulador() {
   // Vindo da página do contrato (?contrato=AR00224-01): o assistente já abre com ele.
   useEffect(() => { if (pedido && ligado && contratos.length) setAberto(true); }, [pedido, ligado, contratos.length]);
 
-  const colunas: Coluna<Entrega>[] = [
-    { chave: 'nfNumero', titulo: 'NF', ordenavel: true, render: (en) => `NF ${en.nfNumero}` },
-    { chave: 'contratoId', titulo: 'Contrato', render: (en) => <span className="mono">{numeroDe(en.contratoId)}</span> },
-    { chave: 'fardosIds', titulo: 'Fardos', alinhar: 'right', render: (en) => numero(en.fardosIds.length) },
-    { chave: 'dormentes', titulo: 'Dormentes', alinhar: 'right', ordenavel: true, render: (en) => numero(en.dormentes) },
-    { chave: 'situacao', titulo: 'Situação', render: (en) => <BadgeDe mapa={SITUACAO_ENTREGA} valor={en.situacao} /> },
-    { chave: 'criadoEm', titulo: 'Gerada em', ordenavel: true, render: (en) => dataHora(en.criadoEm) },
+  const colunas: Coluna<Emissao>[] = [
+    { chave: 'nf', titulo: 'NF', render: (em) => `NF ${em.nf.numero}` },
+    { chave: 'contratoId', titulo: 'Contrato', render: (em) => <span className="mono">{numeroDe(em.contratoId)}</span> },
+    { chave: 'fardosIds', titulo: 'Fardos', alinhar: 'right', render: (em) => numero(em.fardosIds.length) },
+    { chave: 'dormentes', titulo: 'Dormentes', alinhar: 'right', ordenavel: true, render: (em) => numero(em.dormentes) },
+    { chave: 'situacao', titulo: 'Situação', render: (em) => <BadgeDe mapa={SITUACAO_EMISSAO} valor={em.situacao} /> },
+    { chave: 'criadoEm', titulo: 'Emitida em', ordenavel: true, opcional: true, render: (em) => dataHora(em.criadoEm) },
   ];
 
   return (
     <>
       <CabecalhoPagina
         titulo="Simulador do fornecedor" selo={<SeloDemo />}
-        subtitulo="Gera fardos e dormentes com IDs do contrato, NF e DOF de exemplo, e imprime as etiquetas com QR."
-        acoes={ligado && pode('simulador:usar') && <button className="btn btn-pri" onClick={() => setAberto(true)}>Gerar entrega</button>}
+        subtitulo="Emite fardos e dormentes com IDs do contrato, com a NF e a DOF de exemplo, e imprime as etiquetas com QR."
+        acoes={ligado && pode('simulador:usar') && <button className="btn btn-pri" onClick={() => setAberto(true)}>Emitir fardos</button>}
       />
       <Aviso tom="alerta"><strong>Demonstração.</strong> Na operação real, o fornecedor grava o QR na plaquinha seguindo o padrão do contrato.</Aviso>
-      {parametros.dados && !ligado && <Aviso tom="critico">O modo demonstração está desligado em Configurações: o simulador não gera entregas.</Aviso>}
-      <ListPage<Entrega>
-        titulo="Entregas geradas" subnivel
-        listar={(q) => servicos.documentos.listarEntregas({ ...q, filters: { ...q.filters, origem: 'simulador' } })}
+      {parametros.dados && !ligado && <Aviso tom="critico">O modo demonstração está desligado em Configurações: o simulador não emite fardos.</Aviso>}
+      <ListPage<Emissao>
+        titulo="Emissões" subnivel
+        listar={(q) => servicos.simulador.listar(q)}
         recarregar={rec}
         colunas={colunas}
         acoesLinha={[
-          { rotulo: 'Imprimir etiquetas', principal: true, aoClicar: (en) => nav(`/simulador/etiquetas/${en.id}`) },
-          { rotulo: 'Baixar XML da NF', aoClicar: (en) => { baixarXml(en).catch((e) => notificar('erro', mensagemSegura(e))); } },
+          { rotulo: 'Imprimir etiquetas', principal: true, aoClicar: (em) => nav(`/simulador/etiquetas/${em.id}`) },
+          { rotulo: 'Baixar XML da NF', aoClicar: (em) => { baixarXml(em).catch((e) => notificar('erro', mensagemSegura(e))); } },
+          { rotulo: 'Ver DOF', aoClicar: setVerDof },
         ]}
       />
-      <GerarEntrega
+      <VerDof emissao={verDof} aoFechar={() => setVerDof(undefined)} />
+      <EmitirFardos
         aberto={aberto} contratos={vigentes} inicial={pedido} porFardo={parametros.dados?.dormentesPorFardoPadrao ?? 14}
         aoFechar={() => { setAberto(false); if (pedido) setParams({}, { replace: true }); }}
-        aoGerar={(en) => {
+        aoGerar={(em) => {
           setAberto(false);
           if (pedido) setParams({}, { replace: true });
-          notificar('sucesso', `Entrega da NF ${en.nfNumero} gerada: ${en.fardosIds.length} fardo(s), ${numero(en.dormentes)} dormentes.`);
+          notificar('sucesso', em.comDocumentos
+            ? `Emitidos ${em.fardosIds.length} fardo(s) e ${numero(em.dormentes)} dormentes, com a entrega da NF ${em.nf.numero} a caminho.`
+            : `Emitidos ${em.fardosIds.length} fardo(s) e ${numero(em.dormentes)} dormentes. Baixe o XML da NF ${em.nf.numero} e cadastre NF e DOF.`);
           setRec((x) => x + 1);
           todos.recarregar();
         }}

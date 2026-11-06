@@ -25,6 +25,8 @@ interface Props {
   titulo?: string;
   /** Conteúdo extra abaixo da câmera (ex. a lista dos fardos esperados com o contador "8 de 12 lidos"). */
   children?: ReactNode;
+  /** Câmera mais baixa, para caber uma decisão embaixo dela (ex. Aprovado ou Reprovado na inspeção à mão). */
+  cameraReduzida?: boolean;
 }
 
 type EstadoCamera = 'iniciando' | 'ativa' | 'sem-permissao' | 'sem-camera' | 'inseguro' | 'erro';
@@ -44,7 +46,7 @@ const INTERVALO_REPETIDA_MS = 2500;
  * Câmera traseira, moldura de mira, lanterna quando existir, leitura contínua com vibração curta e sempre a opção de
  * digitar o código. Só aceita códigos reconhecidos por `lerCodigo()`.
  */
-export function LeitorQr({ aberto, aoFechar, modo = 'navegar', continuo, aoLer, titulo = 'Ler QR', children }: Props) {
+export function LeitorQr({ aberto, aoFechar, modo = 'navegar', continuo, aoLer, titulo = 'Ler QR', children, cameraReduzida }: Props) {
   const nav = useNavigate();
   const idCampo = useId();
   const video = useRef<HTMLVideoElement>(null);
@@ -166,7 +168,7 @@ export function LeitorQr({ aberto, aoFechar, modo = 'navegar', continuo, aoLer, 
   return (
     <Modal titulo={titulo} aberto={aberto} aoFechar={fechar} largo>
       <div className="leitor">
-        <div className="leitor-camera">
+        <div className={`leitor-camera${cameraReduzida ? ' leitor-camera-reduzida' : ''}`}>
           <video ref={video} playsInline muted aria-label="Imagem da câmera" />
           {estado === 'ativa' && <div className="leitor-mira" aria-hidden="true" />}
           {estado === 'iniciando' && <p className="leitor-estado">Abrindo a câmera…</p>}

@@ -8,6 +8,7 @@ import { LinhaTempo } from '../components/LinhaTempo';
 import { Relacionados } from '../components/Relacionados';
 import { RE_FARDO } from '../dominio/identificacao';
 import { rotuloCategoria, SITUACAO_DORMENTE, SITUACAO_FARDO, TIPO_MOVIMENTACAO } from '../dominio/rotulos';
+import { useAuth } from '../contexts/AuthContext';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
@@ -18,10 +19,11 @@ type AbaFardo = 'dormentes' | 'origem' | 'movimentacoes' | 'historico';
 
 /**
  * Página do fardo (seção 9.12 do plano), destino do QR do fardo: saldo físico e disponível, local, idade, os
- * dormentes, a origem e o histórico. Inspecionar e transferir a partir daqui entram nas Etapas 6 e 7.
+ * dormentes, a origem e o histórico. Inspecionar leva à inspeção do fardo; transferir entra na Etapa 7.
  */
 export default function FardoDetalhe() {
   const { id: bruto = '' } = useParams();
+  const { pode } = useAuth();
   const id = decodeURIComponent(bruto).trim().toUpperCase();
   const cad = useCadastros();
   const r = useAsync(() => servicos.fardos.obter(id), [id]);
@@ -46,7 +48,10 @@ export default function FardoDetalhe() {
       <CabecalhoObjeto
         tipo="Fardo" id={f.id} situacao={<BadgeDe mapa={SITUACAO_FARDO} valor={f.situacao} />}
         migalhas={[{ rotulo: 'Contratos', para: '/contratos' }, { rotulo: `Contrato ${contrato.numero}`, para: `/contratos/${contrato.numero}?aba=fardos` }, { rotulo: `Fardo ${f.id}` }]}
-        acoes={entrega && <Link className="btn btn-sec" to={`/simulador/etiquetas/${entrega.id}?fardo=${f.id}`}>Imprimir etiqueta do fardo</Link>}
+        acoes={<>
+          {(f.situacao === 'aguardando_inspecao' || f.situacao === 'em_inspecao') && pode('inspecao:operar') && <Link className="btn btn-acao" to={`/inspecao/${f.id}`}>Inspecionar</Link>}
+          {f.emissaoId && <Link className="btn btn-sec" to={`/simulador/etiquetas/${f.emissaoId}?fardo=${f.id}`}>Imprimir etiqueta do fardo</Link>}
+        </>}
         fatos={<>
           <FatoChave rotulo="Saldo" valor={`${numero(f.saldo)} de ${numero(f.quantidadeInicial)}`} />
           <FatoChave rotulo="Disponível" valor={numero(f.disponivel)} />
@@ -54,6 +59,8 @@ export default function FardoDetalhe() {
           <FatoChave rotulo="Idade" valor={f.idadeDias !== undefined ? <>{dias(f.idadeDias)}{f.acimaLimiteDias && <span className="texto-critico"> · acima do limite</span>}</> : '—'} />
           <FatoChave rotulo="Contrato" valor={<span className="mono">{contrato.numero}</span>} para={`/contratos/${contrato.numero}`} />
           <FatoChave rotulo="Item" valor={`${item.especie.nomePopular} · ${item.tamanho.codigo}`} />
+          {f.faltaDeclarada ? <FatoChave rotulo="Falta no recebimento" valor={`${numero(f.faltaDeclarada)} dormente(s)`} /> : null}
+          {f.progressoInspecao && <FatoChave rotulo="Inspeção" valor={`${numero(f.progressoInspecao.inspecionados)} de ${numero(f.progressoInspecao.total)}`} para={`/inspecao/${f.id}`} />}
         </>}
       />
       <div className="objeto-grade">

@@ -1,6 +1,6 @@
 import { dataSP } from '../../dominio/parametros';
 import type {
-  Anexo, Ata, Contrato, Dof, Dormente, EmpresaInspetora, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
+  Anexo, Ata, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
   Movimentacao, NotaFiscal, Parametros, Recebimento, Rme, Tamanho, Tratamento, Usuario,
 } from '../../types/models';
 import { ApiError } from '../http';
@@ -14,7 +14,8 @@ export type TamanhoReg = Omit<Tamanho, 'volumeM3'>;
 export type LocalReg = Omit<Local, 'ocupacao' | 'fardos'>;
 export type ItemContratoReg = Pick<ItemContrato, 'id' | 'especieId' | 'tamanhoId' | 'tratamentoId' | 'quantidade'>;
 export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao'> & { situacao: 'vigente' | 'cancelado'; itens: ItemContratoReg[] };
-export type FardoReg = Omit<Fardo, 'saldo' | 'disponivel' | 'situacao' | 'idadeDias' | 'acimaLimiteDias'>;
+export type FardoReg = Omit<Fardo, 'saldo' | 'disponivel' | 'situacao' | 'idadeDias' | 'acimaLimiteDias' | 'progressoInspecao'>;
+export type EmissaoReg = Omit<Emissao, 'dormentes' | 'situacao'>;
 export type DofReg = Omit<Dof, 'prazoDeclaracao' | 'diasParaPrazo' | 'nivelPrazo' | 'nfNumero' | 'fornecedorId' | 'contratoId' | 'entregaId' | 'situacaoDeclaracao' | 'podeDeclarar'>;
 export type EntregaReg = Omit<Entrega, 'nfNumero' | 'fornecedorId' | 'fardosRecebidos' | 'dormentes' | 'prazoDeclaracao' | 'nivelPrazo' | 'divergenciaVolume' | 'etapa' | 'comOcorrencia' | 'recebimentosIds'>;
 
@@ -36,6 +37,7 @@ export interface Estado {
   dormentes: Dormente[];
   nfs: NotaFiscal[];
   dofs: DofReg[];
+  emissoes: EmissaoReg[];
   entregas: EntregaReg[];
   recebimentos: Recebimento[];
   inspecoes: Inspecao[];
@@ -46,7 +48,7 @@ export interface Estado {
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 4;
+export const VERSAO_ESTADO = 5;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }

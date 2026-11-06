@@ -2,10 +2,10 @@ import {
   diasEntre, dataSP, diferencaVolumePct, foraDaTolerancia, nivelPrazo, prazoDeclaracao, situacaoSaldo, volumeM3,
 } from '../../dominio/parametros';
 import type {
-  Contrato, DivergenciaVolume, Dof, Dormente, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo, Id, InspecaoFardo, ItemContrato,
+  Contrato, DivergenciaVolume, Dof, Dormente, Emissao, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo, Id, InspecaoFardo, ItemContrato,
   ItemDescrito, Local, SaldoItem, SituacaoFardo, Tamanho,
 } from '../../types/models';
-import { achar, type ContratoReg, type DofReg, type EntregaReg, type Estado, type FardoReg, type FornecedorReg, type LocalReg, type TamanhoReg } from './estado';
+import { achar, type ContratoReg, type DofReg, type EmissaoReg, type EntregaReg, type Estado, type FardoReg, type FornecedorReg, type LocalReg, type TamanhoReg } from './estado';
 
 /*
  * Campos calculados: montados na consulta, a partir do que está gravado (no Supabase, views e funções).
@@ -56,7 +56,8 @@ export function fardoView(e: Estado, f: FardoReg, hoje: string): Fardo {
   const idadeDias = f.recebidoEm ? Math.max(0, diasEntre(dataSP(new Date(f.recebidoEm)), hoje)) : undefined;
   const situacao = situacaoFardo(e, f, ds);
   const comSaldo = situacao === 'em_estoque' || situacao === 'aberto';
-  return { ...f, saldo, disponivel, situacao, idadeDias, acimaLimiteDias: comSaldo && (idadeDias ?? 0) > e.parametros.limiteDiasEstoque };
+  const progressoInspecao = f.recebidoEm && !f.conclusaoInspecao ? { inspecionados: ds.filter((d) => d.inspecaoId).length, total: ds.length } : undefined;
+  return { ...f, saldo, disponivel, situacao, idadeDias, acimaLimiteDias: comSaldo && (idadeDias ?? 0) > e.parametros.limiteDiasEstoque, progressoInspecao };
 }
 
 export function localView(e: Estado, l: LocalReg, hoje: string): Local {
@@ -68,7 +69,9 @@ export function localView(e: Estado, l: LocalReg, hoje: string): Local {
 
 export function itemContratoView(e: Estado, contratoId: Id, item: ContratoReg['itens'][number]): ItemContrato {
   const ds = e.dormentes.filter((d) => d.itemContratoId === item.id && d.contratoId === contratoId);
-  const recebidos = ds.filter((d) => d.situacao !== 'emitido').length;
+  // Recebidos: os que chegaram, sem a falta declarada no recebimento dos fardos do item.
+  const faltas = e.fardos.filter((f) => f.itemContratoId === item.id).reduce((t, f) => t + (f.faltaDeclarada ?? 0), 0);
+  const recebidos = Math.max(0, ds.filter((d) => d.situacao !== 'emitido').length - faltas);
   const reprovados = ds.filter((d) => d.situacao === 'reprovado').length;
   const aprovados = ds.filter((d) => ['em_estoque', 'reservado', 'baixado'].includes(d.situacao)).length;
   return { ...item, emitidos: ds.length, recebidos, aprovados, reprovados, saldoAEmitir: item.quantidade - (ds.length - reprovados) };
@@ -97,22 +100,44 @@ export function dofView(e: Estado, d: DofReg, hoje: string): Dof {
   };
 }
 
+/** Volume real de um dormente pelas medidas da inspeção; sem medidas, o volume do tamanho. */
+function volumeMedido(e: Estado, d: Dormente): number {
+  if (d.medidas) return volumeM3(d.medidas.comprimentoCm, d.medidas.larguraCm, d.medidas.alturaCm);
+  return itemDescrito(e, d.itemContratoId).tamanho.volumeM3;
+}
+
+const arredondar = (v: number) => Math.round(v * 1000) / 1000;
+
 /**
- * Divergência de volume por espécie: volume da DOF × volume calculado dos fardos informados (dormentes × volume
- * do tamanho). Espécie sem volume na DOF e com material recebido aparece com divergência infinita.
+ * Divergência de volume por espécie (regra da IN Ibama): DOF × volume nominal (dormentes recebidos × volume do tamanho,
+ * descontada a falta declarada) e, quando todos os fardos recebidos da espécie já tiveram a inspeção concluída, DOF ×
+ * volume medido (medidas reais dos aprovados e reprovados). A divergência oficial usa o medido quando existe.
+ * `faltas` sobrepõe a falta declarada dos fardos (recebimento ainda não gravado).
  */
-export function divergenciaVolume(e: Estado, dof: DofReg, fardos: FardoReg[]): DivergenciaVolume[] {
-  const calculado = new Map<Id, number>();
+export function divergenciaVolume(e: Estado, dof: DofReg, fardos: FardoReg[], faltas: Map<Id, number> = new Map()): DivergenciaVolume[] {
+  const nominal = new Map<Id, number>();
+  const medido = new Map<Id, number>();
+  const tudoInspecionado = new Map<Id, boolean>();
   for (const f of fardos) {
     const d = itemDescrito(e, f.itemContratoId);
-    calculado.set(d.especie.id, (calculado.get(d.especie.id) ?? 0) + dormentesDoFardo(e, f.id).length * d.tamanho.volumeM3);
+    const especieId = d.especie.id;
+    const falta = faltas.get(f.id) ?? f.faltaDeclarada ?? 0;
+    nominal.set(especieId, (nominal.get(especieId) ?? 0) + Math.max(0, dormentesDoFardo(e, f.id).length - falta) * d.tamanho.volumeM3);
+    tudoInspecionado.set(especieId, (tudoInspecionado.get(especieId) ?? true) && !!f.conclusaoInspecao);
+    const inspecionados = dormentesDoFardo(e, f.id).filter((x) => ['em_estoque', 'reservado', 'baixado', 'reprovado'].includes(x.situacao));
+    medido.set(especieId, (medido.get(especieId) ?? 0) + inspecionados.reduce((t, x) => t + volumeMedido(e, x), 0));
   }
-  const especies = new Set([...dof.volumes.map((v) => v.especieId), ...calculado.keys()]);
+  const especies = new Set([...dof.volumes.map((v) => v.especieId), ...nominal.keys()]);
   return [...especies].map((especieId) => {
     const documentalM3 = dof.volumes.find((v) => v.especieId === especieId)?.volumeM3 ?? 0;
-    const calculadoM3 = Math.round((calculado.get(especieId) ?? 0) * 1000) / 1000;
-    const percentual = diferencaVolumePct(documentalM3, calculadoM3);
-    return { especieId, documentalM3, calculadoM3, percentual: Number.isFinite(percentual) ? Math.round(percentual * 10) / 10 : percentual, acimaTolerancia: foraDaTolerancia(percentual) };
+    const nominalM3 = arredondar(nominal.get(especieId) ?? 0);
+    const medidoM3 = tudoInspecionado.get(especieId) ? arredondar(medido.get(especieId) ?? 0) : undefined;
+    const base = medidoM3 !== undefined ? 'medido' as const : 'nominal' as const;
+    const percentual = diferencaVolumePct(documentalM3, medidoM3 ?? nominalM3);
+    return {
+      especieId, documentalM3, nominalM3, medidoM3, base,
+      percentual: Number.isFinite(percentual) ? Math.round(percentual * 10) / 10 : percentual, acimaTolerancia: foraDaTolerancia(percentual),
+    };
   });
 }
 
@@ -213,15 +238,24 @@ export function inspecaoFardo(e: Estado, fardoId: Id, hoje: string): InspecaoFar
   return {
     fardo: fardoView(e, reg, hoje), item: itemDescrito(e, reg.itemContratoId), local: local && localView(e, local, hoje),
     dormentes, inspecionados, pendentes: dormentes.filter((d) => d.situacao === 'aguardando_inspecao' && !d.inspecao).length,
+    faltaDeclarada: reg.faltaDeclarada, justificativaSugerida: reg.faltaDeclarada ? justificativaDaFalta(reg.faltaDeclarada) : undefined,
   };
 }
 
-export function etiquetasEntrega(e: Estado, entregaId: Id, hoje: string): EtiquetasEntrega {
-  const en = achar(e.entregas, (x) => x.id === entregaId, 'Entrega');
+export function emissaoView(e: Estado, em: EmissaoReg): Emissao {
+  const entrega = e.entregas.find((x) => x.id === em.entregaId);
   return {
-    entrega: entregaView(e, en, hoje),
-    contrato: contratoView(e, achar(e.contratos, (c) => c.id === en.contratoId, 'Contrato')),
-    fardos: e.fardos.filter((f) => en.fardosIds.includes(f.id)).map((f) => ({
+    ...em, dormentes: e.dormentes.filter((d) => em.fardosIds.includes(d.fardoId)).length,
+    situacao: entrega ? entrega.situacao : 'aguardando_documentos',
+  };
+}
+
+export function etiquetasEmissao(e: Estado, emissaoId: Id, hoje: string): EtiquetasEmissao {
+  const em = achar(e.emissoes, (x) => x.id === emissaoId, 'Emissão');
+  return {
+    emissao: emissaoView(e, em),
+    contrato: contratoView(e, achar(e.contratos, (c) => c.id === em.contratoId, 'Contrato')),
+    fardos: e.fardos.filter((f) => em.fardosIds.includes(f.id)).map((f) => ({
       fardo: fardoView(e, f, hoje), item: itemDescrito(e, f.itemContratoId), dormentesIds: dormentesDoFardo(e, f.id).map((d) => d.id),
     })),
   };
@@ -247,3 +281,6 @@ export function resumoFornecedor(e: Estado, id: Id, hoje: string): FornecedorRes
     reprovacao: [...porEspecie].map(([especieId, t]) => ({ especieId, ...t, percentual: Math.round((t.reprovados / t.inspecionados) * 1000) / 10 })),
   };
 }
+
+/** Justificativa usada quando os dormentes não lidos na inspeção cabem na falta declarada no recebimento. */
+export const justificativaDaFalta = (n: number) => `Falta de ${n} ${n === 1 ? 'dormente declarada' : 'dormentes declarada'} no recebimento do fardo.`;

@@ -1,5 +1,5 @@
 import type {
-  NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEntrega,
+  NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEmissao, SituacaoEntrega,
   SituacaoFardo, SituacaoRme, SituacaoSaldo, TipoLocal, TipoMovimentacao, TipoOcorrencia,
 } from '../types/models';
 
@@ -35,6 +35,12 @@ export const SITUACAO_ENTREGA: Rotulos<SituacaoEntrega> = {
   a_caminho: ['azul', 'A caminho'],
   recebida_parcial: ['laranja', 'Recebida em parte'],
   recebida: ['verde', 'Recebida'],
+};
+
+/** Emissão do fornecedor (Simulador): sem NF e DOF, aguarda o cadastro dos documentos pela CPTM. */
+export const SITUACAO_EMISSAO: Rotulos<SituacaoEmissao> = {
+  aguardando_documentos: ['laranja', 'Aguardando NF e DOF'],
+  ...SITUACAO_ENTREGA,
 };
 
 export const SITUACAO_CONTRATO: Rotulos<SituacaoContrato> = {

@@ -52,7 +52,7 @@ describe('sessão e permissões', () => {
   it('cada perfil só faz o que pode', async () => {
     const { s, como } = montar('requisitante');
     const c = await contrato(s, 'AR00224-01');
-    await falhaCom(s.simulador.gerarEntrega({ contratoId: c.id, itens: [{ itemContratoId: c.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 403);
+    await falhaCom(s.simulador.emitir({ contratoId: c.id, comDocumentos: true, itens: [{ itemContratoId: c.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 403);
     como('gestor');
     const en = await entregaACaminho(s);
     await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: en.fardosIds, ocorrencias: [], localEsperaId: 'x' }), 403);
@@ -275,26 +275,101 @@ describe('simulador', () => {
     const mac = c.itens[1];
     expect(mac.saldoAEmitir).toBe(100); // 140 − (42 emitidos − 2 reprovados)
     const antes = (await s.fardos.listar({ pageSize: 1 })).total;
-    await falhaCom(s.simulador.gerarEntrega({ contratoId: c.id, itens: [{ itemContratoId: mac.id, fardos: 3, dormentesPorFardo: 34 }] }), 422, 'itens.0');
+    await falhaCom(s.simulador.emitir({ contratoId: c.id, comDocumentos: true, itens: [{ itemContratoId: mac.id, fardos: 3, dormentesPorFardo: 34 }] }), 422, 'itens.0');
     expect((await s.fardos.listar({ pageSize: 1 })).total).toBe(antes);
-    const en = await s.simulador.gerarEntrega({ contratoId: c.id, itens: [{ itemContratoId: mac.id, fardos: 2, dormentesPorFardo: 50 }] });
-    expect(en.fardosIds).toEqual(['AR00224-01-F009', 'AR00224-01-F010']);
+    const em = await s.simulador.emitir({ contratoId: c.id, comDocumentos: true, itens: [{ itemContratoId: mac.id, fardos: 2, dormentesPorFardo: 50 }] });
+    expect(em.fardosIds).toEqual(['AR00224-01-F009', 'AR00224-01-F010']);
+    expect(em.situacao).toBe('a_caminho');
+    const en = (await s.documentos.listarEntregas({ pageSize: 50 })).items.find((x) => x.id === em.entregaId)!;
     expect(en.origem).toBe('simulador');
-    const etiquetas = await s.simulador.etiquetas(en.id);
+    expect(en.fardosIds).toEqual(em.fardosIds);
+    const etiquetas = await s.simulador.etiquetas(em.id);
     expect(etiquetas.fardos[0].dormentesIds[0]).toBe('AR00224-01-000113');
     expect((await contrato(s, 'AR00224-01')).itens[1].saldoAEmitir).toBe(0);
-    const xml = await s.simulador.xmlNf(en.id);
-    expect(xml).toContain(`<nNF>${en.nfNumero}</nNF>`);
+    const xml = await s.simulador.xmlNf(em.id);
+    expect(xml).toContain(`<nNF>${em.nf.numero}</nNF>`);
+    expect(invariantes()).toEqual([]);
+  });
+  it('só os fardos: a CPTM cadastra NF e DOF pelo XML e a entrega se liga à emissão', async () => {
+    const { s, como, invariantes } = montar('administrador');
+    const c = await contrato(s, 'AR00224-01');
+    const mac = c.itens[1];
+    const em = await s.simulador.emitir({ contratoId: c.id, comDocumentos: false, itens: [{ itemContratoId: mac.id, fardos: 1, dormentesPorFardo: 10 }] });
+    expect(em.situacao).toBe('aguardando_documentos');
+    expect(em.entregaId).toBeUndefined();
+    expect((await s.documentos.fardosSemEntrega(c.id)).map((f) => f.id)).toContain(em.fardosIds[0]);
+    const xml = await s.simulador.xmlNf(em.id);
+    // O leitor de XML (DOMParser) é do navegador; aqui, confere-se o que ele leria.
+    expect(xml).toContain(`<chNFe>${em.nf.chaveAcesso}</chNFe>`);
+    expect(xml).toContain(`DOF n. ${em.dof.numero}`);
+    const nf = em.nf;
+    // Sem fardos indicados: os da emissão viram os esperados.
+    const en = await s.documentos.cadastrarEntrega({
+      nf: { numero: nf.numero, serie: nf.serie, chaveAcesso: nf.chaveAcesso, contratoId: c.id, emissao: nf.emissao, itens: [{ itemContratoId: mac.id, quantidade: 10, volumeM3: 0.704 }] },
+      dof: { numero: em.dof.numero, validade: em.dof.validade, volumes: em.dof.volumes },
+    });
+    expect(en.fardosIds).toEqual(em.fardosIds);
+    expect((await s.simulador.listar()).items.find((x) => x.id === em.id)?.entregaId).toBe(en.id);
+    como('almoxarife');
+    const loc = await localPorCodigo(s, 'INSP-01');
+    await s.recebimentos.receber(en.id, { fardosLidos: em.fardosIds, ocorrencias: [], localEsperaId: loc.id });
+    expect((await s.simulador.listar()).items.find((x) => x.id === em.id)?.situacao).toBe('recebida');
     expect(invariantes()).toEqual([]);
   });
   it('recusa contrato concluído e respeita o modo demonstração', async () => {
     const { s } = montar('administrador');
     const c2 = await contrato(s, 'AR00224-02');
     expect(c2.situacao).toBe('concluido');
-    await falhaCom(s.simulador.gerarEntrega({ contratoId: c2.id, itens: [{ itemContratoId: c2.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 422);
+    await falhaCom(s.simulador.emitir({ contratoId: c2.id, comDocumentos: true, itens: [{ itemContratoId: c2.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 422);
     await s.parametros.atualizar({ modoDemonstracao: false });
     const c1 = await contrato(s, 'AR00224-01');
-    await falhaCom(s.simulador.gerarEntrega({ contratoId: c1.id, itens: [{ itemContratoId: c1.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 409);
+    await falhaCom(s.simulador.emitir({ contratoId: c1.id, comDocumentos: true, itens: [{ itemContratoId: c1.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 409);
+  });
+});
+
+describe('falta de dormentes e volume nominal × medido', () => {
+  it('a falta declarada informa a quantidade, sai do recebido e do nominal; depois da inspeção vale o medido', async () => {
+    const { s, invariantes } = montar('almoxarife');
+    const en = await entregaACaminho(s);
+    const loc = await localPorCodigo(s, 'INSP-01');
+    const [f6, f7, f8] = en.fardosIds;
+    const foto = new File(['x'], 'falta.jpg', { type: 'image/jpeg' });
+    const c = await contrato(s, 'AR00224-01');
+    const recebidoAntes = c.itens[0].recebidos;
+    // Falta sem quantidade ou maior que o fardo é recusada.
+    await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: [f6, f7, f8], ocorrencias: [{ tipo: 'falta', descricao: 'Faltam dormentes', fardoId: f6, fotos: [foto] }], localEsperaId: loc.id }), 422, 'ocorrencias.0');
+    await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: [f6, f7, f8], ocorrencias: [{ tipo: 'falta', descricao: 'Faltam dormentes', fardoId: f6, quantidade: 99, fotos: [foto] }], localEsperaId: loc.id }), 422, 'ocorrencias.0');
+    const faltas = [{ fardoId: f6, quantidade: 2 }];
+    const previa = await s.recebimentos.previa(en.id, [f6, f7, f8], faltas);
+    expect(previa.dormentes).toBe(42 - 2);
+    const jat = previa.divergenciaVolume.find((d) => d.nominalM3 > 0 && d.documentalM3 > 0 && d.percentual !== 0)!;
+    expect(jat.base).toBe('nominal');
+    expect(jat.medidoM3).toBeUndefined();
+    const rec = await s.recebimentos.receber(en.id, {
+      fardosLidos: [f6, f7, f8], localEsperaId: loc.id,
+      ocorrencias: [{ tipo: 'falta', descricao: 'Faltam 2 dormentes no fardo', fardoId: f6, quantidade: 2, fotos: [foto] }],
+    });
+    expect(rec.ocorrencias[0].quantidade).toBe(2);
+    expect(rec.divergenciaVolume).toEqual(previa.divergenciaVolume);
+    expect((await contrato(s, 'AR00224-01')).itens[0].recebidos).toBe(recebidoAntes + 28 - 2);
+    // Inspeção: os 2 não lidos ficam não localizados com a justificativa sugerida pela falta.
+    const insp = await s.inspecao.obterFardo(f6);
+    expect(insp.faltaDeclarada).toBe(2);
+    expect(insp.justificativaSugerida).toContain('2 dormentes');
+    const lidos = insp.dormentes.slice(0, insp.dormentes.length - 2);
+    for (const d of lidos) await s.inspecao.registrar(d.id, { origem: 'manual', resultado: 'aprovado', categoria: 1, medidas: { comprimentoCm: 280, larguraCm: 24, alturaCm: 17 } }, f6);
+    const ins = await localPorCodigo(s, 'A-05');
+    // Os não lidos cabem na falta declarada: conclui sem escrever a justificativa (vale a do sistema).
+    const concluido = await s.inspecao.concluir(f6, { localId: ins.id });
+    expect(concluido.conclusaoInspecao?.justificativa).toBe(insp.justificativaSugerida);
+    expect(concluido.saldo).toBe(lidos.length);
+    await s.inspecao.simularFardo(f7);
+    await s.inspecao.concluir(f7, { localId: ins.id });
+    const depois = (await s.documentos.listarEntregas({ pageSize: 50 })).items.find((x) => x.id === en.id)!;
+    const jat2 = depois.divergenciaVolume!.find((d) => d.especieId === jat.especieId)!;
+    expect(jat2.base).toBe('medido');
+    expect(jat2.medidoM3).toBeGreaterThan(0);
+    expect(invariantes()).toEqual([]);
   });
 });
 

@@ -2,7 +2,7 @@ import { sequenciaDe } from '../../dominio/identificacao';
 import { categoriaDoIndice, resultadoDoVeredito } from '../../dominio/parametros';
 import type { Categoria, Id, Inspecao, ResultadoInspecao, VereditoInspector } from '../../types/models';
 import type { DadosInspecao } from '../contracts';
-import { dormentesDoFardo, itemDescrito } from './consultas';
+import { dormentesDoFardo, itemDescrito, justificativaDaFalta } from './consultas';
 import { achar, evento, falha, instante, novoId, type Ctx, type Estado } from './estado';
 import { localDeSegregacao, movimentarDormentes } from './estoque';
 
@@ -94,7 +94,10 @@ export function simularFardo(e: Estado, fardoId: Id, ctx: Ctx) {
   }
 }
 
-/** Conclui a inspeção do fardo e guarda no local. Dormentes não lidos exigem justificativa e ficam "não localizado". */
+/**
+ * Conclui a inspeção do fardo e guarda no local. Dormentes não lidos exigem justificativa e ficam "não localizado";
+ * quando cabem na falta declarada no recebimento, a justificativa do sistema vale se a pessoa não escrever outra.
+ */
 export function concluirInspecao(e: Estado, fardoId: Id, dados: { localId: Id; justificativa?: string }, ctx: Ctx) {
   const f = exigirEmInspecao(e, fardoId);
   const local = e.locais.find((l) => l.id === dados.localId);
@@ -104,7 +107,9 @@ export function concluirInspecao(e: Estado, fardoId: Id, dados: { localId: Id; j
   const aprovados = aguardando.filter((d) => resultadoDe(d.inspecaoId) === 'aprovado').map((d) => d.id);
   const reprovados = aguardando.filter((d) => resultadoDe(d.inspecaoId) === 'reprovado').map((d) => d.id);
   const naoLidos = aguardando.filter((d) => !d.inspecaoId).map((d) => d.id);
-  const justificativa = dados.justificativa?.trim();
+  // Não lidos que cabem na falta declarada no recebimento já têm justificativa: a do sistema, se ninguém escreveu outra.
+  const automatica = naoLidos.length && f.faltaDeclarada && naoLidos.length <= f.faltaDeclarada ? justificativaDaFalta(f.faltaDeclarada) : undefined;
+  const justificativa = dados.justificativa?.trim() || automatica;
   if (naoLidos.length && !justificativa) {
     falha(422, `${naoLidos.length} dormente(s) não foram lidos. Para concluir assim, informe a justificativa: eles ficarão como não localizados.`, { justificativa: 'Justificativa obrigatória com dormentes não lidos.' });
   }

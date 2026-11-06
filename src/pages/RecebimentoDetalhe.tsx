@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TabelaVolumes } from '../components/TabelaVolumes';
 import { Link, useParams } from 'react-router-dom';
 import { AbasSecao, useAbaNoEndereco, type Aba } from '../components/Abas';
 import { Badge, BadgeDe } from '../components/Badge';
@@ -117,23 +118,8 @@ export default function RecebimentoDetalhe() {
                 <dt>Declaração</dt><dd>{dof?.declarado ? `${dataHora(dof.declarado.quando)} · ${dof.declarado.quem}` : 'Ainda não declarada'}</dd>
                 <dt>PDF da DOF</dt><dd>{dof?.pdf?.nome ?? '—'}</dd>
               </dl>
-              <div className="tabela-wrap">
-                <table className="tabela">
-                  <caption className="sr-only">Volume documental e calculado por espécie</caption>
-                  <thead><tr><th scope="col">Espécie</th><th scope="col" className="al-right">DOF</th><th scope="col" className="al-right">Calculado</th><th scope="col" className="al-right">Diferença</th></tr></thead>
-                  <tbody>
-                    {(entrega?.divergenciaVolume ?? rec.divergenciaVolume).map((d) => (
-                      <tr key={d.especieId}>
-                        <td>{cad.nomeEspecie(d.especieId)}</td>
-                        <td className="al-right">{m3(d.documentalM3)}</td>
-                        <td className="al-right">{m3(d.calculadoM3)}</td>
-                        <td className="al-right">{Number.isFinite(d.percentual) ? pct(d.percentual) : 'sem DOF'} {d.acimaTolerancia && <Badge tom="vermelho">acima de 10%</Badge>}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mudo">Divergência acumulada da entrega (DOF × tudo o que já chegou), recalculada a cada recebimento.</p>
+              <TabelaVolumes volumes={entrega?.divergenciaVolume ?? rec.divergenciaVolume} legenda="Volume documental, nominal e medido por espécie" />
+              <p className="mudo">Divergência acumulada da entrega (DOF × tudo o que já chegou), recalculada a cada recebimento e depois da inspeção.</p>
               {rec.justificativaDivergencia && <p><strong>Justificativa:</strong> {rec.justificativaDivergencia} {rec.justificativaAutomatica && <Badge tom="azul">preenchida pelo sistema</Badge>}</p>}
             </div>
           )}
@@ -141,7 +127,7 @@ export default function RecebimentoDetalhe() {
             <ul className="lista-ocorrencias">
               {rec.ocorrencias.map((o, n) => (
                 <li key={n}>
-                  <BadgeDe mapa={TIPO_OCORRENCIA} valor={o.tipo} /> {o.fardoId && <span className="mono">{o.fardoId}</span>} {o.automatica && <Badge tom="cinza">registrada pelo sistema</Badge>}
+                  <BadgeDe mapa={TIPO_OCORRENCIA} valor={o.tipo} /> {o.fardoId && <span className="mono">{o.fardoId}</span>} {o.quantidade ? <Badge tom="laranja">{numero(o.quantidade)} dormente(s) faltando</Badge> : null} {o.automatica && <Badge tom="cinza">registrada pelo sistema</Badge>}
                   <p>{o.descricao}</p>
                   {o.fotos.length > 0 && <p className="mudo">Fotos: {o.fotos.map((f) => f.nome).join(', ')}</p>}
                 </li>

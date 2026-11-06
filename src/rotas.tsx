@@ -4,6 +4,8 @@ import type { NomeIcone } from './components/Icone';
 import type { Permissao } from './dominio/permissoes';
 import Cadastros from './pages/Cadastros';
 import ContratoDetalhe from './pages/ContratoDetalhe';
+import Inspecao from './pages/Inspecao';
+import InspecaoFardo from './pages/InspecaoFardo';
 import Documentos from './pages/Documentos';
 import Contratos from './pages/Contratos';
 import EmConstrucao from './pages/EmConstrucao';
@@ -63,12 +65,13 @@ export const ROTAS: Rota[] = [
   { caminho: '/contratos', tela: Contratos, rotulo: 'Contratos', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO },
   { caminho: '/contratos/:numero', tela: ContratoDetalhe, rotulo: 'Contrato', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/simulador', tela: Simulador, rotulo: 'Simulador do fornecedor', icone: 'fabrica', grupo: 'Suprimento', permissoes: ['simulador:usar'], demo: true },
-  { caminho: '/simulador/etiquetas/:entrega', tela: EtiquetasImpressao, rotulo: 'Etiquetas', icone: 'impressora', grupo: 'Suprimento', permissoes: ['simulador:usar', 'operacao:consultar'], foraDoMenu: true, semLayout: true },
+  { caminho: '/simulador/etiquetas/:emissao', tela: EtiquetasImpressao, rotulo: 'Etiquetas', icone: 'impressora', grupo: 'Suprimento', permissoes: ['simulador:usar', 'operacao:consultar'], foraDoMenu: true, semLayout: true },
   // NF e DOF primeiro: a entrega nasce no cadastro da NF e da DOF, antes da chegada.
   { caminho: '/documentos', tela: Documentos, rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: OPERACAO },
   { caminho: '/recebimentos', tela: Recebimentos, rotulo: 'Recebimentos', icone: 'truck', grupo: 'Entrada', permissoes: OPERACAO },
   { caminho: '/recebimentos/:id', tela: RecebimentoDetalhe, rotulo: 'Recebimento', icone: 'truck', grupo: 'Entrada', permissoes: OPERACAO, foraDoMenu: true },
-  { caminho: '/inspecao', tela: emConstrucao('Inspeção', 6), rotulo: 'Inspeção', icone: 'inspecao', grupo: 'Entrada', permissoes: OPERACAO },
+  { caminho: '/inspecao', tela: Inspecao, rotulo: 'Inspeção', icone: 'inspecao', grupo: 'Entrada', permissoes: OPERACAO },
+  { caminho: '/inspecao/:fardo', tela: InspecaoFardo, rotulo: 'Inspeção do fardo', icone: 'inspecao', grupo: 'Entrada', permissoes: OPERACAO, foraDoMenu: true },
   // Todos: o requisitante verá só a visão por item (Etapa 7).
   { caminho: '/estoque', tela: emConstrucao('Estoque', 7), rotulo: 'Estoque', icone: 'box', grupo: 'Estoque' },
   { caminho: '/locais', tela: emConstrucao('Locais', 7), rotulo: 'Locais', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO },

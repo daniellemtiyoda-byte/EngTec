@@ -238,9 +238,15 @@ interface Dof { id; numero; nfId; validade: string; volumes: { especieId; volume
   declarado?: { quando; quem }; prazoDeclaracao /* calculado: dia seguinte à validade */;
   nivelPrazo: 'ok' | 'atencao' | 'critico' | 'vencido' /* calculado */ }
 interface Recebimento { id; entregaId; nfId; dofId; recebidoEm; recebidoPor; fardosEsperados: string[]; fardosLidos: string[];
-  conforme: boolean; ocorrencias: { tipo: 'avaria' | 'falta' | 'sobra' | 'fardo_desconhecido'; descricao; fotos: Anexo[] }[];
-  divergenciaVolume: { especieId; documentalM3; calculadoM3; percentual; acimaTolerancia: boolean }[];
+  conforme: boolean; ocorrencias: { tipo: 'avaria' | 'falta' | 'sobra' | 'fardo_desconhecido'; descricao; fardoId?;
+    quantidade? /* falta declarada: dormentes que faltam no fardo lido */; fotos: Anexo[] }[];
+  divergenciaVolume: { especieId; documentalM3; nominalM3; medidoM3?; base: 'nominal' | 'medido'; percentual; acimaTolerancia: boolean }[];
   localEsperaId: string }
+// Fardo ganha `emissaoId` (emissão do fornecedor) e `faltaDeclarada` (dormentes que faltavam, declarados no recebimento).
+// Emissão do fornecedor (no protótipo, o Simulador): os fardos com QR e a NF e a DOF que acompanham o material.
+interface Emissao { id; contratoId; fardosIds: string[]; nf: { numero; serie; chaveAcesso; emissao; itens };
+  dof: { numero; validade; volumes }; comDocumentos: boolean; entregaId? /* ligada pela chave de acesso */;
+  situacao: 'aguardando_documentos' | 'a_caminho' | 'recebida_parcial' | 'recebida' /* calculado */ }
 interface Inspecao { id; dormenteId; fardoId; resultado: 'aprovado' | 'reprovado'; categoria?: 1 | 2 | 3;
   indice?: number /* 0 a 100, vindo do Inspector */; veredito?: 'APROVADO' | 'ATENCAO' | 'REJEITADO' /* original do Inspector */;
   medidas: { comprimentoCm; larguraCm; alturaCm }; inspetor; inspecionadoEm; origem: 'inspector' | 'simulado' | 'manual';
@@ -248,6 +254,10 @@ interface Inspecao { id; dormenteId; fardoId; resultado: 'aprovado' | 'reprovado
 ```
 
 **Entrega e fardos esperados.** No cadastro de NF e DOF, o usuário pode indicar quais fardos vêm na entrega (fardos já emitidos do contrato, em trânsito e sem entrega). Se não indicar, a entrega começa sem fardos esperados e, no recebimento, todo fardo lido que seja do mesmo contrato, emitido e sem entrega passa a fazer parte dela; fardo de outro contrato, de outra entrega ou com ID inexistente vira ocorrência "fardo desconhecido". A entrega fica `recebida_parcial` enquanto houver fardo esperado dela ainda em trânsito (falta no recebimento). Regra **provisória** (o fornecedor real ainda não informa os fardos da NF ao sistema). Fardos e dormentes sempre existem antes da leitura: são emitidos pelo fornecedor (no protótipo, pelo Simulador).
+
+**Volume nominal e medido.** O volume da DOF é digitado do documento, nunca copiado da NF. A comparação por espécie usa o **volume nominal** (dormentes recebidos × volume do tamanho, descontada a falta de dormentes declarada no recebimento) até a inspeção; quando todos os fardos recebidos da espécie têm a inspeção concluída, passa a usar o **volume medido** (soma das medidas reais dos aprovados e reprovados; dormente sem medidas conta pelo volume do tamanho). A divergência oficial é a do medido; antes dela, a tela marca a diferença como provisória.
+
+**Falta de dormentes.** Ocorrência de falta declarada num fardo lido informa a quantidade de dormentes que faltam; ela sai do recebido do item e do volume nominal, e entra na justificativa automática quando explica a divergência. Na conclusão da inspeção, os não lidos que cabem nessa falta já têm justificativa (a do sistema, se a pessoa não escrever outra).
 
 Regras **provisórias**, a confirmar com o time da inspeção (ficam em `dominio/parametros.ts` e nos parâmetros, nunca espalhadas): veredito APROVADO → `aprovado`; ATENÇÃO e REJEITADO → `reprovado`. Categoria pelo índice: ≥ 80 → 1, ≥ 50 → 2, abaixo → 3 (limites `limitesCategoria`). Vale a inspeção mais recente do dormente.
 
@@ -282,10 +292,10 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `fornecedores`, `especies`, `tamanhos`, `tratamentos`, `empresasInspetoras`, `locais` | `listar`, `obter`, `criar`, `atualizar`, `inativar`, `reativar` (`locais.obter(codigo)` para a página do local) |
 | `usuarios` | `listar`, `atualizar` (só perfil e situação; as contas são criadas no painel do Supabase) |
 | `contratos` | `listar`, `obter(numero)`, `criar`, `atualizar`, `cancelar`; `atas`: `listar`, `criar` |
-| `simulador` | `gerarEntrega({ contratoId, itens: [{ itemContratoId, fardos, dormentesPorFardo }] })` → cria fardos `em_transito`, dormentes `emitido`, NF e DOF de exemplo e a entrega `a_caminho` (como se tivesse sido cadastrada em NF e DOF); recusa acima do `saldoAEmitir`; `etiquetas(entregaId)` |
-| `recebimentos` | `listar`, `obter`, `entregasACaminho()` (inclui as parciais, com os fardos que faltam), `receber(entregaId, dados, arquivos)` |
+| `simulador` | `emitir({ contratoId, comDocumentos, itens: [{ itemContratoId, fardos, dormentesPorFardo }] })` → cria a emissão, fardos `em_transito`, dormentes `emitido` e NF e DOF de exemplo; com documentos, também a entrega `a_caminho` (como se tivesse sido cadastrada em NF e DOF); recusa acima do `saldoAEmitir`; `listar`, `etiquetas(emissaoId)`, `xmlNf(emissaoId)` |
+| `recebimentos` | `listar`, `obter`, `entregasACaminho()` (inclui as parciais, com os fardos que faltam), `previa(entregaId, fardosLidos, faltas?)` (a mesma análise da confirmação, sem gravar), `receber(entregaId, dados, arquivos)` |
 | `documentos` | `cadastrarEntrega({ nf, dof, fardosIds? }, arquivos)` (permissão `nf:cadastrar`: administrador e almoxarife) → cria NF, DOF e a entrega `a_caminho` (chave repetida recusada, sem DOF não cadastra); `listarEntregas`, `listarNfs`, `listarDofs`, `fardosSemEntrega(contratoId)`, `declararDof(id)`; leitura do XML no front com `utils/nfeXml.ts` |
-| `inspecao` | `fila()`, `naoLocalizados()`, `obterFardo(id)`, `registrar(dormenteId, resultado)` (aceita dormente `nao_localizado` encontrado depois), `simularFardo(id)`, `concluir(fardoId, localId, justificativa?)` |
+| `inspecao` | `fila()`, `naoLocalizados()`, `obterFardo(id)`, `registrar(dormenteId, resultado)` (aceita dormente `nao_localizado` encontrado depois), `simularFardo(id)`, `concluir(fardoId, localId, justificativa?)` (justificativa do sistema quando os não lidos cabem na falta declarada) |
 | `fardos` | `listar`, `obter(id)`, `transferir(id, localId)` |
 | `dormentes` | `listar`, `obter(id)` (devolve a ficha completa já montada, seção 9.13) |
 | `estoque` | `porItem()`, `porFardo(q)` |
@@ -429,12 +439,12 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 
 ### 9.5 Simulador do fornecedor (`/simulador`) · padrão Assistente + Lista
 - Aviso fixo no topo (não recolhível): "Demonstração. Na operação real, o fornecedor grava o QR na plaquinha seguindo o padrão do contrato."
-- Assistente **Gerar entrega**: 1) contrato · 2) itens e quantidades (fardos e dormentes por fardo, padrão do parâmetro; mostra o saldo a emitir do item, `quantidade - (emitidos - reprovados)`, e bloqueia acima dele: reposição de reprovados é permitida) · 3) revisar e confirmar.
-- Ao confirmar: cria fardos `em_transito`, dormentes `emitido` com IDs sequenciais, uma NF e uma DOF de exemplo coerentes com o volume, e a entrega `a_caminho`, que aparece em NF e DOF e em Recebimentos como se tivesse sido cadastrada.
-- Lista abaixo: entregas geradas (NF, contrato, fardos, dormentes, situação) com ações **Imprimir etiquetas** e **Baixar XML da NF** (XML fictício para testar a importação).
+- Assistente **Emitir fardos**: 1) contrato · 2) itens e quantidades (fardos e dormentes por fardo, padrão do parâmetro; mostra o saldo a emitir do item, `quantidade - (emitidos - reprovados)`, e bloqueia acima dele: reposição de reprovados é permitida) · 3) revisar e confirmar, escolhendo **Com NF e DOF já cadastradas** ou **Gerar só os fardos (sem NF e DOF)**.
+- Ao confirmar: cria a emissão, fardos `em_transito` e dormentes `emitido` com IDs sequenciais, e uma NF e uma DOF de exemplo coerentes com o volume. Com documentos, a entrega `a_caminho` já nasce cadastrada; só os fardos, a emissão fica "Aguardando NF e DOF" até a CPTM cadastrar NF e DOF importando o XML (a entrega se liga à emissão pela chave de acesso, e os fardos da emissão viram os esperados). Assim se demonstra o fluxo completo: fornecedor emite → CPTM cadastra NF e DOF → almoxarife recebe.
+- Lista abaixo: emissões (NF, contrato, fardos, dormentes, situação) com ações **Imprimir etiquetas**, **Baixar XML da NF** e **Ver DOF** (número, validade e volume por espécie, para digitar no cadastro).
 - Aceite: nenhuma sequência se repete entre entregas do mesmo contrato; emitidos menos reprovados nunca passa do contratado.
 
-### 9.6 Folha de etiquetas (`/simulador/etiquetas/:entrega`)
+### 9.6 Folha de etiquetas (`/simulador/etiquetas/:emissao`)
 - Sem Layout. Grade de `EtiquetaQr` para impressão em A4: primeiro a etiqueta do fardo, depois as dos dormentes daquele fardo.
 - Etiqueta do dormente (proporção da plaquinha do contrato): QR à esquerda, à direita o ID em mono e grande, contrato, espécie e comprimento. Etiqueta do fardo: maior, com "FARDO", ID, item e quantidade.
 - Usar o texto "CPTM" no cabeçalho, não o arquivo do logo (só usar logo se a CPTM fornecer).
@@ -448,21 +458,21 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 - **Assistente de recebimento** (`RecebimentoAssistente`):
   1. **Escolher a entrega**: lista das entregas "A caminho" (NF, fornecedor, contrato, fardos esperados, prazo da DOF), com busca pela NF. Exceção: **Cadastrar NF e DOF agora**, para material que chegou sem cadastro prévio; abre os mesmos passos do cadastro de NF e DOF (9.9) e volta com a entrega criada (origem `recebimento`).
   2. **Leitura dos fardos**: lista dos fardos esperados com caixa de checagem; botão **Ler QR** em modo contínuo marca cada fardo lido; fardo lido do mesmo contrato, emitido e sem entrega entra na entrega; fardo de outro contrato, de outra entrega ou desconhecido vira ocorrência "fardo desconhecido"; também dá para marcar à mão. Fardo esperado e não lido gera ocorrência de **falta** automática, continua `em_transito` e pode ser recebido depois (a entrega fica `recebida_parcial` e continua em "A caminho" com os fardos que faltam).
-  3. **Conferência**: conforme ou com ocorrência (avaria, falta, sobra); ocorrência exige descrição e foto.
+  3. **Conferência**: conforme ou com ocorrência (avaria, falta, sobra); ocorrência exige descrição e foto. Falta declarada exige o fardo lido e a **quantidade de dormentes faltando**, que sai do recebido e do volume nominal.
   4. **Local de espera**: local do tipo inspeção (sugerido o com mais espaço).
-  5. **Revisar e confirmar** (prévia do serviço, `recebimentos.previa`): resumo, divergência de volume por espécie (acima de 10% mostra aviso crítico e pede justificativa, não bloqueia). Se a divergência vem só dos fardos que faltaram (contando-os, a DOF fecha), o campo já vem preenchido com a lista deles (`justificativaPorFalta` em `dominio/parametros.ts`) e a pessoa pode complementar. A divergência é sempre a acumulada da entrega: quando os fardos que faltaram são recebidos, ela é recalculada (`entrega.divergenciaVolume`).
+  5. **Revisar e confirmar** (prévia do serviço, `recebimentos.previa`): resumo, divergência de volume por espécie com DOF, volume nominal e volume medido (este só depois da inspeção; até lá a diferença é marcada como provisória; acima de 10% mostra aviso crítico e pede justificativa, não bloqueia). Se a divergência vem só do que faltou (fardos não lidos e dormentes faltando; contando-os, a DOF fecha), o campo já vem preenchido com a lista deles (`justificativaPorFalta` em `dominio/parametros.ts`) e a pessoa pode complementar. A divergência é sempre a acumulada da entrega: quando os fardos que faltaram são recebidos, ela é recalculada (`entrega.divergenciaVolume`).
 - Resultado: fardos e dormentes lidos passam a `aguardando_inspecao`; os não lidos continuam `em_transito`; abre a página do recebimento.
 
 ### 9.8 Página do recebimento (`/recebimentos/:id`) · padrão Objeto
 - Fatos-chave: NF, DOF, contrato, fardos (lidos/esperados), recebido em, por.
-- Abas: Fardos (com situação e link para inspeção) · Documentos (NF, XML, DOF, PDF, volume documental x calculado) · Ocorrências (fotos) · Histórico.
+- Abas: Fardos (com situação e link para inspeção) · Documentos (NF, XML, DOF, PDF, volume documental × nominal × medido) · Ocorrências (fotos e a quantidade da falta) · Histórico.
 - Ação: **Marcar DOF como declarado no Sinaflor** (com confirmação; registra quem e quando).
 
 ### 9.9 NF e DOF (`/documentos`) · padrão Lista + Assistente
 Primeiro item do grupo Entrada: é onde a entrega nasce, antes da chegada do material, e onde fica o controle de prazo e a declaração no Sinaflor.
 - Ação principal: **Cadastrar NF e DOF** (assistente `EntregaAssistente`):
   1. **NF**: importar o XML (lido no navegador por `utils/nfeXml.ts`, sem executar nada) ou digitar; chave de acesso repetida é recusada; contrato (do fornecedor da NF) e itens com quantidade e volume.
-  2. **DOF**: número, validade, volume por espécie e PDF. Sem DOF não avança.
+  2. **DOF**: número, validade, volume por espécie e PDF. Sem DOF não avança. O volume por espécie começa **vazio e é obrigatório**, digitado do documento (nunca preenchido pela NF), para a comparação com o recebido ter sentido.
   3. **Fardos da entrega** (opcional): fardos já emitidos do contrato, em trânsito e sem entrega; pode ficar em branco (seção 5.5).
   4. **Revisar e confirmar**: resumo e o prazo de declaração calculado.
   - Resultado: NF, DOF e a entrega "A caminho", que aparece em Recebimentos.
@@ -478,7 +488,8 @@ Primeiro item do grupo Entrada: é onde a entrega nasce, antes da chegada do mat
   - Direita: último dormente lido em destaque (ID, resultado, categoria, medidas); botões **Abrir no Inspector** (protocolo atual), **Simular inspeção do fardo** (modo demonstração: gera resultados determinísticos, com ~5% reprovados) e **Registrar à mão** (ler QR + Aprovado ou Reprovado + categoria 1, 2 ou 3).
   - Resultado só aprovado ou reprovado; o ATENÇÃO do Inspector conta como reprovado; categoria pelo índice com os limites 80 e 50 (provisório, seção 5.5).
   - ID lido que não pertence ao fardo vira pendência visível ("não pertence a este fardo").
-  - **Concluir inspeção**: escolhe o local de guarda (lido por QR do local ou selecionado). Com todos inspecionados, conclui direto; com dormentes não lidos (falta ou QR ilegível), mostra quantos e quais e pede **justificativa obrigatória**, e esses dormentes ficam `nao_localizado`. Aprovados ficam `em_estoque` no fardo, que vai para o local; reprovados vão para `reprovado` no local de segregação. Gera movimentações `guarda` e `segregacao`.
+  - **Registrar à mão** (tela de campo, seção 11.1): leitor em modo contínuo; ao ler, a câmera encolhe e aparecem os botões grandes **Aprovado** e **Reprovado**; Aprovado pede a categoria (1, 2 ou 3) em botões; gravado o resultado, o leitor volta a ler o próximo. Dormente já inspecionado pode ser lido de novo (vale o mais recente). Também é o caminho para inspecionar o não localizado encontrado depois (`?dormente=` abre o leitor com ele).
+  - **Concluir inspeção**: escolhe o local de guarda (lido por QR do local ou selecionado). Com todos inspecionados, conclui direto; com dormentes não lidos (falta ou QR ilegível), mostra quantos e quais e pede **justificativa obrigatória**, e esses dormentes ficam `nao_localizado`. Se os não lidos cabem na falta declarada no recebimento, a justificativa já vem preenchida. Aprovados ficam `em_estoque` no fardo, que vai para o local; reprovados vão para `reprovado` no local de segregação. Gera movimentações `guarda` e `segregacao`.
 - Aceite: o saldo do fardo após concluir é igual ao número de aprovados; não localizados aparecem na fila e nas pendências do gestor.
 
 ### 9.11 Estoque (`/estoque`) · padrão Lista com duas visões
@@ -674,7 +685,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Lista de recebimentos com "A caminho", assistente de recebimento começando por "Escolher a entrega" (com a exceção de cadastrar NF e DOF na hora), leitura contínua dos fardos e falta de fardo, página do recebimento.
 - Pronto quando: importar o XML de uma NF e cadastrar a DOF cria a entrega "A caminho"; a entrega é recebida lendo os QR dos fardos, os dormentes passam a "aguardando inspeção" e um fardo não lido pode ser recebido depois.
 
-### Etapa 6 · Inspeção
+### Etapa 6 · Inspeção (concluída)
 - Fila (com não localizados), tela de inspeção do fardo, simulação, registro manual, conclusão com guarda, segregação e justificativa.
 - Pronto quando: fardo inspecionado fica em estoque no local escolhido, reprovados segregados, não lidos ficam não localizados, ficha do dormente mostra a inspeção.
 

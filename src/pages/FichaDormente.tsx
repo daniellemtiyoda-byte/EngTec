@@ -134,7 +134,7 @@ export default function FichaDormente() {
 
       <RodapeAcoes>
         {operacao && <Link className="btn btn-sec" to={`/f/${f.fardo.id}`}>Ver fardo</Link>}
-        {d.situacao === 'nao_localizado' && pode('inspecao:operar') && <Link className="btn btn-pri" to="/inspecao?aba=nao-localizados">Inspecionar agora</Link>}
+        {(d.situacao === 'nao_localizado' || d.situacao === 'aguardando_inspecao') && pode('inspecao:operar') && <Link className="btn btn-pri" to={`/inspecao/${d.fardoId}?dormente=${d.id}`}>Inspecionar agora</Link>}
       </RodapeAcoes>
     </article>
   );
