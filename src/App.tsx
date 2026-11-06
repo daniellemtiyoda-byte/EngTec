@@ -14,7 +14,11 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<RotaProtegida />}>
-              {ROTAS.map(({ caminho, tela: Tela, permissoes }) => <Route key={caminho} path={caminho} element={<ExigePermissao rota={{ permissoes }}><Tela /></ExigePermissao>} />)}
+              {ROTAS.filter((r) => !r.semLayout).map(({ caminho, tela: Tela, permissoes }) => <Route key={caminho} path={caminho} element={<ExigePermissao rota={{ permissoes }}><Tela /></ExigePermissao>} />)}
+            </Route>
+            {/* Folhas de impressão: com sessão e permissão, mas sem menu e topo. */}
+            <Route element={<RotaProtegida semLayout />}>
+              {ROTAS.filter((r) => r.semLayout).map(({ caminho, tela: Tela, permissoes }) => <Route key={caminho} path={caminho} element={<ExigePermissao rota={{ permissoes }}><Tela /></ExigePermissao>} />)}
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

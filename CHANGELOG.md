@@ -6,6 +6,22 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Adicionado
+- 2026-11-06: **Etapa 4 da v2: QR code (ficha do dormente, leitor, simulador e etiquetas).**
+  - **Por quê:** é o coração da v2: cada dormente tem um QR na plaquinha que a câmera do celular lê para abrir a ficha.
+  - **Leitor de QR** (`LeitorQr`, botão "Ler QR" do topo e base dos assistentes das próximas etapas): câmera traseira com mira e lanterna, `BarcodeDetector` nativo ou `jsqr` (carregado só quando precisa), leitura contínua com vibração, sempre com "Digitar código"; aceita o link do QR ou o ID e recusa QR de fora do sistema.
+  - **Ficha do dormente** (`/d/:id`, celular primeiro): onde está (fardo, local, desde quando, RME), inspeção, origem (contrato, ata, fornecedor, empresa inspetora, NF, DOF, recebimento) e linha do tempo; "ID não encontrado" com digitar de novo e ler outro QR. Abrir o link de um QR sem sessão leva ao login e volta para a ficha.
+  - **Página do fardo** (`/f/:id`) e **do local** (`/locais/:codigo`), destinos dos QR de fardo e de local (versões de leitura; ações nas Etapas 6 e 7). `/fardos/:id` redireciona para `/f/:id`.
+  - **Simulador do fornecedor** (`/simulador`): assistente "Gerar entrega" (contrato, fardos e dormentes por item sem passar do saldo a emitir, revisão) e lista das entregas geradas com "Imprimir etiquetas" e "Baixar XML da NF".
+  - **Folha de etiquetas** (`/simulador/etiquetas/:entrega`, sem menu): etiqueta do fardo e dos seus dormentes (QR + ID em mono, "CPTM" em texto), CSS de impressão em A4; avisa quando o link dos QR não é https ou aponta para a máquina local.
+  - **Busca global** no topo e `CodigoLink` reconhecendo os IDs v2 (`rotaDoCodigo`, `destinoBusca`).
+  - Dependências: `qrcode`, `jsqr` e `@types/qrcode`. `VITE_APP_URL` documentada no `.env.example` e no README, com o passo a passo da Vercel (`VITE_USE_MOCK=true` e `VITE_APP_URL`).
+  - Testes: 74, incluindo o QR gerado decodificado pelo `jsqr` (dormente, fardo e local) e a busca. Verificado no Chrome headless em 360 e 1280 px.
+  - Arquivos: `src/components/{LeitorQr,EtiquetaQr,Layout}.tsx`, `src/pages/{FichaDormente,FardoDetalhe,LocalDetalhe,Simulador,EtiquetasImpressao}.tsx`, `src/rotas.tsx`, `src/App.tsx`, `src/utils/busca.ts` (+ teste), `src/dominio/qr.test.ts`, `src/services/{contracts.ts,mock/index.ts}`, `src/styles.css`, `package.json`, `.env.example`, `README.md`, `CLAUDE.md`, `docs/PLANO-V2.md`.
+
+### Removido
+- 2026-11-06: `components/EntradaCodigo.tsx`, substituído pelo `LeitorQr` (que tem a mesma entrada por digitação).
+
+### Adicionado
 - 2026-11-06: **empresas inspetoras como cadastro e reativação de cadastros.**
   - **Por quê:** a empresa inspetora se repete entre contratos e o Painel vai comparar a reprovação na inspeção da CPTM por empresa; e um cadastro inativado por engano precisava voltar.
   - **Empresa inspetora:** nova aba em Cadastros (nome, CNPJ opcional, ativa/inativa). O contrato passa a guardar `empresaInspetoraId` e o `ContratoModal` usa uma seleção do cadastro (só as ativas). Serviço `empresasInspetoras`; estado do mock na versão 3 (a demonstração recomeça uma vez). A taxa de reprovação por empresa inspetora entra no Painel na Etapa 9 (plano e especificação atualizados).

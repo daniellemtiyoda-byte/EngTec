@@ -419,6 +419,8 @@ span.codigo { font-weight: 600; color: var(--texto); }
 .entrada-codigo input::placeholder { text-transform: none; }
 @media (max-width: 760px) {
   .btn-ler-qr { display: none; }
+  /* Com rodapé de ações fixo na tela, o botão flutuante sobe para não cobri-lo. */
+  .app:has(.rodape-fixo) .ler-qr-flutuante { bottom: calc(84px + env(safe-area-inset-bottom)); }
   .ler-qr-flutuante { display: grid; place-items: center; position: fixed; right: var(--esp-4); bottom: calc(var(--esp-4) + env(safe-area-inset-bottom)); z-index: 30; width: 56px; height: 56px; border: 0; border-radius: 50%; background: var(--cor-primaria); color: var(--texto-inverso); box-shadow: var(--sombra-2); cursor: pointer; }
 }
 
@@ -465,3 +467,79 @@ span.codigo { font-weight: 600; color: var(--texto); }
 .item-cartao dt { font-size: var(--fs-12); color: var(--texto-2); }
 .item-cartao dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
+
+/* ===== Etapa 4: QR code ===== */
+/* Leitor de QR */
+.leitor { display: flex; flex-direction: column; gap: var(--esp-3); }
+.leitor-camera { position: relative; background: #000; border-radius: var(--raio-grande); overflow: hidden; aspect-ratio: 4 / 3; max-height: 60vh; display: grid; place-items: center; }
+.leitor-camera video { width: 100%; height: 100%; object-fit: cover; }
+.leitor-mira { position: absolute; inset: 18% 22%; border: 3px solid rgba(255, 255, 255, .9); border-radius: var(--raio-grande); box-shadow: 0 0 0 9999px rgba(0, 0, 0, .35); }
+.leitor-estado { position: absolute; inset: auto var(--esp-4); color: var(--texto-inverso); text-align: center; font-size: var(--fs-16); }
+.leitor-lanterna { position: absolute; right: var(--esp-3); bottom: var(--esp-3); }
+.leitor-aviso { min-height: 44px; display: flex; align-items: center; padding: var(--esp-2) var(--esp-3); border-radius: var(--raio); font-size: var(--fs-16); background: var(--neutro-fundo); }
+.leitor-aviso-ok { background: var(--ok-fundo); color: #0f5a30; font-weight: 700; }
+.leitor-aviso-erro { background: var(--critico-fundo); color: #8f1515; font-weight: 700; }
+.leitor-digitar { display: flex; flex-direction: column; gap: 4px; }
+.leitor-digitar label { font-weight: 600; font-size: var(--fs-14); }
+.leitor-digitar-linha { display: flex; gap: var(--esp-2); }
+.leitor-digitar-linha input { flex: 1; width: 0; min-width: 0; min-height: var(--alvo-campo); padding: 8px 12px; border: 1px solid var(--borda-forte); border-radius: var(--raio); font-family: var(--fonte-mono); font-size: var(--fs-16); text-transform: uppercase; }
+.leitor-digitar-linha input::placeholder { text-transform: none; }
+.leitor-digitar-linha .btn { min-width: var(--alvo-campo); }
+
+/* Ficha do dormente: celular primeiro */
+.ficha { display: flex; flex-direction: column; gap: var(--esp-3); max-width: 760px; width: 100%; margin: 0 auto; }
+.ficha-topo { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-grande); padding: var(--esp-4); display: flex; flex-direction: column; gap: 6px; }
+.ficha-topo .id-grande .codigo { font-size: 22px; }
+.ficha-situacao .badge { font-size: var(--fs-14); padding: 3px 12px; }
+.ficha-especie { font-size: var(--fs-16); font-weight: 600; }
+.ficha-resumo { color: var(--texto-2); }
+.ficha-cartao { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-grande); padding: var(--esp-4); }
+.ficha-cartao h2 { font-size: var(--fs-13); text-transform: uppercase; letter-spacing: .06em; color: var(--texto-2); margin-bottom: var(--esp-3); }
+.ficha-cartao dl { margin: 0; display: flex; flex-direction: column; gap: var(--esp-3); }
+.ficha-par { display: grid; grid-template-columns: 9.5em 1fr; gap: var(--esp-3); font-size: var(--fs-16); }
+.ficha-par dt { color: var(--texto-2); }
+.ficha-par dd { margin: 0; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .ficha-par { grid-template-columns: 1fr; gap: 2px; }
+  .ficha-par dt { font-size: var(--fs-13); }
+  .ficha { padding-bottom: 72px; }
+}
+.ficha-nao-encontrado { max-width: 560px; width: 100%; margin: 0 auto; }
+
+/* Simulador */
+.itens-simulador { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-3); }
+.itens-simulador li { display: grid; grid-template-columns: 1.4fr auto auto 1fr; gap: var(--esp-3); align-items: center; border: 1px solid var(--borda); border-radius: var(--raio); padding: var(--esp-3); }
+.itens-simulador li.invalido { border-color: var(--critico); }
+.itens-simulador li > div { display: flex; flex-direction: column; }
+.campo-contador { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-13); color: var(--texto-2); }
+@media (max-width: 760px) { .itens-simulador li { grid-template-columns: 1fr 1fr; } .itens-simulador li > div { grid-column: 1 / -1; } }
+.resumo-revisao { background: var(--cor-primaria-clara); border-radius: var(--raio); padding: var(--esp-3) var(--esp-4); display: flex; flex-direction: column; gap: var(--esp-2); }
+.resumo-revisao ul { margin: 0; padding-left: 18px; }
+
+/* Etiquetas com QR (plaquinha do dormente e etiqueta do fardo) */
+.etiqueta { background: #fff; color: #000; border: 1px solid #000; border-radius: 2mm; padding: 2mm 3mm; width: 70mm; height: 34mm; display: flex; flex-direction: column; gap: 1mm; break-inside: avoid; page-break-inside: avoid; }
+.etiqueta-grande { width: 100mm; height: 50mm; }
+.etiqueta-cptm { font: 800 8pt/1 var(--fonte); letter-spacing: .12em; }
+.etiqueta-corpo { display: flex; gap: 3mm; align-items: center; flex: 1; min-height: 0; }
+.etiqueta-qr { width: 24mm; height: 24mm; flex: none; image-rendering: pixelated; }
+.etiqueta-grande .etiqueta-qr { width: 40mm; height: 40mm; }
+.etiqueta-qr-vazio { background: #eee; }
+.etiqueta-texto { display: flex; flex-direction: column; gap: 0.6mm; min-width: 0; }
+.etiqueta-titulo { font: 800 11pt/1 var(--fonte); letter-spacing: .08em; }
+.etiqueta-id { font: 700 10pt/1.1 var(--fonte-mono); white-space: nowrap; }
+.etiqueta-grande .etiqueta-id { font-size: 15pt; }
+.etiqueta-linha { font: 400 8pt/1.2 var(--fonte); }
+.etiqueta-grande .etiqueta-linha { font-size: 10pt; }
+
+/* Folha de impressão (sem o Layout) */
+.folha-tela { padding: var(--esp-5); display: flex; flex-direction: column; gap: var(--esp-4); background: var(--fundo); min-height: 100vh; }
+.folha-barra { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--esp-3); flex-wrap: wrap; }
+.folha-etiquetas { display: flex; flex-wrap: wrap; gap: 3mm; align-items: flex-start; }
+@media print {
+  @page { size: A4; margin: 10mm; }
+  body { background: #fff; }
+  .nao-imprimir { display: none !important; }
+  .folha-tela { padding: 0; background: #fff; min-height: 0; }
+  .folha-etiquetas { gap: 2mm; }
+  .toasts { display: none; }
+}

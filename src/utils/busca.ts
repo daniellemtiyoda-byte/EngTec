@@ -1,8 +1,27 @@
+import { lerCodigo, rotaDoObjeto } from '../dominio/identificacao';
+
 /**
- * Reconhece os códigos do sistema e diz para onde levar (links das tabelas e, depois, a busca global).
- * Ainda não reconhece nenhum código: os IDs v2 (dormente, fardo, contrato, RME) entram na Etapa 4,
- * lidos por `lerCodigo()` de `dominio/identificacao.ts`.
+ * Para onde leva um código do sistema (links das tabelas, busca global, leitor de QR). Aceita o ID puro ou o link do
+ * QR, reconhecidos por `lerCodigo()`. RME ainda abre a lista filtrada: a página da RME chega na Etapa 8.
  */
-export function rotaDoCodigo(_texto: string): string | null {
-  return null;
+export function rotaDoCodigo(texto: string): string | null {
+  const c = lerCodigo(texto);
+  if (!c) return null;
+  if (c.tipo === 'rme') return `/saidas?q=${encodeURIComponent(c.id)}`;
+  return rotaDoObjeto(c);
+}
+
+const NF = /^(?:NF\s*)?(\d{1,9})$/i;
+
+/**
+ * Busca global: código conhecido vai direto ao objeto; número (ou "NF 4500") abre NF e DOF filtrada; texto livre
+ * pesquisa nos contratos (passa a pesquisar também os fardos quando o Estoque chegar, na Etapa 7).
+ */
+export function destinoBusca(texto: string): string {
+  const t = texto.trim();
+  const rota = rotaDoCodigo(t);
+  if (rota) return rota;
+  const nf = NF.exec(t);
+  if (nf) return `/documentos?q=${encodeURIComponent(nf[1])}`;
+  return `/contratos?q=${encodeURIComponent(t)}`;
 }

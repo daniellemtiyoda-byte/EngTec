@@ -202,7 +202,12 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
     },
 
     fardos: {
-      listar: (q) => ler((e) => paginar(fardosView(e), maisAntigos(q))),
+      listar: (q = {}) => ler((e) => {
+        // noLocal: fardos que estão de fato no local (o baixado guarda o último local, mas não está mais lá).
+        const { noLocal, ...filters } = q.filters ?? {};
+        const lista = fardosView(e).filter((f) => !noLocal || (f.localId === noLocal && f.situacao !== 'baixado'));
+        return paginar(lista, maisAntigos({ ...q, filters }));
+      }),
       obter: (id) => ler((e) => fardoDetalhe(e, id, dia())),
       transferir: (id, localId) => escrever(['estoque:movimentar'], (e, ctx) => fardoView(e, transferirFardo(e, id, localId, ctx), dia())),
     },

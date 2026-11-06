@@ -3,10 +3,11 @@ import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-route
 import { useAuth } from '../contexts/AuthContext';
 import { PERFIS, type Permissao } from '../dominio/permissoes';
 import { useTelaPequena } from '../hooks/useTelaPequena';
+import { destinoBusca } from '../utils/busca';
 import { GRUPOS_MENU, ROTAS, type Rota } from '../rotas';
 import { SeloDemo } from './Badge';
-import { EntradaCodigo } from './EntradaCodigo';
 import { ErroTela } from './ErroTela';
+import { LeitorQr } from './LeitorQr';
 import { Vazio } from './Estados';
 import { Icone } from './Icone';
 import { Logo } from './Logo';
@@ -20,13 +21,13 @@ export function ExigePermissao({ rota, children }: { rota: Pick<Rota, 'permissoe
   return <section className="painel"><Vazio mensagem="Seu perfil não tem acesso a esta tela." dica="Use o menu para ver as funções do seu perfil. Se precisar deste acesso, fale com o administrador." /></section>;
 }
 
-export function RotaProtegida() {
+export function RotaProtegida({ semLayout }: { semLayout?: boolean }) {
   const { usuario, carregando } = useAuth();
   const loc = useLocation();
   if (carregando) return <div className="tela-cheia" role="status">Carregando…</div>;
   // Guarda caminho + parâmetros (ex.: ?q=) para voltar exatamente à mesma tela depois do login.
   if (!usuario) return <Navigate to="/login" replace state={{ de: loc.pathname + loc.search }} />;
-  return <Layout />;
+  return semLayout ? <Outlet /> : <Layout />;
 }
 
 /**
@@ -54,6 +55,7 @@ function Layout() {
   const [recolhido, setRecolhido] = useState(false);
   const [aberto, setAberto] = useState(false);
   const [lendo, setLendo] = useState(false);
+  const [busca, setBusca] = useState('');
   const pequena = useTelaPequena();
   const campo = pequena && pode('estoque:movimentar');
   useEffect(() => setAberto(false), [loc.pathname]);
@@ -87,7 +89,12 @@ function Layout() {
       <div className="principal">
         <header className="topo">
           <button className="btn-icone btn-icone-claro menu-mobile" onClick={() => setAberto(true)} aria-label="Abrir menu"><Icone nome="menu" /></button>
-          {/* Busca global volta na Etapa 4 (IDs v2) e o sino de alertas na Etapa 9. */}
+          <form className="busca-global" role="search" onSubmit={(e) => { e.preventDefault(); if (busca.trim()) { nav(destinoBusca(busca)); setBusca(''); } }}>
+            <Icone nome="search" tamanho={18} />
+            <label className="sr-only" htmlFor="busca-global">Pesquisa global</label>
+            <input id="busca-global" type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="ID do dormente, fardo, contrato, RME ou NF…" maxLength={300} />
+          </form>
+          {/* Sino de alertas: Etapa 9. */}
           <button type="button" className="btn btn-sec btn-ler-qr" onClick={() => setLendo(true)}><Icone nome="qr" tamanho={18} /><span>Ler QR</span></button>
           <div className="usuario">
             <div><strong>{usuario?.nome}</strong><span>{usuario && PERFIS[usuario.perfil].rotulo}</span></div>
@@ -102,7 +109,7 @@ function Layout() {
       {campo ? <NavInferior aoLerQr={() => setLendo(true)} /> : (
         <button type="button" className="ler-qr-flutuante" onClick={() => setLendo(true)} aria-label="Ler QR"><Icone nome="qr" tamanho={26} /></button>
       )}
-      <EntradaCodigo aberto={lendo} aoFechar={() => setLendo(false)} />
+      <LeitorQr aberto={lendo} aoFechar={() => setLendo(false)} />
     </div>
   );
 }

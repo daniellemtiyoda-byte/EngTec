@@ -132,6 +132,7 @@ export interface Servicos {
     concluir(fardoId: Id, dados: { localId: Id; justificativa?: string }): Promise<Fardo>;
   };
 
+  /** `filters.noLocal`: fardos que estão no local (sem os baixados). */
   fardos: ServicoLista<Fardo> & {
     obter(id: Id): Promise<FardoDetalhe>;
     transferir(id: Id, localId: Id): Promise<Fardo>;

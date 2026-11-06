@@ -661,7 +661,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Cadastros (6 abas, com reativar), Página do fornecedor, Contratos (lista, `ContratoModal` com ata e fornecedor herdado, página do contrato).
 - Pronto quando: é possível criar fornecedor, espécie, tamanho, tratamento, local e um contrato com itens (inclusive em m³ convertido); fornecedor com CTF vencido aparece bloqueado.
 
-### Etapa 4 · QR code: ficha, leitor, simulador e etiquetas
+### Etapa 4 · QR code: ficha, leitor, simulador e etiquetas (concluída; falta o teste no celular pela URL da Vercel)
 - **Pré-requisito:** projeto na Vercel com HTTPS e a URL definitiva no `VITE_APP_URL` (seção 10.4).
 - Dependências `qrcode`, `jsqr` e `@types/qrcode`; `LeitorQr`; `EtiquetaQr`; rotas `/d/:id`, `/f/:id` e `/locais/:codigo`.
 - Ficha do dormente completa (lê do mock todos os vínculos).

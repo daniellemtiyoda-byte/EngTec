@@ -29,6 +29,12 @@ Para testar estados de erro/vazio: `http://localhost:5173/?simular=erro` ou `?si
 O logo do Holz Trilho ainda está em desenvolvimento. Quando estiver pronto, coloque o arquivo em `public/assets/logo.svg`
 (veja `public/assets/LEIA-ME.txt`). Sem o arquivo, a barra lateral e o login mostram o monograma "HT" no mesmo tamanho.
 
+## Publicar na Vercel (QR code no celular)
+
+A câmera do celular só funciona em endereço com https. Na Vercel, importe o fork e escolha a branch `v2-qrcode`, com:
+build `npm run build`, saída `dist` e as variáveis `VITE_USE_MOCK=true` e `VITE_APP_URL` (a URL do projeto na Vercel, com
+`https://`, sem barra no fim). O `VITE_APP_URL` vai gravado em cada QR: confira antes de imprimir etiquetas.
+
 ## Variáveis de ambiente (`.env.local`)
 
 | Variável | Função |
@@ -37,6 +43,7 @@ O logo do Holz Trilho ainda está em desenvolvimento. Quando estiver pronto, col
 | `VITE_USE_MOCK` | `true` = serviços simulados; ausente ou qualquer outro valor = API real (falha segura) |
 | `VITE_LOGO_URL` | caminho do arquivo do logo |
 | `VITE_UPLOAD_MAX_MB` | limite de upload no navegador (o servidor valida de novo) |
+| `VITE_APP_URL` | base do link gravado nos QR (a URL da Vercel, com https) |
 
 Tudo com prefixo `VITE_` vai para o navegador: **nunca** coloque senhas, chaves ou credenciais da fornecedora.
 
