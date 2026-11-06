@@ -13,5 +13,3 @@ export const env = {
  * (pendente na equipe do Inspector: proposta da v1 em docs/arquivo/INTEGRACAO-INSPECAO.md).
  */
 export const PROTOCOLO_INSPECTOR = 'railway-inspector://inspecionar';
-
-export const SUFIXO_SIMULADO = env.USE_MOCK ? ' (modo simulado: nada foi gravado em servidor)' : '';

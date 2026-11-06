@@ -5,5 +5,5 @@
  * laranja = atenção, vermelho = bloqueio ou prazo vencido, cinza = encerrado/neutro.
  * Os mapas da v2 (situações do fardo, do dormente, da RME...) entram na Etapa 2.
  */
-export type Tom = 'verde' | 'laranja' | 'vermelho' | 'azul' | 'cinza' | 'simulado';
+export type Tom = 'verde' | 'laranja' | 'vermelho' | 'azul' | 'cinza';
 export type Rotulos<K extends string> = Record<K, [Tom, string]>;

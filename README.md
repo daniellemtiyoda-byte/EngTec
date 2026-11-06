@@ -3,7 +3,7 @@
 Gestão de dormentes ferroviários de madeira.
 
 Interface web (React + TypeScript + Vite) do sistema de rastreabilidade de dormentes de madeira por QR code (versão 2).
-**Escopo:** apenas front-end, com a camada de serviços simulada; o banco (Supabase) entra depois.
+**Escopo:** apenas front-end, com a camada de serviços simulada; o banco e o login no Supabase entram numa etapa própria, perto do fim. Publicação na Vercel.
 
 > ⚠️ **Estado atual:** em reestruturação para a v2. O app abre numa tela "Em construção" e as telas voltam etapa a etapa,
 > conforme `docs/PLANO-V2.md`. Regras de negócio: `docs/ESPECIFICACAO-FUNCIONAL.md`. A versão 1 (por lote) está em `docs/arquivo/`.
@@ -70,7 +70,7 @@ docs/arquivo/              documentos da v1 (PRD, contratos de API, integração
 
 ## Regras respeitadas pela interface
 
-- Mensagens de sucesso só após a resposta do serviço; dados simulados identificados (faixa "Modo simulado").
+- Mensagens de sucesso só após a resposta do serviço. É um protótipo sem dados reais, então não há avisos de dados simulados.
 - Botões ocultos e rotas protegidas são só UX; o servidor deve validar permissões.
 - As regras de negócio da v2 estão em `docs/ESPECIFICACAO-FUNCIONAL.md` e entram no código a partir da Etapa 2 do plano.
 

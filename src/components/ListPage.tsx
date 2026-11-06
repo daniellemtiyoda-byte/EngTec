@@ -183,7 +183,6 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
             </div>
           </details>
         )}
-        {r.dados?.origem === 'simulado' && <span className="chip-simulado">Dados simulados</span>}
       </div>
       {(ativos.length > 0 || buscaAtraso) && (
         <div className="chips" aria-label="Filtros ativos">

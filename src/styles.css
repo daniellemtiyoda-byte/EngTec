@@ -32,12 +32,15 @@ button, input, select, textarea { font: inherit; }
 .nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: var(--raio); color: #dbe4f3; text-decoration: none; }
 .nav-item:hover { background: rgba(255,255,255,.08); }
 .nav-item.ativo { background: var(--azul-600); color: #fff; font-weight: 600; box-shadow: inset 3px 0 0 var(--laranja); }
-.recolher { margin: auto 8px 12px; display: flex; align-items: center; gap: 12px; background: transparent; border: 1px solid rgba(255,255,255,.2); color: #dbe4f3; padding: 8px 10px; border-radius: var(--raio); cursor: pointer; }
+/* Recolher: ícone discreto no topo, ao lado do logo. */
+.recolher { margin-left: auto; display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; background: transparent; border: 0; color: #dbe4f3; border-radius: var(--raio); cursor: pointer; opacity: .7; }
+.recolher:hover, .recolher:focus-visible { opacity: 1; }
 .recolher svg { transition: transform .15s; }
 .recolhido .recolher svg { transform: rotate(180deg); }
-.recolhido .marca-texto, .recolhido .nav-item span, .recolhido .nav-titulo, .recolhido .recolher span { display: none; }
-.recolhido .nav-item, .recolhido .recolher { justify-content: center; }
-.recolhido .marca { justify-content: center; }
+.recolhido .marca-texto, .recolhido .nav-item span, .recolhido .nav-titulo { display: none; }
+.recolhido .nav-item { justify-content: center; }
+.recolhido .marca { flex-direction: column; justify-content: center; padding: 12px 6px; }
+.recolhido .recolher { margin-left: 0; }
 .principal { min-width: 0; display: flex; flex-direction: column; }
 .topo { background: var(--azul-900); color: #fff; display: flex; align-items: center; gap: 14px; padding: 10px 20px; position: sticky; top: 0; z-index: 30; }
 .busca-global { flex: 1; max-width: 520px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.12); border-radius: var(--raio); padding: 0 12px; }
@@ -52,7 +55,6 @@ button, input, select, textarea { font: inherit; }
 .btn-icone-claro { color: #fff; }
 .btn-icone:hover { background: rgba(128,128,128,.2); }
 .menu-mobile { display: none; }
-.banner-simulado { background: var(--laranja-100); color: #6b3500; border-bottom: 2px solid var(--laranja); padding: 8px 20px; font-size: 14px; }
 .conteudo { padding: 22px; display: flex; flex-direction: column; gap: 20px; max-width: 1400px; width: 100%; }
 .sombra { display: none; }
 
@@ -67,7 +69,6 @@ button, input, select, textarea { font: inherit; }
 .busca input { min-width: 240px; }
 .toolbar input, .toolbar select, .campo input, .campo select, .campo textarea { border: 1px solid var(--cinza-300); border-radius: var(--raio); padding: 8px 10px; background: #fff; width: 100%; }
 .filtro { display: flex; flex-direction: column; font-size: 12px; color: var(--texto-mudo); gap: 2px; }
-.chip-simulado { margin-left: auto; font-size: 12px; background: var(--laranja-100); color: #7a3d00; border: 1px dashed var(--laranja); border-radius: 12px; padding: 3px 10px; }
 
 /* Botões */
 .btn { border: 1px solid transparent; border-radius: var(--raio); padding: 8px 14px; cursor: pointer; font-weight: 600; }
@@ -100,7 +101,6 @@ a.btn { display: inline-block; text-decoration: none; }
 .badge-vermelho { background: var(--vermelho-100); color: #8f1515; border-color: #f0a3a3; }
 .badge-azul { background: var(--azul-100); color: var(--azul-700); border-color: #b4c7e4; }
 .badge-cinza { background: var(--cinza-200); color: #3c4652; border-color: var(--cinza-300); }
-.badge-simulado { background: #fff; color: #6b3500; border: 1px dashed var(--laranja); }
 .aviso { padding: 10px 12px; border-radius: var(--raio); border-left: 4px solid; font-size: 14px; }
 .aviso-info { background: var(--azul-100); border-color: var(--azul-600); }
 .aviso-alerta { background: var(--laranja-100); border-color: var(--laranja); }
@@ -192,7 +192,7 @@ body { background: #f6f7f9; }
 .nav-titulo { color: #6b7788; }
 .nav-item { color: #2a3a55; } .nav-item:hover { background: var(--cinza-100); }
 .nav-item.ativo { background: var(--azul-100); color: var(--azul-800); box-shadow: inset 3px 0 0 var(--laranja); }
-.recolher { color: #2a3a55; border-color: var(--cinza-300); } .recolher:hover { background: var(--cinza-100); }
+.recolher { color: #2a3a55; } .recolher:hover { background: var(--cinza-100); }
 .topo { background: #fff; color: var(--texto); border-bottom: 1px solid var(--cinza-200); }
 .busca-global { background: var(--cinza-100); } .busca-global input { color: var(--texto); } .busca-global input::placeholder { color: var(--texto-mudo); }
 .usuario span { color: var(--texto-mudo); } .btn-icone-claro { color: var(--azul-800); }

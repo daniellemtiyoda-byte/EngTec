@@ -7,12 +7,13 @@ Documento para orientar o Claude Code na reestruturação do front-end. Ele diz 
 ## 0. Como usar este plano
 
 1. Leia este arquivo inteiro e `docs/ESPECIFICACAO-FUNCIONAL.md` antes de escrever código.
-2. Trabalhe numa branch própria: `git checkout -b v2-qrcode` (o fluxo de fork do `CLAUDE.md` continua valendo; nada vai para `upstream`).
-3. Siga as **etapas da seção 13 na ordem**. Cada etapa termina com `npm run build` sem erros, uma entrada no `CHANGELOG.md` e um commit.
-4. Ao fim de cada etapa, atualize o `CLAUDE.md` com o que mudou (arquitetura, rotas, regras de domínio). Na etapa 2, a seção "Regras de domínio" do `CLAUDE.md` deve ser reescrita para o modelo v2; regras antigas que deixarem de valer saem do arquivo.
-5. A partir deste plano, **a especificação funcional v2 substitui o `docs/PRD.md` como fonte de verdade**. Mova o PRD antigo para `docs/arquivo/PRD-v1.md` na etapa 0.
+2. Trabalhe na branch `v2-qrcode` (o fluxo de fork do `CLAUDE.md` continua valendo; nada vai para `upstream`).
+3. Siga as **etapas da seção 13 na ordem, uma por vez**, e só avance para a próxima quando a Dani pedir. Cada etapa termina com `npm run build` sem erros, os testes passando (a partir da Etapa 2), uma entrada no `CHANGELOG.md` e um commit.
+4. Ao fim de cada etapa, atualize o `CLAUDE.md` com o que mudou (arquitetura, rotas, regras de domínio); regras que deixarem de valer saem do arquivo.
+5. **A especificação funcional v2 e este plano são a fonte de verdade** e substituem o PRD da v1, arquivado em `docs/arquivo/PRD-v1.md`. Em conflito, a especificação manda na regra de negócio e o plano na implementação.
 6. Em dúvida sobre uma regra de negócio, pergunte antes de inventar. Em dúvida sobre interface, siga os padrões da seção 8.
-7. Escopo continua sendo **só front-end**, com a camada de serviços `mock/` e `real/`. Tudo funciona no modo simulado (`VITE_USE_MOCK=true`).
+7. Escopo é **só front-end**. Os dados ficam no mock (`services/mock/`) até a etapa do Supabase (Etapa 10), que cria o banco e a implementação `services/supabase/`. Não há back-end próprio.
+8. É um protótipo que nunca terá dados reais: **não há banner de "modo simulado", selo de "dados simulados" nem sufixo nos toasts**. O único aviso de demonstração é o do Simulador do fornecedor (exigido pela especificação).
 
 ---
 
@@ -27,39 +28,34 @@ Documento para orientar o Claude Code na reestruturação do front-end. Ele diz 
 | Quem gera o QR | O fornecedor, seguindo o padrão do contrato. No protótipo, o **Simulador do fornecedor** gera para a demonstração |
 | Compra | Por **Ata de Registro de Preços** e **Contrato** (não "pedido de compra") |
 | Fardos | Chegam montados pelo fornecedor; na inspeção são abertos, os reprovados saem e o fardo é fechado de novo |
-| Inspeção | Sistema externo, peça a peça, grava no banco compartilhado; no protótipo é simulada |
+| Inspeção | Sistema externo, peça a peça, grava no banco compartilhado; no protótipo é simulada. Resultado só **aprovado** ou **reprovado** (o ATENÇÃO do Inspector conta como reprovado) e **categoria 1, 2 ou 3** pelos limites 80 e 50 do índice, ambos **provisórios**, a confirmar com o time da inspeção |
+| Faltas | Fardo não lido no recebimento continua em trânsito e pode ser recebido depois; dormente não lido na inspeção fica **não localizado** (conclusão com justificativa) |
+| Reprovados | Ficam segregados; a devolução ao fornecedor fica fora do protótipo. O contrato é cumprido por aprovados, então o fornecedor pode enviar reposição |
 | Lote | **Deixa de existir** como conceito de tela. Agrupamento = contrato + fardo |
 | Saída | Por requisição (RME): aberta → em separação → pronta → entregue (ou cancelada) |
-| Login | **Supabase Auth** (e-mail e senha) desde o início; o perfil do usuário fica numa tabela `perfis` no Supabase. Os demais dados ficam no mock até o banco ser criado |
-| Ponto de partida | Código antigo de domínio, telas e mock é **removido** na etapa 0; só a infraestrutura reaproveitável fica |
-| Fora do protótipo | Etiqueta de contingência, inventário, ajustes com aprovação, visão computacional, offline, RFID, Sinaflor automático |
+| Login | Simulado (perfil escolhido pelo nome do usuário) até a etapa do Supabase; lá entra o **Supabase Auth** (e-mail e senha), com o perfil numa tabela `perfis` e a sessão guardada no aparelho (para o QR abrir a ficha sem novo login). A autenticação é um serviço separado da camada de dados desde a Etapa 1 |
+| Banco | **Supabase**, numa etapa própria (Etapa 10) junto com o login: SQL em `supabase/migrations/`, executado pela Dani no editor SQL. Não há back-end próprio: `services/real/` (HTTP) sai nessa etapa |
+| Hospedagem | **Vercel**, com HTTPS (a câmera exige); a URL da Vercel é o `VITE_APP_URL` gravado nos QR |
+| Ponto de partida | Código antigo de domínio, telas e mock **foi removido** na Etapa 0; só a infraestrutura reaproveitável ficou |
+| Fora do protótipo | Etiqueta de contingência, devolução dos reprovados ao fornecedor, inventário, ajustes com aprovação, visão computacional, offline, RFID, Sinaflor automático |
 
 ---
 
-## 2. Inventário do código atual: manter, adaptar, remover, criar
+## 2. Ponto de partida: o que ficou da v1 depois da Etapa 0
 
-A arquitetura atual é boa e **deve ser aproveitada**: camada de serviços com contrato único (`services/contracts.ts`), mock e real, `ROTAS` como lista única de telas, componentes genéricos (`ListPage`, `FormModal`, `Passos`, `LinhaTempo`, `PainelAbas`, `Contador`), dicionário do domínio em `src/dominio/`. O que muda é o **domínio** (de lote para contrato e QR) e a **camada visual** (padrões de página mais fortes).
+A arquitetura da v1 foi aproveitada: camada de serviços com contrato único (`services/contracts.ts`), `ROTAS` como lista única de telas, componentes genéricos e dicionário do domínio em `src/dominio/`. O domínio da v1 (lote, formação de fardos, quarentena, conferência em duas pessoas, perda e ajuste, inventário, visão computacional, relatórios IBAMA) foi removido na Etapa 0. O app abre numa tela "Em construção".
 
-| Item atual | Ação | Observação |
+| Item | Situação após a Etapa 0 | Próximo passo |
 | --- | --- | --- |
-| `services/http.ts`, `services/index.ts`, `config/env.ts` | Manter | Acrescentar `VITE_APP_URL` (base do link do QR) |
-| `services/contracts.ts`, `real/index.ts`, `endpoints.ts` | Adaptar | Novos domínios (seção 6); remover `lotes`, `volumetria`, `inventario`, `visao` |
-| `services/mock/*` | Reescrever | Novo `data.ts` com a história de demonstração (seção 15); regras por módulo |
-| `types/models.ts` | Reescrever | Modelo v2 (seção 5) |
-| `dominio/rotulos.ts`, `opcoes.ts`, `permissoes.ts`, `parametros.ts` | Adaptar | Novas situações, permissões e parâmetros |
-| `dominio/inspecao.ts` | Remover | Formação de fardos deixa de existir |
-| `components/ListPage.tsx` | Adaptar | Acrescentar abas de situação com contador (`abasStatus`) e barra de filtros nova |
-| `components/FormModal.tsx`, `Modal.tsx`, `Passos.tsx`, `Contador.tsx`, `LinhaTempo.tsx`, `PainelAbas.tsx`, `Toast.tsx`, `ErroTela.tsx`, `Estados.tsx`, `Badge.tsx`, `MenuAcoes.tsx`, `Codigos.tsx`, `Etapas.tsx`, `UploadModal.tsx`, `FormLinha.tsx` | Manter | `Codigos.tsx` passa a reconhecer IDs v2 |
-| `components/Layout.tsx` | Adaptar | Novo topo com botão **Ler QR** e menu v2 |
-| `components/NfModal.tsx`, `RecebimentoModal.tsx`, `DeclararDofModal.tsx`, `utils/nfeXml.ts` | Adaptar | Viram passos do novo assistente de recebimento |
-| `components/SeparacaoModal.tsx`, `RmeModal.tsx` | Adaptar | Separação por leitura de QR |
-| `components/InspectorModal.tsx` | Adaptar | Protocolo continua; código da peça passa a ser o ID v2 |
-| `components/FormarFardosModal.tsx`, `FardosModal.tsx`, `RelatorioVolumetria.tsx`, `RelatoriosIbama.tsx`, `RelatorioMovimentacoes.tsx`, `Quadro.tsx` | Remover | `Quadro` pode ficar no repositório sem uso; não usar nas telas v2 |
-| Páginas `Lotes`, `LoteDetalhe`, `Saldo`, `Inventario`, `VisaoComputacional`, `Relatorios` | Remover | Saldo vira visão do Estoque; indicadores vão para o Painel |
-| Páginas `Patio` | Renomear | Vira `Locais` |
-| Páginas `Administracao` | Renomear | Vira `Usuarios` |
-| Páginas `Cadastros`, `Especies`, `Tamanhos`, `Fornecedores`, `Enderecos`, `Configuracoes`, `Dashboard`, `Estoque`, `FardoDetalhe`, `Inspecao`, `Recebimento`, `NotasFiscais`, `Movimentacoes`, `Rme`, `Login` | Adaptar | Ver especificação de cada tela (seção 9) |
-| Novas | Criar | `Contratos`, `ContratoDetalhe`, `Simulador`, `EtiquetasImpressao`, `RecebimentoDetalhe`, `InspecaoFardo`, `FichaDormente`, `FornecedorDetalhe`, `SaidaDetalhe`, `LeitorQr` (componente global) |
+| `services/http.ts`, `endpoints.ts`, `real/index.ts` | Só com `auth` | Saem na Etapa 10 (Supabase); `ApiError` e `mensagemSegura` vão para um módulo próprio de erros |
+| `services/index.ts`, `contracts.ts`, `mock/index.ts`, `mock/util.ts`, `mock/data.ts` | Só com `auth` e o usuário de demonstração | Etapa 1: autenticação vira serviço separado; Etapa 2: serviços v2, regras e história de demonstração |
+| `config/env.ts` | Mantido | Etapa 4: `VITE_APP_URL`; Etapa 10: variáveis do Supabase |
+| `types/models.ts` | Só `Origem`, `Paginado`, `ListQuery`, `Usuario` | Etapa 2: modelo v2 (seção 5) |
+| `dominio/rotulos.ts`, `opcoes.ts`, `permissoes.ts` | Só tipos, `opcoesDe()` e `admin` | Etapa 1: permissões e perfis; Etapa 2: situações e `identificacao.ts`, `parametros.ts` |
+| `components/` genéricos: `ListPage`, `FormModal`, `FormLinha`, `Modal`, `Passos`, `Contador`, `LinhaTempo`, `Etapas`, `PainelAbas`, `Toast`, `ErroTela`, `Estados`, `Badge`, `MenuAcoes`, `Codigos`, `UploadModal`, `Logo`, `Icone`, `Layout` | Mantidos (`LinhaTempo` recebe eventos genéricos) | Etapa 1: `ListPage` com `AbasSituacao` e `BarraFiltros`, `Layout` v2 |
+| `utils/format.ts`, `utils/nfeXml.ts`, `hooks/useAsync.ts`, `contexts/AuthContext.tsx`, `pages/Login.tsx` | Mantidos | `utils/busca.ts` reconhece IDs v2 na Etapa 4 |
+| Modais da v1 de NF, recebimento, DOF, separação, RME e Inspector | Removidos; continuam em `main` e na branch `backup/v1` | Servem de base nas Etapas 5, 6 e 8 (`git show main:src/components/NfModal.tsx`) |
+| Novas telas | — | `Contratos`, `ContratoDetalhe`, `Simulador`, `EtiquetasImpressao`, `Recebimentos`, `RecebimentoDetalhe`, `Documentos`, `Inspecao`, `InspecaoFardo`, `Estoque`, `FardoDetalhe`, `FichaDormente`, `Locais`, `LocalDetalhe`, `Movimentacoes`, `Saidas`, `SaidaDetalhe`, `Cadastros`, `FornecedorDetalhe`, `Usuarios`, `Configuracoes`, `Painel`, `Vitrine`, e o componente global `LeitorQr` |
 
 ---
 
@@ -100,14 +96,17 @@ O menu segue a **jornada do dormente** (contrato → recebimento → inspeção 
 | `/f/:id` | Página do fardo | Destino do QR do fardo; `/fardos/:id` redireciona para cá |
 | `/d/:id` | Ficha do dormente | Destino do QR do dormente; tela mobile-first |
 | `/saidas/:numero` | Página da requisição | |
+| `/locais/:codigo` | Página do local | Destino do QR do local; `codigo` = `A03` (ID `LOC-A03`) |
+| `/vitrine` | Vitrine de componentes | Interna, só administrador, dados fixos; valida os padrões de lista e de objeto |
 | `/simulador/etiquetas/:remessa` | Folha de impressão de etiquetas | Sem o Layout (só a folha), com CSS de impressão |
 | `/login` | Login | Guarda o destino (ex. `/d/...`) e volta para ele após entrar |
 
 ### 3.4 Elementos globais (em toda tela)
 
 - **Topo**: logo, busca global, botão **Ler QR** (ícone + texto no desktop, botão flutuante no celular), sino de alertas, usuário.
-- **Busca global** reconhece IDs v2 e leva direto ao objeto: dormente → `/d/`, fardo → `/f/`, contrato → `/contratos/`, RME → `/saidas/`, NF → `/documentos?q=`. Texto livre pesquisa fardos e contratos.
-- **Selo "Dados simulados"** continua no modo mock.
+- **Busca global** reconhece IDs v2 e leva direto ao objeto: dormente → `/d/`, fardo → `/f/`, contrato → `/contratos/`, RME → `/saidas/`, local → `/locais/`, NF → `/documentos?q=`. Texto livre pesquisa fardos e contratos.
+- **Sem avisos de dados simulados** (banner, selo ou sufixo): o protótipo nunca terá dados reais.
+- **Menu lateral** recolhível por um ícone discreto no topo, ao lado do logo (sem botão no rodapé).
 
 ---
 
@@ -136,7 +135,7 @@ Contratos ──► Contrato ──► Fornecedor
 Recebimentos ──► Recebimento ──► Fardos recebidos ──► Inspeção do fardo
 Inspeção ──► Inspeção do fardo ──► Fardo (após concluir)
 Estoque ──► por item ──► fardos do item ──► Fardo ──► Dormente
-Locais ──► fardos no local ──► Fardo
+Locais ──► Local (/locais/) ──► fardos no local ──► Fardo
 RME ──► Requisição ──► fardos/dormentes separados ──► Dormente
 Ficha do dormente ──► Fardo, Local, Contrato, Fornecedor, NF, DOF, Recebimento, Inspeção, RME
 ```
@@ -154,25 +153,28 @@ export const RE_CONTRATO = /^[A-Z]{2}\d{5}-\d{2}$/;           // AR00224-01
 export const RE_DORMENTE = /^([A-Z]{2}\d{5}-\d{2})-(\d{6})$/;  // AR00224-01-000357
 export const RE_FARDO    = /^([A-Z]{2}\d{5}-\d{2})-F(\d{3})$/; // AR00224-01-F012
 export const RE_RME      = /^RME-\d{4}-\d{4}$/;                 // RME-2026-0012
+export const RE_LOCAL    = /^LOC-([A-Z0-9]+(?:-[A-Z0-9]+)*)$/;  // LOC-A03 (código do local: A03)
 
 export function idDormente(contrato: string, seq: number): string; // zero-padding 6
 export function idFardo(contrato: string, seq: number): string;    // zero-padding 3
 export function lerCodigo(texto: string): { tipo: 'dormente' | 'fardo' | 'contrato' | 'rme' | 'local'; id: string } | null;
-// lerCodigo aceita o ID puro ou o link completo do QR (extrai o ID do final de /#/d/<id> ou /#/f/<id>)
+// lerCodigo aceita o ID puro ou o link completo do QR (extrai o ID do final de /#/d/<id>, /#/f/<id> ou /#/locais/<código>)
 export function linkQr(tipo: 'dormente' | 'fardo' | 'local', id: string): string; // usa VITE_APP_URL
+// local: ID LOC-A03, link <APP_URL>/#/locais/A03
 ```
 
-Formatos de ata e contrato são provisórios (ver perguntas em aberto); toda validação passa por estas funções, nunca regex espalhada pelas telas.
+Formatos de ata e contrato são provisórios (ver perguntas em aberto); toda validação passa por estas funções, nunca regex espalhada pelas telas. `identificacao.ts` tem testes no Vitest (`identificacao.test.ts`) com exemplos válidos e inválidos de cada formato.
 
 ### 5.2 Cadastros
 
 ```ts
 interface Fornecedor { id; razaoSocial; cnpj; cidadeUf; ctfIbama: string; ctfValidade: string;
-  situacao: 'ativo' | 'bloqueado' | 'inativo'; especiesIds: string[]; certificados: Anexo[] }
+  situacao: 'ativo' | 'inativo' /* manual */; bloqueado: boolean /* calculado: CTF vencido pela validade */;
+  especiesIds: string[]; certificados: Anexo[] }
 interface Especie { id; nomeCientifico; nomePopular; classe?: string; ativo: boolean }
 interface Tamanho { id; codigo; comprimentoCm; larguraCm; alturaCm; volumeM3 /* calculado */; medidas: 'provisorio' | 'confirmado' }
 interface Tratamento { id; preservativo: string /* CCA */; empresa: string /* Granoski */ }
-interface Local { id; codigo; descricao; tipo: 'armazenagem' | 'inspecao' | 'segregacao' | 'expedicao'; capacidade: number /* dormentes */; ocupacao /* calculada */; ativo: boolean }
+interface Local { id; codigo /* A03; ID do QR = LOC-A03 */; descricao; tipo: 'armazenagem' | 'inspecao' | 'segregacao' | 'expedicao'; capacidade: number /* dormentes */; ocupacao /* calculada */; ativo: boolean }
 interface NivelEstoque { especieId; tamanhoId; minimo: number; maximo: number }   // em Configurações
 interface Anexo { id; nome; tipo: 'pdf' | 'xml' | 'imagem'; url; enviadoEm; enviadoPor }
 ```
@@ -181,37 +183,46 @@ interface Anexo { id; nome; tipo: 'pdf' | 'xml' | 'imagem'; url; enviadoEm; envi
 
 ```ts
 interface Ata { id; numero /* AR00224 */; fornecedorId; vigenciaInicio; vigenciaFim }
-interface Contrato { id; numero /* AR00224-01 */; ataId; fornecedorId; empresaInspetora: string; ano: number;
+interface Contrato { id; numero /* AR00224-01 */; ataId /* o fornecedor vem da ata, não é gravado de novo */; empresaInspetora: string; ano: number;
   situacao: 'vigente' | 'concluido' | 'cancelado'; itens: ItemContrato[]; criadoEm; criadoPor }
 interface ItemContrato { id; especieId; tamanhoId; tratamentoId; quantidade: number /* unidades */;
   // calculados pelo serviço:
-  emitidos: number; recebidos: number; aprovados: number; reprovados: number }
-interface Remessa { id; contratoId; nfNumero; criadoEm; fardosIds: string[]; situacao: 'em_transito' | 'recebida' }
+  emitidos: number; recebidos: number; aprovados: number; reprovados: number;
+  saldoAEmitir: number /* = quantidade - (emitidos - reprovados) */ }
+interface Remessa { id; contratoId; nfNumero; criadoEm; fardosIds: string[]; situacao: 'em_transito' | 'recebida_parcial' | 'recebida' }
 ```
 
-`Remessa` representa o que o fornecedor envia de uma vez (uma NF). No protótipo é criada pelo Simulador e consumida pelo Recebimento.
+`Remessa` representa o que o fornecedor envia de uma vez (uma NF). No protótipo é criada pelo Simulador e consumida pelo Recebimento. Fica `recebida_parcial` enquanto houver fardo dela ainda em trânsito (falta no recebimento).
+
+O contrato é cumprido por dormentes **aprovados**: o fornecedor pode emitir reposição dos reprovados, e o limite de emissão é `emitidos - reprovados <= quantidade`.
 
 ### 5.4 Fardo e dormente (dois níveis)
 
 ```ts
 type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao' | 'em_estoque' | 'aberto' | 'baixado';
 interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId; remessaId; quantidadeInicial: number;
-  saldo: number /* calculado = dormentes em_estoque */; localId?: string; situacao: SituacaoFardo;
+  saldo: number /* calculado: saldo físico = dormentes em_estoque + reservado */;
+  disponivel: number /* calculado: dormentes em_estoque (livres para nova saída) */;
+  localId?: string; situacao: SituacaoFardo;
+  conclusaoInspecao?: { quando; quem; justificativa? /* obrigatória com não localizados */; naoLocalizados: string[] };
   recebidoEm?: string; idadeDias?: number /* calculado */; historico: Evento[] }
 
-type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado';
+type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'nao_localizado';
 interface Dormente { id /* AR00224-01-000357 */; contratoId; itemContratoId; fardoId: string;
   situacao: SituacaoDormente; categoria?: number; medidas?: { comprimentoCm; larguraCm; alturaCm };
   inspecaoId?: string; rmeNumero?: string; historico: Evento[] }
 
 interface Evento { quando; quem; tipo: 'emitido' | 'recebido' | 'inspecionado' | 'guardado' | 'transferido'
-  | 'reservado' | 'baixado' | 'segregado' | 'cancelado'; descricao: string; referencia?: string }
+  | 'reservado' | 'baixado' | 'segregado' | 'nao_localizado' | 'cancelado'; descricao: string; referencia?: string }
 ```
 
 Invariantes (garantidas no serviço, nunca na tela):
-- `fardo.saldo` é sempre o número de dormentes `em_estoque` ou `reservado` daquele fardo.
+- `fardo.saldo` (saldo físico) é sempre o número de dormentes `em_estoque` + `reservado` daquele fardo, que ainda estão fisicamente nele; `fardo.disponivel` é só os `em_estoque`. Sugestão e separação de RME usam o disponível.
 - Um dormente pertence a exatamente um fardo; reprovado sai do fardo (`fardoId` mantido como origem, situação `reprovado`, local de segregação).
+- Dormente não lido quando o fardo é concluído na inspeção fica `nao_localizado` (fora do saldo); se for encontrado, é inspecionado e segue o fluxo normal.
+- Fardo esperado e não lido no recebimento continua `em_transito` e pode ser recebido depois.
 - Um ID nunca é reaproveitado nem apagado.
+- Os invariantes têm testes no Vitest sobre as regras do mock (`mock/*.test.ts`).
 
 ### 5.5 Entrada
 
@@ -225,58 +236,67 @@ interface Recebimento { id; nfId; dofId; recebidoEm; recebidoPor; fardosEsperado
   conforme: boolean; ocorrencias: { tipo: 'avaria' | 'falta' | 'sobra' | 'fardo_desconhecido'; descricao; fotos: Anexo[] }[];
   divergenciaVolume: { especieId; documentalM3; calculadoM3; percentual; acimaTolerancia: boolean }[];
   localEsperaId: string }
-interface Inspecao { id; dormenteId; fardoId; resultado: 'aprovado' | 'reprovado'; categoria?: number;
-  medidas: { comprimentoCm; larguraCm; alturaCm }; inspetor; inspecionadoEm; origem: 'inspector' | 'simulado';
+interface Inspecao { id; dormenteId; fardoId; resultado: 'aprovado' | 'reprovado'; categoria?: 1 | 2 | 3;
+  indice?: number /* 0 a 100, vindo do Inspector */; veredito?: 'APROVADO' | 'ATENCAO' | 'REJEITADO' /* original do Inspector */;
+  medidas: { comprimentoCm; larguraCm; alturaCm }; inspetor; inspecionadoEm; origem: 'inspector' | 'simulado' | 'manual';
   relatorioUrl?: string }
 ```
+
+Regras **provisórias**, a confirmar com o time da inspeção (ficam em `dominio/parametros.ts` e nos parâmetros, nunca espalhadas): veredito APROVADO → `aprovado`; ATENÇÃO e REJEITADO → `reprovado`. Categoria pelo índice: ≥ 80 → 1, ≥ 50 → 2, abaixo → 3 (limites `limitesCategoria`). Vale a inspeção mais recente do dormente.
 
 ### 5.6 Estoque e saída
 
 ```ts
-interface SaldoItem { especieId; tamanhoId; emEstoque; aguardandoInspecao; reservado; minimo; maximo;
+interface SaldoItem { especieId; tamanhoId; emEstoque /* disponível */; aguardandoInspecao; reservado; naoLocalizado; minimo; maximo;
   situacao: 'falta' | 'ok' | 'excesso' /* calculado */ }
 interface Movimentacao { id; tipo: 'guarda' | 'transferencia' | 'segregacao' | 'saida'; fardoId; dormentesIds?: string[];
   deLocalId?; paraLocalId?; quando; quem; referencia?: string }
 type SituacaoRme = 'aberta' | 'em_separacao' | 'pronta' | 'entregue' | 'cancelada';
-interface Rme { id; numero /* RME-2026-0012 */; solicitante; destino: string /* obra ou trecho */; necessidadeEm: string;
+interface Rme { id; numero /* RME-2026-0012 */; solicitanteId; destino: string /* obra ou trecho */; necessidadeEm: string;
   itens: { especieId; tamanhoId; quantidade }[]; separacao?: { fardoId; dormentesIds: string[]; seguiuSugestao: boolean; justificativa? }[];
   situacao: SituacaoRme; historico: Evento[] }
 ```
 
 ### 5.7 Parâmetros (`servicos.parametros`, editados em Configurações)
 
-`limiteDiasEstoque` (provisório 120), `alertaDofDias` ([3, 1]), `toleranciaVolumePct` (10, regra IBAMA, só leitura), `dormentesPorFardoPadrao` (sugestão do simulador), `niveis: NivelEstoque[]`, `modoDemonstracao` (mostra o Simulador).
+`limiteDiasEstoque` (provisório 120), `alertaDofDias` ([3, 1]), `toleranciaVolumePct` (10, regra IBAMA, só leitura), `limitesCategoria` ([80, 50], provisório), `dormentesPorFardoPadrao` (14, sugestão do simulador), `niveis: NivelEstoque[]`, `modoDemonstracao` (mostra o Simulador).
 
 ---
 
 ## 6. Camada de serviços
 
-Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; mock e real implementam a mesma interface; `endpoints.ts` com caminhos provisórios. Ao criar uma operação, atualizar contrato, mock, real e endpoints juntos.
+Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cada implementação (mock e, na Etapa 10, Supabase) implementa a mesma interface. Ao criar uma operação, atualizar contrato e todas as implementações juntos.
+
+**Autenticação separada da camada de dados.** Desde a Etapa 1, a autenticação é um serviço à parte (`services/auth/`: contrato `ServicoAuth` com `entrar`, `sair`, `usuarioAtual` e `aoMudarSessao`), usado só pelo `AuthContext`. As telas usam apenas `useAuth()` e `pode()`. Até a Etapa 10 a implementação é a simulada: o nome digitado escolhe o perfil (`administrador`, `almoxarife`, `gestor`, `requisitante`; qualquer senha). Na Etapa 10 entra a implementação do Supabase Auth (e-mail e senha, perfil lido da tabela `perfis`, sessão guardada no aparelho pelo padrão do `supabase-js`), sem mexer nas telas.
 
 | Serviço | Operações principais |
 | --- | --- |
-| `auth` | manter |
 | `dashboard` | `indicadores()`, `pendencias()` (por perfil), `alertas()` |
-| `fornecedores`, `especies`, `tamanhos`, `tratamentos`, `locais`, `usuarios` | `listar`, `obter`, `criar`, `atualizar`, `inativar` |
-| `contratos` | `listar`, `obter(numero)`, `criar`, `atualizar`, `cancelar` |
-| `simulador` | `gerarRemessa({ contratoId, itens: [{ itemContratoId, fardos, dormentesPorFardo }] })` → cria fardos `em_transito`, dormentes `emitido`, NF e DOF de exemplo; `etiquetas(remessaId)` |
-| `recebimentos` | `listar`, `obter`, `remessasACaminho()`, `receber(dados, arquivos)` |
+| `fornecedores`, `especies`, `tamanhos`, `tratamentos`, `locais` | `listar`, `obter`, `criar`, `atualizar`, `inativar` (`locais.obter(codigo)` para a página do local) |
+| `usuarios` | `listar`, `atualizar` (só perfil e situação; as contas são criadas no painel do Supabase) |
+| `contratos` | `listar`, `obter(numero)`, `criar`, `atualizar`, `cancelar`; `atas`: `listar`, `criar` |
+| `simulador` | `gerarRemessa({ contratoId, itens: [{ itemContratoId, fardos, dormentesPorFardo }] })` → cria fardos `em_transito`, dormentes `emitido`, NF e DOF de exemplo; recusa acima do `saldoAEmitir`; `etiquetas(remessaId)` |
+| `recebimentos` | `listar`, `obter`, `remessasACaminho()` (inclui as parciais, com os fardos que faltam), `receber(dados, arquivos)` |
 | `documentos` | `listarNfs`, `listarDofs`, `declararDof(id)`, `importarXml` (validação no front com `utils/nfeXml.ts`) |
-| `inspecao` | `fila()`, `obterFardo(id)`, `registrar(dormenteId, resultado)`, `simularFardo(id)`, `concluir(fardoId, localId)` |
+| `inspecao` | `fila()`, `naoLocalizados()`, `obterFardo(id)`, `registrar(dormenteId, resultado)` (aceita dormente `nao_localizado` encontrado depois), `simularFardo(id)`, `concluir(fardoId, localId, justificativa?)` |
 | `fardos` | `listar`, `obter(id)`, `transferir(id, localId)` |
-| `dormentes` | `listar`, `obter(id)` (devolve a ficha completa já montada, seção 9.12) |
+| `dormentes` | `listar`, `obter(id)` (devolve a ficha completa já montada, seção 9.13) |
 | `estoque` | `porItem()`, `porFardo(q)` |
 | `movimentacoes` | `listar` |
 | `rme` | `listar`, `obter`, `abrir`, `sugerirSeparacao(numero)`, `separar`, `entregar`, `cancelar` |
-| `parametros` | `obter`, `atualizar` |
+| `parametros` | `obter`, `atualizar`, `reiniciarDemonstracao()` (só no mock) |
 
-**Persistência e futuro banco (Supabase).** A interface é construída inteira sobre o mock e só depois o banco é criado no Supabase. Para isso funcionar sem retrabalho:
-- O mock passa a **guardar o estado no `localStorage`** (com `try/catch`), para os dados sobreviverem ao recarregar a página, e ganha um botão **Reiniciar dados de demonstração** em Configurações.
-- A história inicial (`data.ts`) é **determinística**: os mesmos IDs sempre, sem `Math.random()` nem datas soltas (datas relativas a uma data-base fixa). Assim, etiquetas impressas com antecedência abrem a ficha certa em qualquer aparelho.
-- O Supabase entra depois como **uma terceira implementação** da mesma interface (`services/supabase/`), escolhida por variável de ambiente, sem mudar nenhuma tela. Os tipos de `models.ts` devem ser pensados como tabelas: cada entidade com `id` próprio, vínculos por id (`contratoId`, `fardoId`), campos calculados marcados como tal (viram views ou consultas).
-- Enquanto não houver banco, cada aparelho tem seus próprios dados. A demonstração que usa computador e celular juntos só funciona depois do Supabase.
+**Mock (até a Etapa 10).**
+- Guarda o estado no **`localStorage`** (com `try/catch`), para os dados sobreviverem ao recarregar a página; **Reiniciar dados de demonstração** em Configurações volta à história inicial.
+- A história inicial (`data.ts`) é **determinística**: os mesmos IDs sempre, sem `Math.random()` nem datas soltas (datas relativas a uma data-base fixa). Inclui uma **remessa "a caminho" pronta, com IDs fixos**, para computador e celular partirem do mesmo estado e as etiquetas poderem ser impressas com antecedência (seção 15).
+- Regras num módulo por assunto: `mock/simulador.ts`, `mock/recebimento.ts`, `mock/inspecao.ts`, `mock/estoque.ts` (única porta de mudança de saldo: `movimentarDormentes()`), `mock/rme.ts`. `data.ts` gera a história **chamando essas regras**, nunca montando registros à mão. As regras e os invariantes da seção 5.4 têm testes no Vitest.
+- Remessas geradas no Simulador depois do início ficam só no aparelho onde foram geradas.
 
-Regras no mock, um módulo por assunto (como hoje): `mock/simulador.ts`, `mock/recebimento.ts`, `mock/inspecao.ts`, `mock/estoque.ts` (única porta de mudança de saldo: `movimentarDormentes()`), `mock/rme.ts`. `data.ts` gera a história inicial **chamando essas regras**, nunca montando registros à mão.
+**Supabase (Etapa 10).**
+- SQL em `supabase/migrations/` (numerado, um arquivo por mudança): tabela `perfis` ligada a `auth.users`, tabelas dos dados a partir de `models.ts` (campos calculados viram views ou funções), políticas RLS por perfil e a carga da história de demonstração com os mesmos IDs do mock. Claude escreve; a Dani executa no editor SQL do Supabase.
+- Implementação `services/supabase/` da mesma interface, escolhida por variável de ambiente (`VITE_FONTE_DADOS=mock|supabase`), e o Supabase Auth no serviço de autenticação. Regras que mudam várias tabelas juntas (receber, concluir inspeção, separar, entregar) viram funções no banco (`rpc`), para valerem no servidor.
+- Sai `services/real/` (HTTP), com `http.ts` e `endpoints.ts`; `ApiError` e `mensagemSegura()` vão para `services/erros.ts`.
+- A chave pública (`anon`) do Supabase pode ir no `.env`; o acesso é controlado pelas políticas RLS. A chave de serviço nunca vai para o front.
 
 ---
 
@@ -320,9 +340,11 @@ Regras: cor semântica sempre acompanha texto ou ícone (nunca só cor); o laran
 | `BarraProgresso` | Contratado x recebido x aprovado (contratos e itens) |
 | `EtiquetaQr` | Desenho da plaquinha com QR, para tela e impressão |
 | `LeitorQr` | Camada de leitura pela câmera, com entrada manual |
-| `SeloDemo` | Selo laranja tracejado "Demonstração" para o Simulador |
+| `SeloDemo` | Selo laranja tracejado "Demonstração" para o Simulador (único aviso de demonstração do sistema) |
 
 Ícones: ampliar `components/Icone.tsx` com `qr`, `scan`, `contrato`, `fabrica`, `impressora`, `etiqueta`, `local`, `copiar`, `seta-direita`.
+
+Menu lateral: recolhível por um ícone discreto no topo, ao lado do logo; não há botão "Recolher menu" no rodapé.
 
 ---
 
@@ -373,12 +395,12 @@ Usada só em `/d/:id`. Uma coluna, cartões empilhados, texto grande, ações gr
 Para cada tela: rota, objetivo, padrão, conteúdo, ações, ligações e critérios de aceite. Todas têm estados carregando, vazio e erro (`Estados.tsx`), e respeitam permissões (`pode()`).
 
 ### 9.1 Login (`/login`)
-Manter. Perfis demo: `administrador`, `almoxarife`, `gestor`, `requisitante` (qualquer senha). Após login, voltar ao destino guardado, inclusive `/d/:id` vindo de um QR.
+Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administrador`, `almoxarife`, `gestor`, `requisitante`; qualquer senha). Na Etapa 10, e-mail e senha pelo Supabase Auth, com a sessão guardada no aparelho (o QR abre a ficha sem novo login enquanto a sessão valer). Após login, voltar ao destino guardado, inclusive `/d/:id` vindo de um QR.
 - Aceite: abrir `/#/d/AR00224-01-000001` sem sessão leva ao login e, após entrar, abre a ficha.
 
 ### 9.2 Painel (`/`) · padrão Painel
 - **Indicadores** (clicáveis): Em estoque (dormentes) · Aguardando inspeção · Itens abaixo do mínimo · Fardos acima do limite de dias · DOFs a declarar · RMEs abertas.
-- **Para fazer agora** por perfil: almoxarife (remessas a receber, fardos a inspecionar, fardos a guardar, RMEs a separar e entregar, DOFs a declarar); gestor (itens em falta ou excesso, fardos parados, taxa de reprovação alta); requisitante (suas RMEs e situação); administrador (contratos perto do fim, fornecedores com CTF vencendo).
+- **Para fazer agora** por perfil: almoxarife (remessas a receber, fardos a inspecionar, fardos a guardar, RMEs a separar e entregar, DOFs a declarar); gestor (itens em falta ou excesso, fardos parados, taxa de reprovação alta, dormentes não localizados); requisitante (suas RMEs e situação); administrador (contratos perto do fim, fornecedores com CTF vencendo).
 - **Estoque por item**: gráfico de barras horizontais por espécie + tamanho, com marcas de mínimo e máximo (cor só reforça o rótulo falta/ok/excesso).
 - **Entregas dos contratos**: `BarraProgresso` por contrato vigente.
 - **Alertas**: lista curta com link.
@@ -388,21 +410,21 @@ Manter. Perfis demo: `administrador`, `almoxarife`, `gestor`, `requisitante` (qu
 - Abas: Vigentes · Concluídos · Cancelados.
 - Colunas: Contrato (link) · Ata · Fornecedor (link) · Itens · Entregue (`BarraProgresso` recebido/contratado) · Vigência · Situação.
 - Filtros: fornecedor, espécie, ano.
-- Ação principal: **Novo contrato** (modal largo `ContratoModal`: ata (selecionar ou criar), número, fornecedor, empresa inspetora, ano, itens em linhas: espécie, tamanho, tratamento, quantidade e unidade (un ou m³). Em m³ o sistema mostra a conversão em unidades pelo volume do tamanho, arredondada para baixo, e grava em unidades).
-- Aceite: não deixa salvar item com espécie que o fornecedor não fornece; fornecedor bloqueado não aparece.
+- Ação principal: **Novo contrato** (modal largo `ContratoModal`: ata (selecionar ou criar; o fornecedor é escolhido na ata e o contrato o herda, sem digitar de novo), número, empresa inspetora, ano, itens em linhas: espécie, tamanho, tratamento, quantidade e unidade (un ou m³). Em m³ o sistema mostra a conversão em unidades pelo volume do tamanho, arredondada para baixo, e grava em unidades).
+- Aceite: não deixa salvar item com espécie que o fornecedor não fornece; fornecedor inativo ou bloqueado (CTF vencido, calculado pela validade) não aparece ao criar ata ou contrato.
 
 ### 9.4 Página do contrato (`/contratos/:numero`) · padrão Objeto
-- Cabeçalho: número, situação, fatos-chave (Fornecedor, Ata, Contratado, Recebido, Aprovado, Reprovado).
-- Abas: **Itens** (por item: contratado, emitidos, recebidos, aprovados, reprovados, saldo a entregar, barra de progresso) · **Fardos** (lista filtrada por contrato) · **Notas e recebimentos** · **Histórico**.
+- Cabeçalho: número, situação, fatos-chave (Fornecedor (da ata), Ata, Contratado, Recebido, Aprovado, Reprovado).
+- Abas: **Itens** (por item: contratado, emitidos, recebidos, aprovados, reprovados, saldo a emitir, barra de progresso) · **Fardos** (lista filtrada por contrato) · **Notas e recebimentos** · **Histórico**.
 - Ações: Editar, Cancelar, **Gerar remessa no simulador** (só com modo demonstração).
 - Relacionados: fornecedor, ata, NFs, recebimentos.
 
 ### 9.5 Simulador do fornecedor (`/simulador`) · padrão Assistente + Lista
 - Aviso fixo no topo (não recolhível): "Demonstração. Na operação real, o fornecedor grava o QR na plaquinha seguindo o padrão do contrato."
-- Assistente **Gerar remessa**: 1) contrato · 2) itens e quantidades (fardos e dormentes por fardo, padrão do parâmetro; mostra saldo a emitir do item e bloqueia acima dele) · 3) revisar e confirmar.
+- Assistente **Gerar remessa**: 1) contrato · 2) itens e quantidades (fardos e dormentes por fardo, padrão do parâmetro; mostra o saldo a emitir do item, `quantidade - (emitidos - reprovados)`, e bloqueia acima dele: reposição de reprovados é permitida) · 3) revisar e confirmar.
 - Ao confirmar: cria fardos `em_transito`, dormentes `emitido` com IDs sequenciais, uma NF e um DOF de exemplo coerentes com o volume, e a remessa `em_transito`.
 - Lista abaixo: remessas geradas (NF, contrato, fardos, dormentes, situação) com ações **Imprimir etiquetas** e **Baixar XML da NF** (XML fictício para testar a importação).
-- Aceite: nenhuma sequência se repete entre remessas do mesmo contrato; o total emitido nunca passa do contratado.
+- Aceite: nenhuma sequência se repete entre remessas do mesmo contrato; emitidos menos reprovados nunca passa do contratado.
 
 ### 9.6 Folha de etiquetas (`/simulador/etiquetas/:remessa`)
 - Sem Layout. Grade de `EtiquetaQr` para impressão em A4: primeiro a etiqueta do fardo, depois as dos dormentes daquele fardo.
@@ -412,16 +434,16 @@ Manter. Perfis demo: `administrador`, `almoxarife`, `gestor`, `requisitante` (qu
 - Aceite: a etiqueta impressa é lida pela câmera do celular e abre a ficha.
 
 ### 9.7 Recebimentos (`/recebimentos`) · padrão Lista
-- Abas: **A caminho** (remessas em trânsito) · Aguardando inspeção · Concluídos · Com ocorrência.
+- Abas: **A caminho** (remessas em trânsito, inclusive as recebidas em parte, com os fardos que faltam) · Aguardando inspeção · Concluídos · Com ocorrência.
 - Colunas: NF · Fornecedor · Contrato · Fardos · Dormentes · Prazo DOF (badge) · Situação.
 - Ação na linha "A caminho": **Receber** (abre o assistente com a remessa já escolhida). Ação principal da tela: **Receber sem remessa** (NF por XML ou digitada).
 - **Assistente de recebimento** (`RecebimentoAssistente`):
   1. **Documentos**: NF (da remessa, por XML com `utils/nfeXml.ts` ou digitada; chave repetida é recusada) e DOF (número, validade, volume por espécie, PDF). Sem DOF não avança.
-  2. **Leitura dos fardos**: lista dos fardos esperados com caixa de checagem; botão **Ler QR** em modo contínuo marca cada fardo lido; fardo lido que não é da remessa vira ocorrência "fardo desconhecido"; também dá para marcar à mão.
+  2. **Leitura dos fardos**: lista dos fardos esperados com caixa de checagem; botão **Ler QR** em modo contínuo marca cada fardo lido; fardo lido que não é da remessa vira ocorrência "fardo desconhecido"; também dá para marcar à mão. Fardo esperado e não lido gera ocorrência de **falta** automática, continua `em_transito` e pode ser recebido depois (a remessa fica `recebida_parcial` e volta para "A caminho" com os fardos que faltam).
   3. **Conferência**: conforme ou com ocorrência (avaria, falta, sobra); ocorrência exige descrição e foto.
   4. **Local de espera**: local do tipo inspeção (sugerido o com mais espaço).
   5. **Revisar e confirmar**: resumo, divergência de volume por espécie (acima de 10% mostra aviso crítico e pede justificativa, não bloqueia).
-- Resultado: fardos e dormentes lidos passam a `aguardando_inspecao`; abre a página do recebimento.
+- Resultado: fardos e dormentes lidos passam a `aguardando_inspecao`; os não lidos continuam `em_transito`; abre a página do recebimento.
 
 ### 9.8 Página do recebimento (`/recebimentos/:id`) · padrão Objeto
 - Fatos-chave: NF, DOF, contrato, fardos (lidos/esperados), recebido em, por.
@@ -434,29 +456,30 @@ Manter. Perfis demo: `administrador`, `almoxarife`, `gestor`, `requisitante` (qu
 - Ação na linha: **Declarar**. Ordenação padrão: prazo mais próximo primeiro.
 
 ### 9.10 Inspeção (`/inspecao`) e Inspeção do fardo (`/inspecao/:fardo`)
-- **Fila** (padrão Lista): fardos `aguardando_inspecao` e `em_inspecao` com progresso (x de N dormentes inspecionados), contrato, item, local de espera, há quantos dias. Ação: **Inspecionar**.
+- **Fila** (padrão Lista): fardos `aguardando_inspecao` e `em_inspecao` com progresso (x de N dormentes inspecionados), contrato, item, local de espera, há quantos dias. Ação: **Inspecionar**. Aba **Não localizados**: dormentes que ficaram `nao_localizado` (pendência do gestor), com ação **Inspecionar** quando o dormente for encontrado.
 - **Inspeção do fardo** (tela de trabalho, duas colunas):
-  - Esquerda: lista dos dormentes do fardo com situação (pendente, aprovado, reprovado) e categoria.
-  - Direita: último dormente lido em destaque (ID, resultado, categoria, medidas); botões **Abrir no Inspector** (protocolo atual), **Simular inspeção do fardo** (modo demonstração: gera resultados determinísticos, com ~5% reprovados) e **Registrar à mão** (ler QR + resultado).
+  - Esquerda: lista dos dormentes do fardo com situação (pendente, aprovado, reprovado, não localizado) e categoria.
+  - Direita: último dormente lido em destaque (ID, resultado, categoria, medidas); botões **Abrir no Inspector** (protocolo atual), **Simular inspeção do fardo** (modo demonstração: gera resultados determinísticos, com ~5% reprovados) e **Registrar à mão** (ler QR + Aprovado ou Reprovado + categoria 1, 2 ou 3).
+  - Resultado só aprovado ou reprovado; o ATENÇÃO do Inspector conta como reprovado; categoria pelo índice com os limites 80 e 50 (provisório, seção 5.5).
   - ID lido que não pertence ao fardo vira pendência visível ("não pertence a este fardo").
-  - **Concluir inspeção** (habilitado com todos inspecionados): escolhe o local de guarda (lido por QR do local ou selecionado); aprovados ficam `em_estoque` no fardo, que vai para o local; reprovados vão para `reprovado` no local de segregação. Gera movimentações `guarda` e `segregacao`.
-- Aceite: o saldo do fardo após concluir é igual ao número de aprovados.
+  - **Concluir inspeção**: escolhe o local de guarda (lido por QR do local ou selecionado). Com todos inspecionados, conclui direto; com dormentes não lidos (falta ou QR ilegível), mostra quantos e quais e pede **justificativa obrigatória**, e esses dormentes ficam `nao_localizado`. Aprovados ficam `em_estoque` no fardo, que vai para o local; reprovados vão para `reprovado` no local de segregação. Gera movimentações `guarda` e `segregacao`.
+- Aceite: o saldo do fardo após concluir é igual ao número de aprovados; não localizados aparecem na fila e nas pendências do gestor.
 
 ### 9.11 Estoque (`/estoque`) · padrão Lista com duas visões
 - Alternar **Por item** | **Por fardo** (`?visao=`).
-- Por item: Espécie · Tamanho · Em estoque · Aguardando inspeção · Reservado · Mínimo · Máximo · Situação (falta, ok, excesso). Clique na linha → visão por fardo filtrada pelo item.
-- Por fardo: Fardo (link) · Item · Contrato · Local · Saldo · Idade (dias, com alerta acima do limite) · Situação. Ordenação padrão: mais antigos primeiro.
+- Por item: Espécie · Tamanho · Em estoque (disponível) · Aguardando inspeção · Reservado · Mínimo · Máximo · Situação (falta, ok, excesso). Falta e excesso usam o disponível. Clique na linha → visão por fardo filtrada pelo item.
+- Por fardo: Fardo (link) · Item · Contrato · Local · Saldo (físico) · Disponível · Idade (dias, com alerta acima do limite) · Situação. Ordenação padrão: mais antigos primeiro.
 - Filtros: espécie, tamanho, local, situação, contrato, "acima do limite de dias".
 - Ação principal: **Transferir fardo** (ler QR do fardo → ler QR ou escolher local).
 
 ### 9.12 Página do fardo (`/f/:id`) · padrão Objeto
-- Fatos-chave: Saldo/inicial · Local · Idade · Contrato · Item · Recebido em.
+- Fatos-chave: Saldo/inicial (físico: em estoque + reservados) · Disponível · Local · Idade · Contrato · Item · Recebido em.
 - Abas: **Dormentes** (ID, situação, categoria, comprimento medido) · **Origem** (contrato, fornecedor, NF, DOF, recebimento, inspeção) · **Movimentações** · **Histórico**.
 - Ações por situação: aguardando inspeção → **Inspecionar**; em estoque/aberto → **Transferir**, **Imprimir etiqueta do fardo**.
 
 ### 9.13 Ficha do dormente (`/d/:id`) · padrão Ficha rápida
 - Topo: ID grande em mono, badge de situação, espécie (nome científico + popular), classe, tamanho, tratamento.
-- Cartão **Onde está**: fardo (link), local, desde quando. Se baixado: RME e destino.
+- Cartão **Onde está**: fardo (link), local, desde quando. Se baixado: RME e destino. Se não localizado: aviso com a justificativa da conclusão e, para o almoxarife, a ação **Inspecionar agora**.
 - Cartão **Inspeção**: resultado, categoria, medidas, inspetor, data, link do relatório (`urlSegura()`).
 - Cartão **Origem**: contrato, ata, fornecedor, empresa inspetora, NF, DOF, recebido em.
 - Cartão **Linha do tempo**: eventos do dormente (`LinhaTempo`).
@@ -467,10 +490,11 @@ Manter. Perfis demo: `administrador`, `almoxarife`, `gestor`, `requisitante` (qu
 ### 9.14 Leitor de QR (componente global `LeitorQr`)
 Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 
-### 9.15 Locais (`/locais`) · padrão Lista + mapa
+### 9.15 Locais (`/locais`) e Página do local (`/locais/:codigo`)
 - Visão **Mapa**: grade de cartões por local (código, tipo, barra de ocupação dormentes/capacidade, número de fardos); cores por tipo e ocupação com texto.
 - Visão **Lista**: Código · Tipo · Descrição · Fardos · Ocupação · Situação.
-- Clique no local → Estoque por fardo filtrado pelo local.
+- Clique no local → **Página do local** (padrão Objeto): fatos-chave (tipo, capacidade, ocupação, fardos), lista dos fardos no local (link para cada fardo e para o Estoque por fardo filtrado pelo local) e **Imprimir QR do local**. É o destino do QR do local.
+- QR do local: ID `LOC-<código>` (ex. `LOC-A03`), link `<APP_URL>/#/locais/A03`; validação por `RE_LOCAL` em `identificacao.ts`.
 - Ação: **Imprimir QR dos locais** (etiqueta de endereço, para guarda por leitura).
 
 ### 9.16 Movimentações (`/movimentacoes`) · padrão Lista
@@ -480,7 +504,7 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 ### 9.17 Requisições (`/saidas`) e Página da RME (`/saidas/:numero`)
 - Lista: abas Abertas · Em separação · Prontas · Entregues · Canceladas. Colunas: RME · Solicitante · Destino · Itens · Necessidade em · Situação.
 - **Nova RME** (requisitante): destino (obra ou trecho), data de necessidade, itens (espécie, tamanho, quantidade, mostrando o disponível).
-- **Separar** (almoxarife, assistente): 1) sugestão de fardos (abertos primeiro, depois os mais antigos), só aprovados e em estoque; 2) leitura dos QR dos dormentes ou "fardo inteiro"; escolha diferente da sugestão pede justificativa; quantidade tem de bater com a pedida; 3) revisar e confirmar → dormentes `reservado`, RME `pronta`.
+- **Separar** (almoxarife, assistente): 1) sugestão de fardos (abertos primeiro, depois os mais antigos), só com dormentes disponíveis (em estoque, não reservados); 2) leitura dos QR dos dormentes ou "fardo inteiro"; escolha diferente da sugestão pede justificativa; quantidade tem de bater com a pedida; 3) revisar e confirmar → dormentes `reservado` (continuam no saldo físico do fardo, saem do disponível), RME `pronta`.
 - **Entregar**: confirma a entrega → dormentes `baixado`, fardos com sobra ficam `aberto`, zerados `baixado`; gera movimentações `saida`.
 - **Cancelar** antes da entrega libera as reservas.
 - Página da RME: fatos-chave (solicitante, destino, itens, situação), abas Itens · Separação (fardos e dormentes com link) · Histórico.
@@ -491,8 +515,13 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 - Fornecedor: razão social, CNPJ, cidade/UF, CTF IBAMA e validade, espécies que fornece (seleção múltipla), certificados (anexos). Linha leva à **Página do fornecedor** (`/fornecedores/:id`): contratos, entregas, taxa de reprovação, certificados.
 
 ### 9.19 Usuários (`/usuarios`) e Configurações (`/configuracoes`)
-- Usuários: nome, e-mail, perfil, ativo.
-- Configurações: parâmetros da seção 5.7, com a tabela de **níveis de estoque** (mínimo e máximo por espécie + tamanho) editável e o interruptor **Modo demonstração**.
+- Usuários: lista (nome, e-mail, perfil, situação) e edita só perfil e situação. As contas são criadas no painel do Supabase (Etapa 10); até lá a lista mostra os quatro perfis de demonstração.
+- Configurações: parâmetros da seção 5.7, com a tabela de **níveis de estoque** (mínimo e máximo por espécie + tamanho) editável, o interruptor **Modo demonstração** e, só no mock, **Reiniciar dados de demonstração**.
+
+### 9.20 Vitrine (`/vitrine`)
+- Interna: fora do menu, só administrador (`admin`). Dados fixos no próprio arquivo, sem serviço.
+- Mostra um exemplo do padrão Lista (cabeçalho, abas de situação, barra de filtros, tabela com ação na linha, cartões no celular) e um do padrão Objeto (cabeçalho do objeto com fatos-chave, abas, relacionados, linha do tempo), mais os componentes visuais da seção 7.3.
+- Serve para validar a casca na Etapa 1 e como referência visual nas etapas seguintes; não é uma tela do produto.
 
 ---
 
@@ -504,8 +533,9 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 | --- | --- | --- |
 | Gerar QR | `qrcode` | Pequena, sem dependências de UI; gerar com `toDataURL()` e exibir em `<img>` (proibido `dangerouslySetInnerHTML`) |
 | Ler QR | API nativa `BarcodeDetector` quando existir; senão `jsqr` lendo quadros da câmera num `<canvas>` | Funciona em Android/Chrome e nos demais navegadores |
+| Login e banco | `@supabase/supabase-js` | Cliente oficial do Supabase (Auth e dados); entra na Etapa 10 |
 
-Registrar no `CLAUDE.md` que estas são as únicas dependências de runtime além de React e react-router-dom.
+Dependências de desenvolvimento: `@types/qrcode` (tipos do `qrcode`, Etapa 4) e `vitest` (testes de `identificacao.ts` e das regras do mock, Etapa 2). Registrar no `CLAUDE.md` que estas são as únicas dependências de runtime além de React e react-router-dom.
 
 ### 10.2 Conteúdo e correção de erro
 - Conteúdo: `linkQr('dormente', id)` = `${VITE_APP_URL}/#/d/${id}`. Nível de correção **M**, margem de 2 módulos.
@@ -517,8 +547,8 @@ Registrar no `CLAUDE.md` que estas são as únicas dependências de runtime alé
 - Sempre oferece **Digitar código** como alternativa e mostra mensagem clara quando não há permissão de câmera.
 - Lê só códigos reconhecidos por `lerCodigo()`; outros mostram "QR não pertence ao sistema".
 
-### 10.4 Câmera exige HTTPS
-O navegador só libera a câmera em `https` ou `localhost`. Para testar no celular e para a apresentação, publicar o `dist/` em hospedagem estática com HTTPS (o `HashRouter` já dispensa configuração de servidor) ou usar `vite --host` com certificado local. Documentar o caminho escolhido no `CLAUDE.md`.
+### 10.4 Câmera exige HTTPS: hospedagem na Vercel
+O navegador só libera a câmera em `https` ou `localhost`. O app é publicado na **Vercel** (HTTPS; o `HashRouter` dispensa configuração de rotas no servidor), e a URL da Vercel é o `VITE_APP_URL`, gravado no link de cada QR. **Pré-requisito da Etapa 4**: projeto na Vercel ligado ao fork, com a URL definitiva, antes de imprimir qualquer etiqueta (etiqueta com `localhost` não abre no celular). Documentar a URL e as variáveis no `CLAUDE.md`.
 
 ---
 
@@ -569,7 +599,14 @@ Quem usa a câmera trabalha no pátio, com o celular numa mão e às vezes luva 
 - **Camada de serviços como fronteira**: nenhuma tela conhece HTTP; trocar mock por API real é configuração. Integrações futuras (portal real do fornecedor, Inspector, Sinaflor) entram como serviços novos com a mesma interface.
 - **Domínio centralizado**: IDs (`identificacao.ts`), rótulos e cores (`rotulos.ts`), opções (`opcoes.ts`), permissões (`permissoes.ts`) e parâmetros ficam em `src/dominio/`. Mudar o formato do ID ou acrescentar uma situação é editar um arquivo.
 - **Telas por configuração**: nova tela = uma linha em `ROTAS`; novo módulo de menu = um grupo em `GRUPOS_MENU`.
-- **Permissões granulares** (nomes provisórios): `admin`, `cadastros:editar`, `contratos:editar`, `simulador:usar`, `recebimento:registrar`, `dof:declarar`, `inspecao:operar`, `estoque:movimentar`, `rme:abrir`, `rme:separar`, `painel:gestao`. Perfil = conjunto de permissões, não regra no código.
+- **Permissões granulares** (nomes provisórios, entram na Etapa 1): `admin`, `operacao:consultar`, `cadastros:editar`, `contratos:editar`, `simulador:usar`, `recebimento:registrar`, `dof:declarar`, `inspecao:operar`, `estoque:movimentar`, `rme:abrir`, `rme:separar`, `painel:gestao`. Perfil = conjunto de permissões, não regra no código. `operacao:consultar` dá acesso de leitura às telas de suprimento, entrada, estoque e cadastros.
+
+| Perfil | Permissões |
+| --- | --- |
+| Administrador | `admin`, `operacao:consultar`, `cadastros:editar`, `contratos:editar`, `simulador:usar`, `painel:gestao` |
+| Almoxarife | `operacao:consultar`, `simulador:usar`, `recebimento:registrar`, `dof:declarar`, `inspecao:operar`, `estoque:movimentar`, `rme:separar` |
+| Gestor | `operacao:consultar`, `painel:gestao` |
+| Requisitante | `rme:abrir` |
 - **Modo demonstração** como parâmetro: o Simulador e os botões "Simular" somem quando desligado, sem remover código.
 - **Pontos de extensão já previstos** (não implementar agora): etiqueta de contingência no `LeitorQr` (ID não encontrado → gerar), inventário por leitura de QR, RFID como outra fonte para `lerCodigo()`.
 
@@ -577,49 +614,53 @@ Quem usa a câmera trabalha no pátio, com o celular numa mão e às vezes luva 
 
 ## 13. Etapas de implementação
 
-Cada etapa: build sem erros, `CHANGELOG.md` atualizado, `CLAUDE.md` atualizado quando aplicável, um commit com mensagem clara. Não pular etapas: cada uma depende das anteriores.
+Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.md` atualizado, `CLAUDE.md` atualizado quando aplicável, um commit com mensagem clara. Não pular etapas: cada uma depende das anteriores. Uma etapa por vez, e a próxima só começa quando a Dani pedir.
 
-### Etapa 0 · Preparação
-- Branch `v2-qrcode`. Mover `docs/PRD.md` para `docs/arquivo/PRD-v1.md`. Salvar `docs/ESPECIFICACAO-FUNCIONAL.md` e este plano em `docs/PLANO-V2.md`.
-- Atualizar o topo do `CLAUDE.md`: fonte de verdade passa a ser a especificação v2 + este plano.
-- Pronto quando: documentação no lugar, build ainda passa.
+### Etapa 0 · Preparação e limpeza (concluída)
+- Branch `v2-qrcode`. PRD, contratos de API e integração com a inspeção da v1 em `docs/arquivo/`; especificação e plano em `docs/`.
+- Código de domínio da v1 removido (telas, mock, modais, componentes de relatório e quadro); ficou só a infraestrutura da seção 2. O app abre numa tela "Em construção".
+- `CLAUDE.md` reescrito para a v2.
+- Revisão das decisões (2026-11-05): plano e especificação sem contradições; sem avisos de dados simulados; botão de recolher o menu no topo.
 
-### Etapa 1 · Fundação visual e casca
+### Etapa 1 · Fundação visual, casca, perfis e vitrine
 - `styles/tokens.css` e ajuste de `styles.css` para os tokens.
-- Componentes: `CabecalhoPagina`, `CabecalhoObjeto`, `FatoChave`, `AbasSecao`, `AbasSituacao`, `BarraFiltros` (extraída do `ListPage`), `CartaoIndicador`, `Relacionados`, `IdCodigo`, `BarraProgresso`, `SeloDemo`; ícones novos.
-- `Layout`: topo com botão Ler QR (por enquanto abre entrada manual), menu com `GRUPOS_MENU` v2, navegação inferior do almoxarife no celular e `useTelaPequena()`.
-- Rodapé fixo de ações para telas de campo (`RodapeAcoes`), seguindo a seção 11.1.
-- Pronto quando: telas atuais continuam funcionando com a nova casca; um exemplo de cada padrão (lista e objeto) usa os componentes novos.
+- Componentes: `CabecalhoPagina`, `CabecalhoObjeto`, `FatoChave`, `AbasSecao`, `AbasSituacao`, `BarraFiltros` (extraída do `ListPage`), `CartaoIndicador`, `Relacionados`, `IdCodigo`, `BarraProgresso`, `SeloDemo`, `RodapeAcoes` (rodapé fixo das telas de campo, seção 11.1); ícones novos.
+- Permissões granulares e os quatro perfis da seção 12 em `dominio/permissoes.ts`; login simulado com escolha de perfil pelo nome.
+- Autenticação como serviço separado da camada de dados (`services/auth/`, seção 6), com a implementação simulada.
+- `Layout`: topo com botão Ler QR (por enquanto abre entrada manual), menu com `GRUPOS_MENU` v2 e **todos os itens da seção 3.2**, cada um levando ao "Em construção", com as permissões de cada perfil; navegação inferior do almoxarife no celular e `useTelaPequena()`.
+- Vitrine `/vitrine` (seção 9.20).
+- Pronto quando: cada perfil vê o seu menu; a vitrine mostra os padrões de lista e de objeto funcionando no desktop e em 360 px.
 
-### Etapa 2 · Domínio, modelo e serviços
-- `identificacao.ts` com testes manuais documentados (exemplos válidos e inválidos no comentário).
-- `models.ts` v2, `rotulos.ts`, `opcoes.ts`, `permissoes.ts`, `parametros.ts`.
-- `contracts.ts`, `endpoints.ts`, `real/index.ts` v2; mock reescrito com os módulos de regra e o `data.ts` da história de demonstração (seção 15).
-- Remover páginas, componentes e serviços marcados como "Remover" na seção 2; rotas antigas saem de `ROTAS`. Telas que ainda não existem na v2 ficam como página "Em construção" para o build passar.
+### Etapa 2 · Domínio, modelo, serviços e testes
+- `vitest` como dependência de desenvolvimento e `npm test`.
+- `identificacao.ts` (dormente, fardo, contrato, RME, local) com testes.
+- `models.ts` v2, `rotulos.ts`, `opcoes.ts`, `parametros.ts` (tolerância de volume, regras provisórias da inspeção).
+- `contracts.ts` v2 e mock reescrito: módulos de regra, persistência no `localStorage`, reinício da demonstração e o `data.ts` da história de demonstração (seção 15), com a remessa "a caminho" de IDs fixos. Testes dos invariantes da seção 5.4 e das regras de recebimento, inspeção (inclusive não localizados), simulador (limite com reposição) e RME.
 - Reescrever a seção de regras de domínio do `CLAUDE.md`.
-- Pronto quando: build passa, mock gera a história completa e consistente (invariantes da seção 5.4).
+- Pronto quando: build e testes passam, o mock gera a história completa e consistente.
 
 ### Etapa 3 · Cadastros e Contratos
-- Cadastros (5 abas), Página do fornecedor, Contratos (lista, `ContratoModal`, página do contrato).
-- Pronto quando: é possível criar fornecedor, espécie, tamanho, tratamento, local e um contrato com itens (inclusive em m³ convertido).
+- Cadastros (5 abas), Página do fornecedor, Contratos (lista, `ContratoModal` com ata e fornecedor herdado, página do contrato).
+- Pronto quando: é possível criar fornecedor, espécie, tamanho, tratamento, local e um contrato com itens (inclusive em m³ convertido); fornecedor com CTF vencido aparece bloqueado.
 
 ### Etapa 4 · QR code: ficha, leitor, simulador e etiquetas
-- Dependências `qrcode` e `jsqr`; `LeitorQr`; `EtiquetaQr`; rotas `/d/:id` e `/f/:id`.
+- **Pré-requisito:** projeto na Vercel com HTTPS e a URL definitiva no `VITE_APP_URL` (seção 10.4).
+- Dependências `qrcode`, `jsqr` e `@types/qrcode`; `LeitorQr`; `EtiquetaQr`; rotas `/d/:id`, `/f/:id` e `/locais/:codigo`.
 - Ficha do dormente completa (lê do mock todos os vínculos).
-- Simulador (assistente + lista de remessas) e folha de etiquetas com CSS de impressão.
+- Simulador (assistente + lista de remessas) e folha de etiquetas com CSS de impressão, inclusive da remessa "a caminho" fixa.
 - Busca global e `CodigoLink` reconhecendo IDs v2.
-- Pronto quando: gerar uma remessa, imprimir, apontar a câmera do celular (via HTTPS) e abrir a ficha.
+- Pronto quando: imprimir as etiquetas da remessa fixa, apontar a câmera do celular (pela URL da Vercel) e abrir a ficha.
 
 ### Etapa 5 · Recebimento, NF e DOF
-- Lista de recebimentos com "A caminho", assistente de recebimento com leitura contínua dos fardos, página do recebimento, tela NF e DOF com declaração.
-- Pronto quando: a remessa gerada no simulador é recebida lendo os QR dos fardos e os dormentes passam a "aguardando inspeção".
+- Lista de recebimentos com "A caminho", assistente de recebimento com leitura contínua dos fardos e falta de fardo, página do recebimento, tela NF e DOF com declaração.
+- Pronto quando: a remessa é recebida lendo os QR dos fardos, os dormentes passam a "aguardando inspeção" e um fardo não lido pode ser recebido depois.
 
 ### Etapa 6 · Inspeção
-- Fila, tela de inspeção do fardo, simulação, registro manual, conclusão com guarda e segregação.
-- Pronto quando: fardo inspecionado fica em estoque no local escolhido, reprovados segregados, ficha do dormente mostra a inspeção.
+- Fila (com não localizados), tela de inspeção do fardo, simulação, registro manual, conclusão com guarda, segregação e justificativa.
+- Pronto quando: fardo inspecionado fica em estoque no local escolhido, reprovados segregados, não lidos ficam não localizados, ficha do dormente mostra a inspeção.
 
 ### Etapa 7 · Estoque, fardo, locais e movimentações
-- Estoque (por item e por fardo), página do fardo, Locais (mapa e lista, QR dos locais), Movimentações, transferência por leitura.
+- Estoque (por item e por fardo), página do fardo, Locais (mapa, lista e página do local, QR dos locais), Movimentações, transferência por leitura.
 - Pronto quando: transferir um fardo lendo o QR do fardo e do local atualiza estoque, local, movimentações e a ficha dos dormentes.
 
 ### Etapa 8 · Saídas (RME)
@@ -627,13 +668,19 @@ Cada etapa: build sem erros, `CHANGELOG.md` atualizado, `CLAUDE.md` atualizado q
 - Pronto quando: uma RME entregue baixa os dormentes certos, o fardo fica aberto com o saldo restante e a ficha mostra o destino.
 
 ### Etapa 9 · Painel e alertas
-- Indicadores por perfil, "Para fazer agora", gráfico de estoque por item com mínimo e máximo, entregas dos contratos, alertas (DOF, falta/excesso, idade). "Início de campo" do almoxarife no celular (seção 11.1).
+- Indicadores por perfil, "Para fazer agora", gráfico de estoque por item com mínimo e máximo, entregas dos contratos, alertas (DOF, falta/excesso, idade, não localizados). "Início de campo" do almoxarife no celular (seção 11.1).
 - Pronto quando: todo número leva à lista filtrada e cada perfil vê só o que lhe cabe.
 
-### Etapa 10 · Acabamento e demonstração
+### Etapa 10 · Supabase: banco e login
+- `supabase/migrations/`: tabela `perfis`, tabelas dos dados, views dos campos calculados, funções das operações que mudam várias tabelas, políticas RLS por perfil e a carga da história de demonstração com os mesmos IDs do mock. Claude escreve; a Dani executa no editor SQL. As contas são criadas no painel do Supabase.
+- `@supabase/supabase-js`; implementação `services/supabase/`; Supabase Auth no serviço de autenticação (sessão guardada no aparelho); `VITE_FONTE_DADOS`, `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (também na Vercel).
+- Remover `services/real/`, `http.ts` e `endpoints.ts`; erros em `services/erros.ts`. Usuários lista e edita perfil e situação.
+- Pronto quando: computador e celular veem os mesmos dados; uma remessa gerada no computador é recebida no celular; cada perfil só lê e grava o que as políticas permitem.
+
+### Etapa 11 · Acabamento e demonstração
 - Revisão de responsividade (360 px), acessibilidade, estados vazios e de erro em todas as telas.
-- Configurações (parâmetros, níveis, modo demonstração) e Usuários.
-- Roteiro de demonstração (seção 16) executado do início ao fim no celular e no computador.
+- Configurações (parâmetros, níveis, modo demonstração) e Usuários revisados.
+- Roteiro de demonstração (seção 16) executado do início ao fim no celular e no computador, com o Supabase.
 - `CLAUDE.md` e `CHANGELOG.md` finais; abrir PR no fork.
 
 ---
@@ -641,6 +688,7 @@ Cada etapa: build sem erros, `CHANGELOG.md` atualizado, `CLAUDE.md` atualizado q
 ## 14. Checklist de qualidade (rodar ao fim de cada etapa)
 
 - [ ] `npm run build` sem erros nem avisos de tipo
+- [ ] `npm test` passando (a partir da Etapa 2)
 - [ ] Nenhuma regra de negócio dentro de página (está no serviço ou em `src/dominio/`)
 - [ ] Todo ID exibido é link (`CodigoLink`) e em fonte mono
 - [ ] Busca, filtros, abas e visão estão no endereço
@@ -648,7 +696,7 @@ Cada etapa: build sem erros, `CHANGELOG.md` atualizado, `CLAUDE.md` atualizado q
 - [ ] Tela usável em 360 px e no desktop
 - [ ] Telas de campo testadas num celular real, com câmera e etiqueta impressa (seção 11.1)
 - [ ] Uma única ação principal (laranja) por tela
-- [ ] Mensagem de sucesso só após a resposta do serviço, com sufixo de simulado no mock
+- [ ] Mensagem de sucesso só após a resposta do serviço; nenhum aviso de dados simulados
 - [ ] Permissões: perfil sem acesso não vê a tela no menu e recebe "sem permissão" pelo endereço
 - [ ] `CHANGELOG.md` e, se for o caso, `CLAUDE.md` atualizados
 
@@ -658,16 +706,18 @@ Cada etapa: build sem erros, `CHANGELOG.md` atualizado, `CLAUDE.md` atualizado q
 
 Montar uma história coerente, gerada pelas regras do mock, para que todas as telas tenham conteúdo realista. Nomes de fornecedores fictícios.
 
-- 2 fornecedores (um ativo com CTF válido, um com CTF vencendo em 20 dias), 4 espécies, 2 tamanhos (2,00 m e 2,80 m, medidas provisórias), 2 tratamentos, 8 locais (5 armazenagem, 1 inspeção, 1 segregação, 1 expedição).
+- 3 fornecedores (um com CTF válido, um com CTF vencendo em 20 dias e um com CTF vencido, bloqueado automaticamente), 4 espécies, 2 tamanhos (2,00 m e 2,80 m, medidas provisórias), 2 tratamentos, 8 locais (5 armazenagem, 1 inspeção, 1 segregação, 1 expedição).
 - 2 atas e 3 contratos vigentes, um concluído.
-- Remessas em todas as fases: 1 a caminho, 1 recebida aguardando inspeção, 1 em inspeção pela metade, várias concluídas.
-- ~200 dormentes com situações variadas; ~5% reprovados; 1 fardo acima do limite de dias; 1 item abaixo do mínimo e 1 acima do máximo.
+- Remessas em todas as fases: **1 a caminho com IDs fixos** (contrato, fardos e dormentes documentados em `data.ts` e no `CLAUDE.md`, para imprimir as etiquetas com antecedência e para computador e celular partirem do mesmo estado), 1 recebida em parte (um fardo ainda em trânsito), 1 recebida aguardando inspeção, 1 em inspeção pela metade, várias concluídas.
+- ~200 dormentes com situações variadas; ~5% reprovados (com uma reposição emitida); 2 dormentes não localizados num fardo concluído com justificativa; 1 fardo acima do limite de dias; 1 item abaixo do mínimo e 1 acima do máximo.
 - DOFs: 1 vencido sem declaração, 1 vencendo em 1 dia, 1 em 3 dias, os demais declarados.
 - RMEs: 1 aberta, 1 em separação, 1 pronta, 3 entregues (uma deixou fardo aberto), 1 cancelada.
 
 ---
 
 ## 16. Roteiro de demonstração (o que a banca vai ver)
+
+Executado na Etapa 11, já com o Supabase, para computador e celular compartilharem os dados. Antes dele, o mesmo roteiro funciona com a remessa "a caminho" fixa no lugar da gerada no passo 3.
 
 1. Login como **administrador**: Painel com indicadores e alertas.
 2. Abrir um contrato e mostrar entregas por item.
@@ -691,3 +741,6 @@ Montar uma história coerente, gerada pelas regras do mock, para que todas as te
 | Quantos dormentes por fardo o fornecedor monta | Parâmetro, padrão 14 |
 | Tamanho final do QR na plaquinha | QR na plaquinha do contrato (a menor), a validar com a CPTM |
 | Quem abre a RME na prática | Perfil requisitante |
+| Quem pode cancelar a RME | O requisitante que abriu e o almoxarife, antes da entrega |
+| ATENÇÃO do Inspector | Conta como reprovado (a confirmar com o time da inspeção) |
+| Categorias e limites do índice | 1, 2 e 3, com limites 80 e 50 (a confirmar com o time da inspeção) |

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { env } from '../config/env';
 import { mensagemSegura } from '../services/http';
 
 export function Carregando({ linhas = 5 }: { linhas?: number }) {
@@ -40,15 +39,6 @@ export function ComoFunciona({ children }: { children: ReactNode }) {
       <summary>Como funciona</summary>
       <div className="como-funciona-texto">{children}</div>
     </details>
-  );
-}
-
-export function BannerSimulado() {
-  if (!env.USE_MOCK) return null;
-  return (
-    <div className="banner-simulado" role="note">
-      <strong>MODO SIMULADO</strong> — todos os dados exibidos são fictícios e nenhuma operação é gravada em servidor. Não use para decisões operacionais.
-    </div>
   );
 }
 

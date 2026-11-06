@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Permissao } from '../dominio/permissoes';
 import { GRUPOS_MENU, ROTAS, type Rota } from '../rotas';
 import { ErroTela } from './ErroTela';
-import { BannerSimulado, Vazio } from './Estados';
+import { Vazio } from './Estados';
 import { Icone } from './Icone';
 import { Logo } from './Logo';
 
@@ -43,6 +43,9 @@ function Layout() {
         <div className="marca">
           <Logo />
           <div className="marca-texto"><strong>Holz Trilho</strong><span>Gestão de dormentes</span></div>
+          <button className="recolher" onClick={() => setRecolhido((v) => !v)} aria-pressed={recolhido} aria-label={recolhido ? 'Expandir menu' : 'Recolher menu'} title={recolhido ? 'Expandir menu' : 'Recolher menu'}>
+            <Icone nome="chevron" tamanho={18} />
+          </button>
         </div>
         <nav>
           {grupos.map((g) => (
@@ -56,9 +59,6 @@ function Layout() {
             </div>
           ))}
         </nav>
-        <button className="recolher" onClick={() => setRecolhido((v) => !v)} aria-pressed={recolhido} title={recolhido ? 'Expandir menu' : 'Recolher menu'}>
-          <Icone nome="chevron" /><span>Recolher menu</span>
-        </button>
       </aside>
       {aberto && <div className="sombra" onClick={() => setAberto(false)} />}
 
@@ -71,7 +71,6 @@ function Layout() {
             <button className="btn-icone btn-icone-claro" aria-label="Sair" title="Sair" onClick={async () => { await sair(); nav('/login'); }}><Icone nome="out" /></button>
           </div>
         </header>
-        <BannerSimulado />
         <main id="conteudo" className="conteudo" tabIndex={-1}>
           <ErroTela key={loc.pathname}><Outlet /></ErroTela>
         </main>
