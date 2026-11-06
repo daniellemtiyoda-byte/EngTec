@@ -286,6 +286,10 @@ a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
 @media (max-width: 760px) {
   .modal-fundo:has(> .modal-largo) { padding: 0; }
   .modal-largo { max-width: none; width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+  /* Tela cheia: o conteúdo rola e os botões ficam no rodapé, ao alcance do polegar. */
+  .modal-largo { display: flex; flex-direction: column; }
+  .modal-largo .modal-corpo { flex: 1; overflow-y: auto; }
+  .modal-largo .modal-rodape { margin-top: auto; border-top: 1px solid var(--borda); }
   .modal-largo .modal-rodape { padding: 10px 12px; }
   .modal-largo .modal-rodape .btn { flex: 1; padding: 12px; font-size: 16px; }
   .contador-campo button { width: 48px; min-height: 48px; }
@@ -526,6 +530,7 @@ span.codigo { font-weight: 600; color: var(--texto); }
 .etiqueta-qr-vazio { background: #eee; }
 .etiqueta-texto { display: flex; flex-direction: column; gap: 0.6mm; min-width: 0; }
 .etiqueta-titulo { font: 800 11pt/1 var(--fonte); letter-spacing: .08em; }
+.etiqueta-dormente .etiqueta-titulo { font-size: 9pt; }
 .etiqueta-id { font: 700 10pt/1.1 var(--fonte-mono); white-space: nowrap; }
 .etiqueta-grande .etiqueta-id { font-size: 15pt; }
 .etiqueta-linha { font: 400 8pt/1.2 var(--fonte); }
@@ -543,3 +548,35 @@ span.codigo { font-weight: 600; color: var(--texto); }
   .folha-etiquetas { gap: 2mm; }
   .toasts { display: none; }
 }
+
+/* ===== Etapa 5: NF e DOF, recebimento ===== */
+.assistente-passo { display: flex; flex-direction: column; gap: var(--esp-3); }
+.quebra-palavra { overflow-wrap: anywhere; }
+.prazo-dof { white-space: nowrap; }
+.linha-item-nf { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: var(--esp-2); align-items: end; border-bottom: 1px solid var(--borda); padding-bottom: var(--esp-2); }
+.linha-item-nf .campo { margin: 0; }
+.linha-item-descricao, .linha-item-nf > .erro-campo { grid-column: 1 / -1; }
+@media (max-width: 760px) { .linha-item-nf { grid-template-columns: 1fr 1fr; } .linha-item-nf .campo:first-of-type { grid-column: 1 / -1; } }
+.lista-marcar { display: flex; flex-direction: column; gap: var(--esp-2); }
+.caixa-grande { min-height: var(--alvo-campo); font-size: var(--fs-16); }
+.caixa-grande input { width: 22px; height: 22px; }
+/* Cartões de escolha (entrega, local): alvo de toque grande, para o pátio */
+.escolha-entregas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
+.cartao-escolha { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--esp-3); align-items: center; padding: var(--esp-3) var(--esp-4); border: 1px solid var(--borda-forte); border-radius: var(--raio); cursor: pointer; min-height: var(--alvo-campo); }
+.cartao-escolha input { grid-row: 1 / span 3; width: 22px; height: 22px; }
+.cartao-escolha > span { grid-column: 2; }
+.cartao-escolha.escolhido { border-color: var(--cor-primaria); background: var(--cor-primaria-clara); box-shadow: inset 4px 0 0 var(--cor-primaria); }
+.cartao-escolha-titulo { font-weight: 700; font-size: var(--fs-16); }
+/* Leitura dos fardos */
+.botao-ler { display: inline-flex; align-items: center; justify-content: center; gap: var(--esp-2); min-height: 56px; font-size: var(--fs-16); }
+.leitura-fardos ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.leitura-fardos li { display: flex; align-items: center; gap: var(--esp-2); padding: 0 var(--esp-2); border-radius: var(--raio); flex-wrap: wrap; }
+.leitura-fardos li.lido { background: var(--ok-fundo); }
+.leitura-fardos li.desconhecido { background: var(--critico-fundo); min-height: var(--alvo-campo); }
+.leitura-contador { position: sticky; top: 0; z-index: 1; background: var(--superficie); padding: var(--esp-2) 0; font-size: var(--fs-16); }
+/* Ocorrências */
+.ocorrencia { border: 1px solid var(--borda); border-radius: var(--raio); padding: var(--esp-3); display: flex; flex-direction: column; gap: var(--esp-2); }
+.ocorrencia legend { font-weight: 700; padding: 0 4px; }
+.lista-ocorrencias, .lista-tipos-ocorrencia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-3); }
+.lista-ocorrencias li { border: 1px solid var(--borda); border-radius: var(--raio); padding: var(--esp-3); }
+.campo textarea { border: 1px solid var(--borda-forte); border-radius: var(--raio); padding: 8px 10px; width: 100%; }

@@ -164,7 +164,7 @@ São dez módulos, um para cada etapa da jornada mais os de apoio. O detalhe das
 | Saída | Requisição, separação e entrega | Sugere fardos abertos primeiro e depois os mais antigos, só com dormentes disponíveis; separação lendo os QR reserva os dormentes; a baixa só acontece na entrega |
 | Painel | Indicadores e alertas | Falta e excesso por espécie e tamanho, tempo em estoque, DOFs perto do prazo, dormentes não localizados, pendências de cada perfil |
 
-DOF: o prazo de declaração no Sinaflor é o dia seguinte ao fim da validade. O sistema alerta com 3 dias e com 1 dia de antecedência, e a declaração é marcada à mão, com registro de quem e quando.
+DOF: o prazo de declaração no Sinaflor é o dia seguinte ao fim da validade. O sistema alerta com 3 dias e com 1 dia de antecedência, e a declaração é marcada à mão, com registro de quem e quando, depois que a entrega chegou (a declaração confirma o recebimento).
 
 ## 6. Perfis e permissões
 

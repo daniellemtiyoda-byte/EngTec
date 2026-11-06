@@ -72,6 +72,9 @@ export function cadastrarEntrega(e: Estado, dados: DadosEntrega, origem: Entrega
 export function declararDof(e: Estado, dofId: Id, ctx: Ctx) {
   const d = achar(e.dofs, (x) => x.id === dofId, 'DOF');
   if (d.declarado) falha(409, `A DOF ${d.numero} já foi declarada.`);
+  // A declaração no Sinaflor confirma o recebimento: só depois que algum fardo da entrega chegou.
+  const daEntrega = e.entregas.find((en) => en.dofId === d.id);
+  if (daEntrega?.situacao === 'a_caminho') falha(409, `A DOF ${d.numero} só pode ser declarada depois do recebimento da entrega.`);
   d.declarado = { quando: instante(ctx), quem: ctx.quem };
   const entrega = e.entregas.find((en) => en.dofId === d.id);
   const nf = e.nfs.find((n) => n.id === d.nfId);

@@ -4,6 +4,7 @@ import type { NomeIcone } from './components/Icone';
 import type { Permissao } from './dominio/permissoes';
 import Cadastros from './pages/Cadastros';
 import ContratoDetalhe from './pages/ContratoDetalhe';
+import Documentos from './pages/Documentos';
 import Contratos from './pages/Contratos';
 import EmConstrucao from './pages/EmConstrucao';
 import EtiquetasImpressao from './pages/EtiquetasImpressao';
@@ -11,6 +12,8 @@ import FardoDetalhe from './pages/FardoDetalhe';
 import FichaDormente from './pages/FichaDormente';
 import FornecedorDetalhe from './pages/FornecedorDetalhe';
 import LocalDetalhe from './pages/LocalDetalhe';
+import RecebimentoDetalhe from './pages/RecebimentoDetalhe';
+import Recebimentos from './pages/Recebimentos';
 import Simulador from './pages/Simulador';
 import Vitrine from './pages/Vitrine';
 
@@ -62,8 +65,9 @@ export const ROTAS: Rota[] = [
   { caminho: '/simulador', tela: Simulador, rotulo: 'Simulador do fornecedor', icone: 'fabrica', grupo: 'Suprimento', permissoes: ['simulador:usar'], demo: true },
   { caminho: '/simulador/etiquetas/:entrega', tela: EtiquetasImpressao, rotulo: 'Etiquetas', icone: 'impressora', grupo: 'Suprimento', permissoes: ['simulador:usar', 'operacao:consultar'], foraDoMenu: true, semLayout: true },
   // NF e DOF primeiro: a entrega nasce no cadastro da NF e da DOF, antes da chegada.
-  { caminho: '/documentos', tela: emConstrucao('NF e DOF', 5), rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: OPERACAO },
-  { caminho: '/recebimentos', tela: emConstrucao('Recebimentos', 5), rotulo: 'Recebimentos', icone: 'truck', grupo: 'Entrada', permissoes: OPERACAO },
+  { caminho: '/documentos', tela: Documentos, rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: OPERACAO },
+  { caminho: '/recebimentos', tela: Recebimentos, rotulo: 'Recebimentos', icone: 'truck', grupo: 'Entrada', permissoes: OPERACAO },
+  { caminho: '/recebimentos/:id', tela: RecebimentoDetalhe, rotulo: 'Recebimento', icone: 'truck', grupo: 'Entrada', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/inspecao', tela: emConstrucao('Inspeção', 6), rotulo: 'Inspeção', icone: 'inspecao', grupo: 'Entrada', permissoes: OPERACAO },
   // Todos: o requisitante verá só a visão por item (Etapa 7).
   { caminho: '/estoque', tela: emConstrucao('Estoque', 7), rotulo: 'Estoque', icone: 'box', grupo: 'Estoque' },

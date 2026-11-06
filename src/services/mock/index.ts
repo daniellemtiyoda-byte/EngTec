@@ -18,7 +18,7 @@ import { transferirFardo } from './estoque';
 import { concluirInspecao, registrarInspecao, simularFardo } from './inspecao';
 import { alertas, indicadores, pendencias } from './painel';
 import { armazenamentoPadrao, carregar, salvar, type Armazenamento } from './persistencia';
-import { receber } from './recebimento';
+import { previaRecebimento, receber } from './recebimento';
 import { abrirRme, acharRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
 import { gerarEntrega, xmlDaNf } from './simulador';
 import { paginar, simularRede } from './util';
@@ -174,8 +174,13 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
     },
 
     documentos: {
-      cadastrarEntrega: (d, arquivos) => escrever(['nf:cadastrar'], (e, ctx) => entregaView(e, cadastrarEntrega(e, d, 'cadastro', ctx, arquivos), dia())),
-      listarEntregas: (q) => ler((e) => paginar(e.entregas.map((x) => entregaView(e, x, dia())), maisRecentes('criadoEm')(q))),
+      cadastrarEntrega: (d, arquivos) => escrever(['nf:cadastrar'], (e, ctx) => entregaView(e, cadastrarEntrega(e, d, d.origem ?? 'cadastro', ctx, arquivos), dia())),
+      listarEntregas: (q = {}) => ler((e) => {
+        // etapa = com_ocorrencia é a aba "Com ocorrência" de Recebimentos (as demais são a etapa calculada).
+        const { etapa, ...filters } = q.filters ?? {};
+        const lista = e.entregas.map((x) => entregaView(e, x, dia())).filter((x) => !etapa || (etapa === 'com_ocorrencia' ? x.comOcorrencia : x.etapa === etapa));
+        return paginar(lista, maisRecentes('criadoEm')({ ...q, filters }));
+      }),
       listarNfs: (q) => ler((e) => paginar(e.nfs, maisRecentes('emissao')(q))),
       listarDofs: (q) => ler((e) => paginar(e.dofs.map((d) => dofView(e, d, dia())), q?.sortBy || q?.sort ? q : { ...q, sort: [{ campo: 'prazoDeclaracao', dir: 'asc' }] })),
       fardosSemEntrega: (contratoId) => ler((e) => fardosView(e).filter((f) => f.contratoId === contratoId && !f.recebidoEm && !f.entregaId)),
@@ -186,6 +191,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       listar: (q) => ler((e) => paginar(e.recebimentos, maisRecentes('recebidoEm')(q))),
       obter: (id) => ler((e) => achar(e.recebimentos, (r) => r.id === id, 'Recebimento')),
       entregasACaminho: () => ler((e) => e.entregas.filter((x) => x.situacao !== 'recebida').map((x) => entregaView(e, x, dia()))),
+      previa: (entregaId, fardosLidos) => ler((e) => previaRecebimento(e, entregaId, fardosLidos)),
       receber: (entregaId, d) => escrever(['recebimento:registrar'], (e, ctx) => receber(e, entregaId, d, ctx)),
     },
 

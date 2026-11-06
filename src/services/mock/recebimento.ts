@@ -1,8 +1,8 @@
 import { justificativaPorFalta } from '../../dominio/parametros';
-import type { Id, Ocorrencia, Recebimento } from '../../types/models';
+import type { Id, Ocorrencia, PreviaRecebimento, Recebimento } from '../../types/models';
 import type { DadosRecebimento } from '../contracts';
 import { divergenciaVolume as calcularDivergencia, dormentesDoFardo } from './consultas';
-import { achar, anexo, evento, falha, instante, novoId, type Ctx, type Estado, type FardoReg } from './estado';
+import { achar, anexo, evento, falha, instante, novoId, type Ctx, type EntregaReg, type Estado, type FardoReg } from './estado';
 import { movimentarDormentes } from './estoque';
 
 /**
@@ -14,17 +14,15 @@ import { movimentarDormentes } from './estoque';
  * fecha), o sistema preenche a justificativa com a lista deles e a pessoa pode complementar. A divergência é sempre
  * a acumulada da entrega: ao receber depois os fardos que faltaram, ela é recalculada.
  */
-export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: Ctx): Recebimento {
-  const entrega = achar(e.entregas, (x) => x.id === entregaId, 'Entrega');
-  if (entrega.situacao === 'recebida') falha(409, 'Esta entrega já foi recebida por completo.');
-  const nf = achar(e.nfs, (n) => n.id === entrega.nfId, 'NF');
+/**
+ * Análise dos fardos lidos para uma entrega, sem gravar: aceitos (esperados ou do mesmo contrato, emitidos e sem
+ * entrega), desconhecidos, faltantes, divergência de volume acumulada e a justificativa automática quando a divergência
+ * vem só dos fardos que faltaram. Usada pela prévia da revisão e pela confirmação, para as duas darem o mesmo resultado.
+ */
+export function analisarRecebimento(e: Estado, entrega: EntregaReg, fardosLidos: Id[]) {
   const dof = achar(e.dofs, (d) => d.id === entrega.dofId, 'DOF');
-
-  const local = e.locais.find((l) => l.id === dados.localEsperaId);
-  if (!local || !local.ativo || local.tipo !== 'inspecao') falha(422, 'Escolha o local de espera da inspeção.', { localEsperaId: 'Escolha um local ativo do tipo inspeção.' });
-
   const esperados = e.fardos.filter((f) => entrega.fardosIds.includes(f.id) && !f.recebidoEm);
-  const lidosIds = [...new Set(dados.fardosLidos.map((id) => id.trim().toUpperCase()).filter(Boolean))];
+  const lidosIds = [...new Set(fardosLidos.map((id) => id.trim().toUpperCase()).filter(Boolean))];
   const aceitos: FardoReg[] = [];
   const desconhecidos: Id[] = [];
   for (const id of lidosIds) {
@@ -34,6 +32,39 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
     if (f && (esperado || avulso)) aceitos.push(f);
     else desconhecidos.push(id);
   }
+  const lidos = new Set(aceitos.map((f) => f.id));
+  const faltantes = esperados.filter((f) => !lidos.has(f.id));
+  const recebidosDaEntrega = [...e.fardos.filter((f) => f.entregaId === entrega.id && f.recebidoEm), ...aceitos];
+  const divergencia = calcularDivergencia(e, dof, recebidosDaEntrega);
+  const acima = divergencia.some((d) => d.acimaTolerancia);
+  // Se, contando os fardos que faltaram, a DOF fecha dentro da tolerância, a divergência vem só da falta deles.
+  const soPorFalta = acima && faltantes.length > 0 && calcularDivergencia(e, dof, [...recebidosDaEntrega, ...faltantes]).every((d) => !d.acimaTolerancia);
+  return {
+    dof, esperados, aceitos, desconhecidos, faltantes, divergencia,
+    justificativaAutomatica: soPorFalta ? justificativaPorFalta(faltantes.map((f) => f.id)) : undefined,
+    exigeJustificativa: acima && !soPorFalta,
+  };
+}
+
+export function previaRecebimento(e: Estado, entregaId: Id, fardosLidos: Id[]): PreviaRecebimento {
+  const entrega = achar(e.entregas, (x) => x.id === entregaId, 'Entrega');
+  const a = analisarRecebimento(e, entrega, fardosLidos);
+  return {
+    aceitos: a.aceitos.map((f) => f.id), desconhecidos: a.desconhecidos, faltantes: a.faltantes.map((f) => f.id),
+    dormentes: a.aceitos.reduce((s, f) => s + dormentesDoFardo(e, f.id).length, 0),
+    divergenciaVolume: a.divergencia, justificativaAutomatica: a.justificativaAutomatica, exigeJustificativa: a.exigeJustificativa,
+  };
+}
+
+export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: Ctx): Recebimento {
+  const entrega = achar(e.entregas, (x) => x.id === entregaId, 'Entrega');
+  if (entrega.situacao === 'recebida') falha(409, 'Esta entrega já foi recebida por completo.');
+  const nf = achar(e.nfs, (n) => n.id === entrega.nfId, 'NF');
+  const dof = achar(e.dofs, (d) => d.id === entrega.dofId, 'DOF');
+  const local = e.locais.find((l) => l.id === dados.localEsperaId);
+  if (!local || !local.ativo || local.tipo !== 'inspecao') falha(422, 'Escolha o local de espera da inspeção.', { localEsperaId: 'Escolha um local ativo do tipo inspeção.' });
+
+  const { esperados, aceitos, desconhecidos, faltantes, divergencia: divergenciaVolume, justificativaAutomatica: automatica, exigeJustificativa } = analisarRecebimento(e, entrega, dados.fardosLidos);
   if (!aceitos.length) falha(422, 'Nenhum fardo desta entrega foi lido.', { fardosLidos: 'Leia o QR de ao menos um fardo da entrega.' });
 
   const campos: Record<string, string> = {};
@@ -43,29 +74,17 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
   });
   if (Object.keys(campos).length) falha(422, 'Complete as ocorrências: descrição e foto são obrigatórias.', campos);
 
-  // Divergência de volume por espécie: DOF × tudo o que já chegou desta entrega (acumulada).
-  const recebidosDaEntrega = [...e.fardos.filter((f) => f.entregaId === entrega.id && f.recebidoEm), ...aceitos];
-  const divergenciaVolume = calcularDivergencia(e, dof, recebidosDaEntrega);
+  // Justificativa: automática quando a divergência vem só dos fardos que faltaram (a pessoa pode complementar).
   const lidosAgora = new Set(aceitos.map((f) => f.id));
-  const faltantes = esperados.filter((f) => !lidosAgora.has(f.id));
   const informada = dados.justificativaDivergencia?.trim() ?? '';
-  let justificativaDivergencia: string | undefined;
+  let justificativaDivergencia: string | undefined = informada || undefined;
   let justificativaAutomatica = false;
-  if (divergenciaVolume.some((d) => d.acimaTolerancia)) {
-    // Se, contando os fardos que faltaram, a DOF fecha dentro da tolerância, a divergência vem só da falta deles.
-    const soPorFalta = faltantes.length > 0 && calcularDivergencia(e, dof, [...recebidosDaEntrega, ...faltantes]).every((d) => !d.acimaTolerancia);
-    if (soPorFalta) {
-      const automatica = justificativaPorFalta(faltantes.map((f) => f.id));
-      const complemento = informada.startsWith(automatica) ? informada.slice(automatica.length).trim() : informada;
-      justificativaDivergencia = complemento ? `${automatica} ${complemento}` : automatica;
-      justificativaAutomatica = true;
-    } else if (!informada) {
-      falha(422, 'A divergência de volume passa de 10% em alguma espécie (IN Ibama): informe a justificativa.', { justificativaDivergencia: 'Justificativa obrigatória.' });
-    } else {
-      justificativaDivergencia = informada;
-    }
-  } else if (informada) {
-    justificativaDivergencia = informada;
+  if (automatica) {
+    const complemento = informada.startsWith(automatica) ? informada.slice(automatica.length).trim() : informada;
+    justificativaDivergencia = complemento ? `${automatica} ${complemento}` : automatica;
+    justificativaAutomatica = true;
+  } else if (exigeJustificativa && !informada) {
+    falha(422, 'A divergência de volume passa de 10% em alguma espécie (IN Ibama): informe a justificativa.', { justificativaDivergencia: 'Justificativa obrigatória.' });
   }
 
   // Ocorrências: as declaradas e as que o sistema gera (falta de fardo esperado e fardo desconhecido).
@@ -75,7 +94,7 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
       tipo: o.tipo, descricao: o.descricao.trim(), fardoId: o.fardoId, automatica: false,
       fotos: o.fotos.map((f) => anexo(e, ctx, f, 'imagem')!),
     })),
-    ...esperados.filter((f) => !lidos.has(f.id)).map((f) => ({ tipo: 'falta' as const, descricao: `Fardo ${f.id} não foi lido; continua em trânsito.`, fardoId: f.id, automatica: true, fotos: [] })),
+    ...faltantes.map((f) => ({ tipo: 'falta' as const, descricao: `Fardo ${f.id} não foi lido; continua em trânsito.`, fardoId: f.id, automatica: true, fotos: [] })),
     ...desconhecidos.map((id) => ({ tipo: 'fardo_desconhecido' as const, descricao: `Fardo ${id} lido não pertence a esta entrega.`, fardoId: id, automatica: true, fotos: [] })),
   ];
 

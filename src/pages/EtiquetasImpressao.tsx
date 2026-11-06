@@ -58,7 +58,7 @@ export default function EtiquetasImpressao() {
             linhas={[`Contrato ${contrato.numero}`, `${item.especie.nomePopular} · ${item.tamanho.codigo}`, `${numero(fardo.quantidadeInicial)} dormentes`]}
           />,
           ...(soFardo ? [] : dormentesIds.map((id) => (
-            <EtiquetaQr key={id} tipo="dormente" id={id} linhas={[`Contrato ${contrato.numero}`, item.especie.nomePopular, metros(item.tamanho.comprimentoCm / 100)]} />
+            <EtiquetaQr key={id} tipo="dormente" id={id} titulo="DORMENTE" linhas={[`Contrato ${contrato.numero}`, item.especie.nomePopular, metros(item.tamanho.comprimentoCm / 100)]} />
           ))),
         ])}
       </div>

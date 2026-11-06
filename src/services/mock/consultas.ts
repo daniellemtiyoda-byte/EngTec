@@ -86,8 +86,13 @@ export function contratoView(e: Estado, c: ContratoReg): Contrato {
 
 export function dofView(e: Estado, d: DofReg, hoje: string): Dof {
   const prazo = prazoDeclaracao(d.validade);
+  const nf = achar(e.nfs, (n) => n.id === d.nfId, 'NF');
+  const entrega = e.entregas.find((x) => x.id === nf.entregaId);
   return {
-    ...d, prazoDeclaracao: prazo, diasParaPrazo: diasEntre(hoje, prazo),
+    ...d, nfNumero: nf.numero, fornecedorId: nf.fornecedorId, contratoId: nf.contratoId, entregaId: nf.entregaId,
+    situacaoDeclaracao: d.declarado ? 'declarado' : 'a_declarar',
+    podeDeclarar: !d.declarado && !!entrega && entrega.situacao !== 'a_caminho',
+    prazoDeclaracao: prazo, diasParaPrazo: diasEntre(hoje, prazo),
     nivelPrazo: d.declarado ? 'ok' : nivelPrazo(prazo, hoje, e.parametros.alertaDofDias),
   };
 }
@@ -120,6 +125,9 @@ export function entregaView(e: Estado, en: EntregaReg, hoje: string): Entrega {
   return {
     ...en, nfNumero: nf.numero, fornecedorId: nf.fornecedorId,
     divergenciaVolume: recebidos.length ? divergenciaVolume(e, dofReg, recebidos) : [],
+    etapa: en.situacao !== 'recebida' ? 'a_caminho' : fardos.every((f) => f.conclusaoInspecao) ? 'concluida' : 'aguardando_inspecao',
+    comOcorrencia: e.recebimentos.some((r) => r.entregaId === en.id && r.ocorrencias.length > 0),
+    recebimentosIds: e.recebimentos.filter((r) => r.entregaId === en.id).map((r) => r.id),
     fardosRecebidos: fardos.filter((f) => f.recebidoEm).map((f) => f.id),
     dormentes: fardos.reduce((s, f) => s + dormentesDoFardo(e, f.id).length, 0),
     prazoDeclaracao: dof.prazoDeclaracao, nivelPrazo: dof.nivelPrazo,

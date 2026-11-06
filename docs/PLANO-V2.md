@@ -450,7 +450,7 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
   2. **Leitura dos fardos**: lista dos fardos esperados com caixa de checagem; botão **Ler QR** em modo contínuo marca cada fardo lido; fardo lido do mesmo contrato, emitido e sem entrega entra na entrega; fardo de outro contrato, de outra entrega ou desconhecido vira ocorrência "fardo desconhecido"; também dá para marcar à mão. Fardo esperado e não lido gera ocorrência de **falta** automática, continua `em_transito` e pode ser recebido depois (a entrega fica `recebida_parcial` e continua em "A caminho" com os fardos que faltam).
   3. **Conferência**: conforme ou com ocorrência (avaria, falta, sobra); ocorrência exige descrição e foto.
   4. **Local de espera**: local do tipo inspeção (sugerido o com mais espaço).
-  5. **Revisar e confirmar**: resumo, divergência de volume por espécie (acima de 10% mostra aviso crítico e pede justificativa, não bloqueia). Se a divergência vem só dos fardos que faltaram (contando-os, a DOF fecha), o campo já vem preenchido com a lista deles (`justificativaPorFalta` em `dominio/parametros.ts`) e a pessoa pode complementar. A divergência é sempre a acumulada da entrega: quando os fardos que faltaram são recebidos, ela é recalculada (`entrega.divergenciaVolume`).
+  5. **Revisar e confirmar** (prévia do serviço, `recebimentos.previa`): resumo, divergência de volume por espécie (acima de 10% mostra aviso crítico e pede justificativa, não bloqueia). Se a divergência vem só dos fardos que faltaram (contando-os, a DOF fecha), o campo já vem preenchido com a lista deles (`justificativaPorFalta` em `dominio/parametros.ts`) e a pessoa pode complementar. A divergência é sempre a acumulada da entrega: quando os fardos que faltaram são recebidos, ela é recalculada (`entrega.divergenciaVolume`).
 - Resultado: fardos e dormentes lidos passam a `aguardando_inspecao`; os não lidos continuam `em_transito`; abre a página do recebimento.
 
 ### 9.8 Página do recebimento (`/recebimentos/:id`) · padrão Objeto
@@ -468,7 +468,7 @@ Primeiro item do grupo Entrada: é onde a entrega nasce, antes da chegada do mat
   - Resultado: NF, DOF e a entrega "A caminho", que aparece em Recebimentos.
 - Abas: **A caminho** (entregas cadastradas e não recebidas) · DOFs a declarar · Declarados · Todas as NFs.
 - Colunas DOF: DOF · NF · Fornecedor · Validade · Prazo de declaração · Nível (crítico, atenção, ok) · Declarado em. Colunas das entregas: NF · Fornecedor · Contrato · Fardos esperados · Prazo DOF · Situação.
-- Ações na linha: **Declarar** (DOF, com confirmação; registra quem e quando) e **Receber** (entrega a caminho, abre o assistente de recebimento com ela escolhida). Ordenação padrão: prazo mais próximo primeiro.
+- Ações na linha: **Declarar** (DOF, com confirmação; registra quem e quando; só depois que algum fardo da entrega foi recebido, porque a declaração confirma o recebimento) e **Receber** (entrega a caminho, abre o assistente de recebimento com ela escolhida). Ordenação padrão: prazo mais próximo primeiro.
 - Aceite: cadastrar NF por XML e DOF cria a entrega "A caminho"; a mesma chave de acesso de novo é recusada.
 
 ### 9.10 Inspeção (`/inspecao`) e Inspeção do fardo (`/inspecao/:fardo`)
@@ -669,7 +669,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Busca global e `CodigoLink` reconhecendo IDs v2.
 - Pronto quando: imprimir as etiquetas da entrega fixa, apontar a câmera do celular (pela URL da Vercel) e abrir a ficha.
 
-### Etapa 5 · NF e DOF, e Recebimento
+### Etapa 5 · NF e DOF, e Recebimento (concluída)
 - Tela NF e DOF com o cadastro da entrega (XML ou digitada, DOF, fardos opcionais), abas de entregas e DOFs, controle de prazo e declaração no Sinaflor.
 - Lista de recebimentos com "A caminho", assistente de recebimento começando por "Escolher a entrega" (com a exceção de cadastrar NF e DOF na hora), leitura contínua dos fardos e falta de fardo, página do recebimento.
 - Pronto quando: importar o XML de uma NF e cadastrar a DOF cria a entrega "A caminho"; a entrega é recebida lendo os QR dos fardos, os dormentes passam a "aguardando inspeção" e um fardo não lido pode ser recebido depois.

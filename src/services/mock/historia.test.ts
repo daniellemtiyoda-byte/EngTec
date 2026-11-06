@@ -54,6 +54,10 @@ describe('história de demonstração', () => {
     expect(e.fornecedores.filter((f) => f.ctfValidade < HOJE)).toHaveLength(1);
   });
 
+  it('declarou só DOFs de entregas já recebidas', () => {
+    expect(e.dofs.filter((d) => d.declarado).every((d) => e.entregas.find((x) => x.dofId === d.id)?.situacao !== 'a_caminho')).toBe(true);
+  });
+
   it('tem entregas em todas as fases', () => {
     const situacoes = e.fardos.map((f) => fardoView(e, f, HOJE).situacao);
     expect(situacoes.filter((s) => s === 'em_transito')).toHaveLength(4); // 3 da entrega a caminho + 1 da recebida em parte

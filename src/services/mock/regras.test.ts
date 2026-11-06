@@ -101,13 +101,50 @@ describe('NF e DOF antes da chegada', () => {
     await falhaCom(s.documentos.cadastrarEntrega({ nf: { ...nf, chaveAcesso: '123' }, dof }), 422, 'nf.chaveAcesso');
     await falhaCom(s.documentos.cadastrarEntrega({ nf: { ...nf, chaveAcesso: chave(CNPJ_A, 9002) }, dof: { ...dof, numero: '' } }), 422, 'dof.numero');
   });
-  it('declara a DOF uma vez só', async () => {
+  it('declara a DOF só depois do recebimento, e uma vez só', async () => {
     const { s } = montar();
     const en = await entregaACaminho(s);
     const dof = (await s.documentos.listarDofs({ pageSize: 50 })).items.find((d) => d.nfId === en.nfId)!;
+    expect([dof.situacaoDeclaracao, dof.podeDeclarar, dof.nfNumero]).toEqual(['a_declarar', false, en.nfNumero]);
+    await falhaCom(s.documentos.declararDof(dof.id), 409);
+    const insp = await localPorCodigo(s, 'INSP-01');
+    await s.recebimentos.receber(en.id, { fardosLidos: en.fardosIds, ocorrencias: [], localEsperaId: insp.id });
     const declarada = await s.documentos.declararDof(dof.id);
     expect(declarada.declarado?.quem).toBe('Almoxarife (demonstração)');
+    expect(declarada.situacaoDeclaracao).toBe('declarado');
     await falhaCom(s.documentos.declararDof(dof.id), 409);
+  });
+  it('a prévia do recebimento bate com o que é gravado; as abas de Recebimentos seguem a etapa da entrega', async () => {
+    const { s, invariantes } = montar();
+    const en = await entregaACaminho(s);
+    const lidos = ['AR00224-01-F006', 'AR00224-01-F007', 'AR00311-01-F001'];
+    const previa = await s.recebimentos.previa(en.id, lidos);
+    expect(previa.aceitos).toEqual(['AR00224-01-F006', 'AR00224-01-F007']);
+    expect(previa.desconhecidos).toEqual(['AR00311-01-F001']);
+    expect(previa.faltantes).toEqual(['AR00224-01-F008']);
+    expect(previa.dormentes).toBe(28);
+    expect(previa.exigeJustificativa).toBe(false);
+    expect(previa.justificativaAutomatica).toBe(justificativaPorFalta(['AR00224-01-F008']));
+    const insp = await localPorCodigo(s, 'INSP-01');
+    const rec = await s.recebimentos.receber(en.id, { fardosLidos: lidos, ocorrencias: [], localEsperaId: insp.id });
+    expect(rec.divergenciaVolume).toEqual(previa.divergenciaVolume);
+    const naAba = async (etapa: string) => (await s.documentos.listarEntregas({ pageSize: 50, filters: { etapa } })).items.map((x) => x.id);
+    expect(await naAba('a_caminho')).toContain(en.id); // recebida em parte continua "A caminho"
+    expect(await naAba('com_ocorrencia')).toContain(en.id);
+    await s.recebimentos.receber(en.id, { fardosLidos: ['AR00224-01-F008'], ocorrencias: [], localEsperaId: insp.id });
+    expect(await naAba('aguardando_inspecao')).toContain(en.id);
+    expect((await s.documentos.listarEntregas({ pageSize: 50 })).items.find((x) => x.id === en.id)?.recebimentosIds).toHaveLength(2);
+    expect(invariantes()).toEqual([]);
+  });
+  it('cadastro na hora do recebimento fica com origem "recebimento"', async () => {
+    const { s } = montar();
+    const c = await contrato(s, 'AR00224-01');
+    const en = await s.documentos.cadastrarEntrega({
+      origem: 'recebimento',
+      nf: { numero: '9031', serie: '1', chaveAcesso: chave(CNPJ_A, 9031), contratoId: c.id, emissao: '2026-11-05', itens: [{ itemContratoId: c.itens[0].id, quantidade: 14, volumeM3: 1.6 }] },
+      dof: { numero: '26999031', validade: '2026-11-20', volumes: [{ especieId: c.itens[0].especieId, volumeM3: 1.6 }] },
+    });
+    expect(en.origem).toBe('recebimento');
   });
 });
 

@@ -1,7 +1,7 @@
 import type {
   Alerta, Ata, Categoria, Contrato, Dof, Dormente, EmpresaInspetora, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros,
-  Pendencia, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
+  Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
 } from '../types/models';
 
@@ -43,7 +43,8 @@ export interface DadosGerarEntrega { contratoId: Id; itens: { itemContratoId: Id
 
 export interface DadosNf { numero: string; serie: string; chaveAcesso: string; contratoId: Id; emissao: string; itens: { itemContratoId: Id; quantidade: number; volumeM3: number }[] }
 export interface DadosDof { numero: string; validade: string; volumes: { especieId: Id; volumeM3: number }[] }
-export interface DadosEntrega { nf: DadosNf; dof: DadosDof; fardosIds?: Id[] }
+/** `origem: 'recebimento'`: cadastro feito na hora do recebimento (exceção). */
+export interface DadosEntrega { nf: DadosNf; dof: DadosDof; fardosIds?: Id[]; origem?: 'cadastro' | 'recebimento' }
 export interface ArquivosEntrega { xml?: File; pdf?: File }
 
 export interface DadosOcorrencia { tipo: TipoOcorrencia; descricao: string; fardoId?: Id; fotos: File[] }
@@ -104,6 +105,7 @@ export interface Servicos {
   documentos: {
     /** Cadastra NF e DOF e cria a entrega "a caminho". */
     cadastrarEntrega(dados: DadosEntrega, arquivos?: ArquivosEntrega): Promise<Entrega>;
+    /** `filters.etapa`: a_caminho, aguardando_inspecao, concluida ou com_ocorrencia (aba de Recebimentos). */
     listarEntregas(q?: ListQuery): Promise<Paginado<Entrega>>;
     listarNfs(q?: ListQuery): Promise<Paginado<NotaFiscal>>;
     listarDofs(q?: ListQuery): Promise<Paginado<Dof>>;
@@ -116,6 +118,8 @@ export interface Servicos {
     obter(id: Id): Promise<Recebimento>;
     /** Entregas a caminho e recebidas em parte. */
     entregasACaminho(): Promise<Entrega[]>;
+    /** Prévia da revisão: aceitos, desconhecidos, faltas, divergência de volume e justificativa automática. Não grava nada. */
+    previa(entregaId: Id, fardosLidos: Id[]): Promise<PreviaRecebimento>;
     receber(entregaId: Id, dados: DadosRecebimento): Promise<Recebimento>;
   };
 

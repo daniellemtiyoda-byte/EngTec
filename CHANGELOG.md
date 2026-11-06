@@ -6,6 +6,17 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Adicionado
+- 2026-11-06: **Etapa 5 da v2: NF e DOF, Recebimento e controle de prazos.**
+  - **Por quê:** o material chega com NF e DOF já emitidas; cadastrá-las antes deixa a entrega pronta para o almoxarife só escolher e ler os fardos no pátio, e concentra o prazo da DOF numa tela.
+  - **NF e DOF** (`/documentos`): abas A caminho, DOFs a declarar (prazo mais próximo primeiro, nível vencido/crítico/atenção), Declarados e Todas as NFs; assistente **Cadastrar NF e DOF** com importação do XML da NF-e (fornecedor pelo CNPJ, DOF das informações complementares) ou digitação, DOF com volume por espécie e PDF, fardos opcionais e revisão; **Declarar** a DOF no Sinaflor com confirmação.
+  - **Recebimentos** (`/recebimentos`): abas A caminho, Aguardando inspeção, Concluídos e Com ocorrência; **assistente de recebimento** pensado primeiro para o celular: escolher a entrega (ou cadastrar NF e DOF na hora, como exceção), ler os QR dos fardos em modo contínuo com a lista e o contador embaixo da câmera, conferir com ocorrências e fotos, escolher o local de espera e revisar a prévia do serviço (faltas, fardos desconhecidos, divergência por espécie e a justificativa automática). Botões fixos no rodapé no celular.
+  - **Página do recebimento** (`/recebimentos/:id`): fardos, documentos com o volume conferido e a justificativa, ocorrências, histórico e "Marcar DOF como declarada".
+  - **Serviço:** `recebimentos.previa` (mesma análise da confirmação, sem gravar), entrega com `etapa`, `comOcorrencia` e `recebimentosIds`, DOF com NF, fornecedor e situação da declaração, filtro `etapa` nas entregas, `origem` no cadastro de NF e DOF. **Regra nova:** a DOF só é declarada depois que algum fardo da entrega foi recebido. Estado do mock na versão 4.
+  - **Etiqueta do dormente** com "DORMENTE" acima do ID, como o "FARDO" da etiqueta do fardo.
+  - Testes: 77 (prévia igual ao gravado, abas por etapa, origem do cadastro na hora, declaração só depois do recebimento). Verificado no Chrome headless: importação do XML de exemplo, recebimento parcial com ocorrência e foto, justificativa automática, recebimento do fardo que faltava, declaração da DOF e as telas do assistente em 360 px.
+  - Arquivos: `src/pages/{Documentos,Recebimentos,RecebimentoDetalhe,EtiquetasImpressao}.tsx`, `src/components/{EntregaAssistente,RecebimentoAssistente,PrazoDof}.tsx`, `src/rotas.tsx`, `src/types/models.ts`, `src/services/contracts.ts`, `src/services/mock/{recebimento,documentos,consultas,estado,index}.ts`, testes, `src/styles.css`, `CLAUDE.md`, `docs/PLANO-V2.md`, `docs/ESPECIFICACAO-FUNCIONAL.md`.
+
+### Adicionado
 - 2026-11-06: **Etapa 4 da v2: QR code (ficha do dormente, leitor, simulador e etiquetas).**
   - **Por quê:** é o coração da v2: cada dormente tem um QR na plaquinha que a câmera do celular lê para abrir a ficha.
   - **Leitor de QR** (`LeitorQr`, botão "Ler QR" do topo e base dos assistentes das próximas etapas): câmera traseira com mira e lanterna, `BarcodeDetector` nativo ou `jsqr` (carregado só quando precisa), leitura contínua com vibração, sempre com "Digitar código"; aceita o link do QR ou o ID e recusa QR de fora do sistema.

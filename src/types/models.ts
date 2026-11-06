@@ -223,6 +223,13 @@ export interface Dof {
   pdf?: Anexo;
   declarado?: { quando: string; quem: string };
   // calculados:
+  nfNumero: string;
+  fornecedorId: Id;
+  contratoId: Id;
+  entregaId: Id;
+  situacaoDeclaracao: 'a_declarar' | 'declarado';
+  /** Só pode ser declarada depois que algum fardo da entrega foi recebido. */
+  podeDeclarar: boolean;
   /** Dia seguinte ao fim da validade. */
   prazoDeclaracao: string;
   diasParaPrazo: number;
@@ -253,6 +260,28 @@ export interface Entrega {
   nivelPrazo: NivelPrazo;
   /** Volume por espécie: DOF × tudo o que já chegou. Recalculada a cada recebimento (inclusive dos fardos que faltaram). */
   divergenciaVolume: DivergenciaVolume[];
+  /** Etapa para as abas de Recebimentos: a caminho (inclui recebida em parte), aguardando inspeção ou concluída. */
+  etapa: EtapaEntrega;
+  /** Algum recebimento desta entrega teve ocorrência (declarada ou automática). */
+  comOcorrencia: boolean;
+  recebimentosIds: Id[];
+}
+
+export type EtapaEntrega = 'a_caminho' | 'aguardando_inspecao' | 'concluida';
+
+/** Prévia do recebimento, antes de confirmar: o que o serviço vai aceitar, recusar e calcular com os fardos lidos. */
+export interface PreviaRecebimento {
+  aceitos: Id[];
+  /** Lidos que não são desta entrega (viram ocorrência "fardo desconhecido"). */
+  desconhecidos: Id[];
+  /** Esperados e não lidos (viram ocorrência de falta e continuam em trânsito). */
+  faltantes: Id[];
+  dormentes: number;
+  divergenciaVolume: DivergenciaVolume[];
+  /** Preenchida quando a divergência vem só dos fardos que faltaram. */
+  justificativaAutomatica?: string;
+  /** Há divergência acima da tolerância que a pessoa precisa justificar. */
+  exigeJustificativa: boolean;
 }
 
 export type TipoOcorrencia = 'avaria' | 'falta' | 'sobra' | 'fardo_desconhecido';

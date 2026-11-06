@@ -15,8 +15,8 @@ export type LocalReg = Omit<Local, 'ocupacao' | 'fardos'>;
 export type ItemContratoReg = Pick<ItemContrato, 'id' | 'especieId' | 'tamanhoId' | 'tratamentoId' | 'quantidade'>;
 export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao'> & { situacao: 'vigente' | 'cancelado'; itens: ItemContratoReg[] };
 export type FardoReg = Omit<Fardo, 'saldo' | 'disponivel' | 'situacao' | 'idadeDias' | 'acimaLimiteDias'>;
-export type DofReg = Omit<Dof, 'prazoDeclaracao' | 'diasParaPrazo' | 'nivelPrazo'>;
-export type EntregaReg = Omit<Entrega, 'nfNumero' | 'fornecedorId' | 'fardosRecebidos' | 'dormentes' | 'prazoDeclaracao' | 'nivelPrazo' | 'divergenciaVolume'>;
+export type DofReg = Omit<Dof, 'prazoDeclaracao' | 'diasParaPrazo' | 'nivelPrazo' | 'nfNumero' | 'fornecedorId' | 'contratoId' | 'entregaId' | 'situacaoDeclaracao' | 'podeDeclarar'>;
+export type EntregaReg = Omit<Entrega, 'nfNumero' | 'fornecedorId' | 'fardosRecebidos' | 'dormentes' | 'prazoDeclaracao' | 'nivelPrazo' | 'divergenciaVolume' | 'etapa' | 'comOcorrencia' | 'recebimentosIds'>;
 
 export interface Estado {
   /** Muda quando o formato do estado muda: estado salvo de outra versão é descartado e a demonstração recomeça. */
@@ -46,7 +46,7 @@ export interface Estado {
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 3;
+export const VERSAO_ESTADO = 4;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }
