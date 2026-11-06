@@ -72,7 +72,8 @@ export default function Fornecedores({ aoAlterar }: { aoAlterar: () => void }) {
         filtros={[{ chave: 'situacao', rotulo: 'Situação', opcoes: SITUACAO_CADASTRO_OPCOES }, { chave: 'bloqueado', rotulo: 'Bloqueado (CTF)', opcoes: SIM_NAO_OPCOES }]}
         acoesLinha={edita ? [
           { rotulo: 'Editar', aoClicar: (f) => setForm({ fornecedor: f }) },
-          { rotulo: 'Inativar', visivel: (f) => f.situacao === 'ativo', aoClicar: (f) => setInativar({ nome: f.razaoSocial, efeito: 'O fornecedor não entra em novas atas; os contratos e as NFs já cadastrados continuam com ele.', inativar: () => servicos.fornecedores.inativar(f.id) }) },
+          { rotulo: 'Inativar', visivel: (f) => f.situacao === 'ativo', aoClicar: (f) => setInativar({ nome: f.razaoSocial, efeito: 'O fornecedor não entra em novas atas; os contratos e as NFs já cadastrados continuam com ele.', executar: () => servicos.fornecedores.inativar(f.id) }) },
+          { rotulo: 'Reativar', visivel: (f) => f.situacao === 'inativo', aoClicar: (f) => setInativar({ nome: f.razaoSocial, acao: 'reativar', efeito: f.bloqueado ? 'Ele continua bloqueado enquanto o CTF Ibama estiver vencido: atualize a validade para liberar novas atas.' : 'Ele volta a poder entrar em novas atas.', executar: () => servicos.fornecedores.reativar(f.id) }) },
         ] : undefined}
       />
       <FormModal

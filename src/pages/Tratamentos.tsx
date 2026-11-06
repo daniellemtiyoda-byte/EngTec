@@ -49,7 +49,8 @@ export default function Tratamentos({ aoAlterar }: { aoAlterar: () => void }) {
         colunas={colunas}
         acoesLinha={edita ? [
           { rotulo: 'Editar', aoClicar: setEditar },
-          { rotulo: 'Inativar', visivel: (t) => t.ativo, aoClicar: (t) => setInativar({ nome: `${t.preservativo} / ${t.empresa}`, efeito: 'O tratamento não entra em novos contratos.', inativar: () => servicos.tratamentos.inativar(t.id) }) },
+          { rotulo: 'Inativar', visivel: (t) => t.ativo, aoClicar: (t) => setInativar({ nome: `${t.preservativo} / ${t.empresa}`, efeito: 'O tratamento não entra em novos contratos.', executar: () => servicos.tratamentos.inativar(t.id) }) },
+          { rotulo: 'Reativar', visivel: (t) => !t.ativo, aoClicar: (t) => setInativar({ nome: `${t.preservativo} / ${t.empresa}`, acao: 'reativar', efeito: 'O tratamento volta a poder entrar em contratos.', executar: () => servicos.tratamentos.reativar(t.id) }) },
         ] : undefined}
       />
       <FormModal

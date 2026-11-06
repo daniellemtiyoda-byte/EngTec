@@ -44,7 +44,7 @@ export default function Contratos() {
     },
     { chave: 'vigencia', titulo: 'Vigência', opcional: true, render: (c) => { const a = cad.atas.get(c.ataId); return a ? `${data(a.vigenciaInicio)} a ${data(a.vigenciaFim)}` : '—'; } },
     { chave: 'situacao', titulo: 'Situação', render: (c) => <BadgeDe mapa={SITUACAO_CONTRATO} valor={c.situacao} /> },
-    { chave: 'empresaInspetora', titulo: 'Empresa inspetora', opcional: true },
+    { chave: 'empresaInspetoraId', titulo: 'Empresa inspetora', opcional: true, render: (c) => cad.nomeEmpresa(c.empresaInspetoraId) },
     { chave: 'ano', titulo: 'Ano', opcional: true, ordenavel: true },
   ];
 

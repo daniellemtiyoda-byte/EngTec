@@ -65,7 +65,8 @@ export default function LocaisCadastro({ aoAlterar }: { aoAlterar: () => void })
         filtros={[{ chave: 'tipo', rotulo: 'Tipo', opcoes: TIPO_LOCAL_OPCOES }]}
         acoesLinha={edita ? [
           { rotulo: 'Editar', aoClicar: setEditar },
-          { rotulo: 'Inativar', visivel: (l) => l.ativo, aoClicar: (l) => setInativar({ nome: `o local ${l.codigo}`, efeito: 'Ele deixa de receber fardos. Local com dormentes não pode ser inativado.', inativar: () => servicos.locais.inativar(l.id) }) },
+          { rotulo: 'Inativar', visivel: (l) => l.ativo, aoClicar: (l) => setInativar({ nome: `o local ${l.codigo}`, efeito: 'Ele deixa de receber fardos. Local com dormentes não pode ser inativado.', executar: () => servicos.locais.inativar(l.id) }) },
+          { rotulo: 'Reativar', visivel: (l) => !l.ativo, aoClicar: (l) => setInativar({ nome: `o local ${l.codigo}`, acao: 'reativar', efeito: 'Ele volta a receber fardos, com o mesmo código e o mesmo QR.', executar: () => servicos.locais.reativar(l.id) }) },
         ] : undefined}
       />
       <FormModal

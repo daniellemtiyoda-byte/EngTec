@@ -53,7 +53,8 @@ export default function Especies({ aoAlterar }: { aoAlterar: () => void }) {
         filtros={[{ chave: 'ativo', rotulo: 'Ativa', opcoes: SIM_NAO_OPCOES }]}
         acoesLinha={edita ? [
           { rotulo: 'Editar', aoClicar: setEditar },
-          { rotulo: 'Inativar', visivel: (e) => e.ativo, aoClicar: (e) => setInativar({ nome: e.nomePopular, efeito: 'A espécie não entra em novos contratos.', inativar: () => servicos.especies.inativar(e.id) }) },
+          { rotulo: 'Inativar', visivel: (e) => e.ativo, aoClicar: (e) => setInativar({ nome: e.nomePopular, efeito: 'A espécie não entra em novos contratos.', executar: () => servicos.especies.inativar(e.id) }) },
+          { rotulo: 'Reativar', visivel: (e) => !e.ativo, aoClicar: (e) => setInativar({ nome: e.nomePopular, acao: 'reativar', efeito: 'A espécie volta a poder entrar em contratos e no cadastro de fornecedores.', executar: () => servicos.especies.reativar(e.id) }) },
         ] : undefined}
       />
       <FormModal

@@ -81,6 +81,9 @@ export interface Tamanho {
 
 export interface Tratamento { id: Id; preservativo: string; empresa: string; ativo: boolean }
 
+/** Empresa contratada pelo fornecedor para inspecionar o material antes da entrega (ex. UFV). */
+export interface EmpresaInspetora { id: Id; nome: string; cnpj?: string; ativo: boolean }
+
 export type TipoLocal = 'armazenagem' | 'inspecao' | 'segregacao' | 'expedicao';
 
 export interface Local {
@@ -129,7 +132,7 @@ export interface Contrato {
   ataId: Id;
   /** Calculado: o fornecedor da ata (não é gravado de novo no contrato). */
   fornecedorId: Id;
-  empresaInspetora: string;
+  empresaInspetoraId: Id;
   ano: number;
   /** Gravado: vigente ou cancelado. "Concluído" é calculado (todos os itens aprovados e nada pendente na entrada). */
   situacao: SituacaoContrato;

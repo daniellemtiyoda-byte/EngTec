@@ -36,7 +36,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
   const [ataId, setAtaId] = useState('');
   const [novaAta, setNovaAta] = useState({ numero: '', fornecedorId: '', vigenciaInicio: '', vigenciaFim: '' });
   const [numeroContrato, setNumero] = useState('');
-  const [empresaInspetora, setEmpresa] = useState('');
+  const [empresaInspetoraId, setEmpresa] = useState('');
   const [ano, setAno] = useState(String(new Date().getFullYear()));
   const [itens, setItens] = useState<LinhaItem[]>([linhaVazia()]);
   const [erros, setErros] = useState<Record<string, string>>({});
@@ -47,7 +47,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
     if (!aberto) return;
     setErros({}); setErroGeral(undefined); setModoAta('existente'); setNovaAta({ numero: '', fornecedorId: '', vigenciaInicio: '', vigenciaFim: '' });
     if (contrato) {
-      setAtaId(contrato.ataId); setNumero(contrato.numero); setEmpresa(contrato.empresaInspetora); setAno(String(contrato.ano));
+      setAtaId(contrato.ataId); setNumero(contrato.numero); setEmpresa(contrato.empresaInspetoraId); setAno(String(contrato.ano));
       setItens(contrato.itens.map((i) => ({
         chave: proximaChave++, id: i.id, especieId: i.especieId, tamanhoId: i.tamanhoId, tratamentoId: i.tratamentoId,
         quantidade: String(i.quantidade), unidade: 'un', minimo: i.emitidos - i.reprovados,
@@ -96,7 +96,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
       else if (numeroAta && !n.startsWith(`${numeroAta}-`)) e.numero = `O contrato começa pelo número da ata (${numeroAta}-).`;
       if (!/^\d{4}$/.test(ano)) e.ano = 'Informe o ano.';
     }
-    if (!empresaInspetora.trim()) e.empresaInspetora = 'Informe a empresa inspetora.';
+    if (!empresaInspetoraId) e.empresaInspetoraId = 'Escolha a empresa inspetora.';
     itens.forEach((i, n) => {
       const q = paraNumero(i.quantidade, i.unidade === 'un');
       if (!i.especieId || !i.tamanhoId || !i.tratamentoId) e[`itens.${n}`] = 'Escolha espécie, tamanho e tratamento.';
@@ -121,7 +121,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
     try {
       let salvo: Contrato;
       if (contrato) {
-        salvo = await servicos.contratos.atualizar(contrato.numero, { empresaInspetora, itens: itens.map(paraItem) });
+        salvo = await servicos.contratos.atualizar(contrato.numero, { empresaInspetoraId, itens: itens.map(paraItem) });
       } else {
         let idAta = ataId;
         if (modoAta === 'nova') {
@@ -134,7 +134,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
           }
           setModoAta('existente'); setAtaId(idAta); cad.recarregar();
         }
-        salvo = await servicos.contratos.criar({ numero: numeroContrato.trim().toUpperCase(), ataId: idAta, empresaInspetora, ano: Number(ano), itens: itens.map(paraItem) });
+        salvo = await servicos.contratos.criar({ numero: numeroContrato.trim().toUpperCase(), ataId: idAta, empresaInspetoraId, ano: Number(ano), itens: itens.map(paraItem) });
       }
       aoSalvar(salvo);
     } catch (err) {
@@ -225,8 +225,12 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
             </div>
             <div className="campo">
               <label htmlFor={`${formId}-empresa`}>Empresa inspetora<span className="obrig" aria-hidden="true"> *</span></label>
-              <input id={`${formId}-empresa`} value={empresaInspetora} maxLength={80} placeholder="ex.: UFV" onChange={(e) => setEmpresa(e.target.value)} {...invalido('empresaInspetora')} />
-              {erro('empresaInspetora')}
+              <select id={`${formId}-empresa`} value={empresaInspetoraId} onChange={(e) => setEmpresa(e.target.value)} {...invalido('empresaInspetoraId')}>
+                <option value="">Selecione…</option>
+                {(listas?.empresas ?? []).filter((x) => x.ativo || x.id === contrato?.empresaInspetoraId).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+              </select>
+              <span className="ajuda">Do cadastro de empresas inspetoras (só as ativas).</span>
+              {erro('empresaInspetoraId')}
             </div>
             <div className="campo">
               <label htmlFor={`${formId}-ano`}>Ano<span className="obrig" aria-hidden="true"> *</span></label>

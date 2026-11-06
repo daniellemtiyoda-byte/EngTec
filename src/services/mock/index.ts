@@ -5,7 +5,8 @@ import { autenticacao } from '../auth';
 import type { Servicos } from '../contracts';
 import { ApiError } from '../http';
 import {
-  atualizarContrato, cancelarContrato, criarAta, criarContrato, inativarLocal, salvarEspecie, salvarFornecedor, salvarLocal, salvarTamanho, salvarTratamento,
+  alterarAtivo, atualizarContrato, cancelarContrato, criarAta, criarContrato, inativarLocal, reativarLocal, salvarEmpresaInspetora, salvarEspecie, salvarFornecedor, salvarLocal,
+  salvarTamanho, salvarTratamento, situacaoFornecedor,
 } from './cadastros';
 import {
   contratoView, dofView, entregaView, etiquetasEntrega, fardoDetalhe, fardoView, fichaDormente, fornecedorView, inspecaoFardo, localView, resumoFornecedor, saldoPorItem, tamanhoView,
@@ -95,7 +96,8 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       obter: (id) => ler((e) => fornecedorView(achar(e.fornecedores, (f) => f.id === id, 'Fornecedor'), dia())),
       criar: (d) => escrever(CADASTROS, (e) => fornecedorView(salvarFornecedor(e, d), dia())),
       atualizar: (id, d) => escrever(CADASTROS, (e) => fornecedorView(salvarFornecedor(e, d, id), dia())),
-      inativar: (id) => escrever(CADASTROS, (e) => { const f = achar(e.fornecedores, (x) => x.id === id, 'Fornecedor'); f.situacao = 'inativo'; return fornecedorView(f, dia()); }),
+      inativar: (id) => escrever(CADASTROS, (e) => fornecedorView(situacaoFornecedor(e, id, 'inativo'), dia())),
+      reativar: (id) => escrever(CADASTROS, (e) => fornecedorView(situacaoFornecedor(e, id, 'ativo'), dia())),
       resumo: (id) => ler((e) => resumoFornecedor(e, id, dia())),
     },
     especies: {
@@ -103,21 +105,32 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       obter: (id) => ler((e) => achar(e.especies, (x) => x.id === id, 'Espécie')),
       criar: (d) => escrever(CADASTROS, (e) => salvarEspecie(e, d)),
       atualizar: (id, d) => escrever(CADASTROS, (e) => salvarEspecie(e, d, id)),
-      inativar: (id) => escrever(CADASTROS, (e) => Object.assign(achar(e.especies, (x) => x.id === id, 'Espécie'), { ativo: false })),
+      inativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.especies, id, false, 'Espécie')),
+      reativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.especies, id, true, 'Espécie')),
     },
     tamanhos: {
       listar: (q) => ler((e) => paginar(e.tamanhos.map(tamanhoView), q)),
       obter: (id) => ler((e) => tamanhoView(achar(e.tamanhos, (x) => x.id === id, 'Tamanho'))),
       criar: (d) => escrever(CADASTROS, (e) => tamanhoView(salvarTamanho(e, d))),
       atualizar: (id, d) => escrever(CADASTROS, (e) => tamanhoView(salvarTamanho(e, d, id))),
-      inativar: (id) => escrever(CADASTROS, (e) => tamanhoView(Object.assign(achar(e.tamanhos, (x) => x.id === id, 'Tamanho'), { ativo: false }))),
+      inativar: (id) => escrever(CADASTROS, (e) => tamanhoView(alterarAtivo(e.tamanhos, id, false, 'Tamanho'))),
+      reativar: (id) => escrever(CADASTROS, (e) => tamanhoView(alterarAtivo(e.tamanhos, id, true, 'Tamanho'))),
     },
     tratamentos: {
       listar: (q) => ler((e) => paginar(e.tratamentos, q)),
       obter: (id) => ler((e) => achar(e.tratamentos, (x) => x.id === id, 'Tratamento')),
       criar: (d) => escrever(CADASTROS, (e) => salvarTratamento(e, d)),
       atualizar: (id, d) => escrever(CADASTROS, (e) => salvarTratamento(e, d, id)),
-      inativar: (id) => escrever(CADASTROS, (e) => Object.assign(achar(e.tratamentos, (x) => x.id === id, 'Tratamento'), { ativo: false })),
+      inativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.tratamentos, id, false, 'Tratamento')),
+      reativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.tratamentos, id, true, 'Tratamento')),
+    },
+    empresasInspetoras: {
+      listar: (q) => ler((e) => paginar(e.empresasInspetoras, q)),
+      obter: (id) => ler((e) => achar(e.empresasInspetoras, (x) => x.id === id, 'Empresa inspetora')),
+      criar: (d) => escrever(CADASTROS, (e) => salvarEmpresaInspetora(e, d)),
+      atualizar: (id, d) => escrever(CADASTROS, (e) => salvarEmpresaInspetora(e, d, id)),
+      inativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.empresasInspetoras, id, false, 'Empresa inspetora')),
+      reativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.empresasInspetoras, id, true, 'Empresa inspetora')),
     },
     locais: {
       listar: (q) => ler((e) => paginar(e.locais.map((l) => localView(e, l, dia())), q)),
@@ -126,6 +139,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       criar: (d) => escrever(CADASTROS, (e, ctx) => localView(e, salvarLocal(e, d, ctx), dia())),
       atualizar: (id, d) => escrever(CADASTROS, (e, ctx) => localView(e, salvarLocal(e, d, ctx, id), dia())),
       inativar: (id) => escrever(CADASTROS, (e, ctx) => localView(e, inativarLocal(e, id, ctx), dia())),
+      reativar: (id) => escrever(CADASTROS, (e) => localView(e, reativarLocal(e, id), dia())),
     },
     usuarios: {
       listar: (q) => ler((e) => paginar(e.usuarios, q)),

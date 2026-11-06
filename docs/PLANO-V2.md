@@ -176,6 +176,7 @@ interface Fornecedor { id; razaoSocial; cnpj; cidadeUf; ctfIbama: string; ctfVal
 interface Especie { id; nomeCientifico; nomePopular; classe?: string; ativo: boolean }
 interface Tamanho { id; codigo; comprimentoCm; larguraCm; alturaCm; volumeM3 /* calculado */; medidas: 'provisorio' | 'confirmado' }
 interface Tratamento { id; preservativo: string /* CCA */; empresa: string /* Granoski */ }
+interface EmpresaInspetora { id; nome /* UFV */; cnpj?: string; ativo: boolean }
 interface Local { id; codigo /* A03; ID do QR = LOC-A03 */; descricao; tipo: 'armazenagem' | 'inspecao' | 'segregacao' | 'expedicao'; capacidade: number /* dormentes */; ocupacao /* calculada */; ativo: boolean }
 interface NivelEstoque { especieId; tamanhoId; minimo: number; maximo: number }   // em Configurações
 interface Anexo { id; nome; tipo: 'pdf' | 'xml' | 'imagem'; url; enviadoEm; enviadoPor }
@@ -185,7 +186,7 @@ interface Anexo { id; nome; tipo: 'pdf' | 'xml' | 'imagem'; url; enviadoEm; envi
 
 ```ts
 interface Ata { id; numero /* AR00224 */; fornecedorId; vigenciaInicio; vigenciaFim }
-interface Contrato { id; numero /* AR00224-01 */; ataId /* o fornecedor vem da ata, não é gravado de novo */; empresaInspetora: string; ano: number;
+interface Contrato { id; numero /* AR00224-01 */; ataId /* o fornecedor vem da ata, não é gravado de novo */; empresaInspetoraId /* cadastro de empresas inspetoras */; ano: number;
   situacao: 'vigente' | 'concluido' | 'cancelado'; itens: ItemContrato[]; criadoEm; criadoPor }
 interface ItemContrato { id; especieId; tamanhoId; tratamentoId; quantidade: number /* unidades */;
   // calculados pelo serviço:
@@ -278,7 +279,7 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | Serviço | Operações principais |
 | --- | --- |
 | `dashboard` | `indicadores()`, `pendencias()` (por perfil), `alertas()` |
-| `fornecedores`, `especies`, `tamanhos`, `tratamentos`, `locais` | `listar`, `obter`, `criar`, `atualizar`, `inativar` (`locais.obter(codigo)` para a página do local) |
+| `fornecedores`, `especies`, `tamanhos`, `tratamentos`, `empresasInspetoras`, `locais` | `listar`, `obter`, `criar`, `atualizar`, `inativar`, `reativar` (`locais.obter(codigo)` para a página do local) |
 | `usuarios` | `listar`, `atualizar` (só perfil e situação; as contas são criadas no painel do Supabase) |
 | `contratos` | `listar`, `obter(numero)`, `criar`, `atualizar`, `cancelar`; `atas`: `listar`, `criar` |
 | `simulador` | `gerarEntrega({ contratoId, itens: [{ itemContratoId, fardos, dormentesPorFardo }] })` → cria fardos `em_transito`, dormentes `emitido`, NF e DOF de exemplo e a entrega `a_caminho` (como se tivesse sido cadastrada em NF e DOF); recusa acima do `saldoAEmitir`; `etiquetas(entregaId)` |
@@ -405,6 +406,7 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 - Aceite: abrir `/#/d/AR00224-01-000001` sem sessão leva ao login e, após entrar, abre a ficha.
 
 ### 9.2 Painel (`/`) · padrão Painel
+- **Taxa de reprovação na inspeção da CPTM por empresa inspetora**: reprovados sobre inspecionados dos dormentes de cada contrato, agrupados pela empresa inspetora do contrato (mostra se a inspeção do fornecedor antes da entrega está funcionando). Para administrador e gestor.
 - **Indicadores** (clicáveis): Em estoque (dormentes) · Aguardando inspeção · Itens abaixo do mínimo · Fardos acima do limite de dias · DOFs a declarar · RMEs abertas.
 - **Para fazer agora** por perfil: almoxarife (entregas a receber, fardos a inspecionar, fardos a guardar, RMEs a separar e entregar, DOFs a declarar); gestor (itens em falta ou excesso, fardos parados, taxa de reprovação alta, dormentes não localizados); requisitante (suas RMEs e situação); administrador (contratos perto do fim, fornecedores com CTF vencendo).
 - **Estoque por item**: gráfico de barras horizontais por espécie + tamanho, com marcas de mínimo e máximo (cor só reforça o rótulo falta/ok/excesso).
@@ -416,7 +418,7 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 - Abas: Vigentes · Concluídos · Cancelados.
 - Colunas: Contrato (link) · Ata · Fornecedor (link) · Itens · Entregue (`BarraProgresso` recebido/contratado) · Vigência · Situação.
 - Filtros: fornecedor, espécie, ano.
-- Ação principal: **Novo contrato** (modal largo `ContratoModal`: ata (selecionar ou criar; o fornecedor é escolhido na ata e o contrato o herda, sem digitar de novo), número, empresa inspetora, ano, itens em linhas: espécie, tamanho, tratamento, quantidade e unidade (un ou m³). Em m³ o sistema mostra a conversão em unidades pelo volume do tamanho, arredondada para baixo, e grava em unidades).
+- Ação principal: **Novo contrato** (modal largo `ContratoModal`: ata (selecionar ou criar; o fornecedor é escolhido na ata e o contrato o herda, sem digitar de novo), número, empresa inspetora (seleção do cadastro, só as ativas), ano, itens em linhas: espécie, tamanho, tratamento, quantidade e unidade (un ou m³). Em m³ o sistema mostra a conversão em unidades pelo volume do tamanho, arredondada para baixo, e grava em unidades).
 - Aceite: não deixa salvar item com espécie que o fornecedor não fornece; fornecedor inativo ou bloqueado (CTF vencido, calculado pela validade) não aparece ao criar ata ou contrato.
 
 ### 9.4 Página do contrato (`/contratos/:numero`) · padrão Objeto
@@ -524,7 +526,8 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 - Página da RME: fatos-chave (solicitante, destino, itens, situação), abas Itens · Separação (fardos e dormentes com link) · Histórico.
 
 ### 9.18 Cadastros (`/cadastros?aba=`) · `PainelAbas` (manter o padrão atual)
-- Abas: Espécies · Tamanhos · Tratamentos · Fornecedores · Locais.
+- Abas: Espécies · Tamanhos · Tratamentos · Fornecedores · Empresas inspetoras (nome, CNPJ opcional, ativa ou inativa) · Locais.
+- **Reativar** cadastro inativado, com confirmação e as regras de cada um: o fornecedor reativado continua bloqueado se o CTF estiver vencido; o local volta com o mesmo código e QR.
 - Inclusão em linha (`FormLinha`), edição em `FormModal`, nada é apagado (inativar). O fornecedor é incluído por modal ("Novo fornecedor"), porque tem campos demais para a linha, inclusive as espécies que fornece.
 - Fornecedor: razão social, CNPJ, cidade/UF, CTF IBAMA e validade, espécies que fornece (seleção múltipla), certificados (anexos). Linha leva à **Página do fornecedor** (`/fornecedores/:id`): contratos, entregas, taxa de reprovação, certificados.
 
@@ -655,7 +658,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Pronto quando: build e testes passam, o mock gera a história completa e consistente.
 
 ### Etapa 3 · Cadastros e Contratos (concluída)
-- Cadastros (5 abas), Página do fornecedor, Contratos (lista, `ContratoModal` com ata e fornecedor herdado, página do contrato).
+- Cadastros (6 abas, com reativar), Página do fornecedor, Contratos (lista, `ContratoModal` com ata e fornecedor herdado, página do contrato).
 - Pronto quando: é possível criar fornecedor, espécie, tamanho, tratamento, local e um contrato com itens (inclusive em m³ convertido); fornecedor com CTF vencido aparece bloqueado.
 
 ### Etapa 4 · QR code: ficha, leitor, simulador e etiquetas
@@ -684,7 +687,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Pronto quando: uma RME entregue baixa os dormentes certos, o fardo fica aberto com o saldo restante e a ficha mostra o destino.
 
 ### Etapa 9 · Painel e alertas
-- Indicadores por perfil, "Para fazer agora", gráfico de estoque por item com mínimo e máximo, entregas dos contratos, alertas (DOF, falta/excesso, idade, não localizados). "Início de campo" do almoxarife no celular (seção 11.1).
+- Indicadores por perfil, taxa de reprovação por empresa inspetora, "Para fazer agora", gráfico de estoque por item com mínimo e máximo, entregas dos contratos, alertas (DOF, falta/excesso, idade, não localizados). "Início de campo" do almoxarife no celular (seção 11.1).
 - Pronto quando: todo número leva à lista filtrada e cada perfil vê só o que lhe cabe.
 
 ### Etapa 10 · Supabase: banco e login

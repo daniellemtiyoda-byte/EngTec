@@ -141,7 +141,7 @@ export default function ContratoDetalhe() {
           { icone: 'fabrica', tipo: 'Fornecedor', valor: cad.nomeFornecedor(c.fornecedorId), para: `/fornecedores/${c.fornecedorId}` },
           { icone: 'contrato', tipo: 'Ata de registro de preços', valor: <span className="mono">{ata?.numero ?? '—'}</span>, detalhe: ata ? `Vigência ${data(ata.vigenciaInicio)} a ${data(ata.vigenciaFim)}` : undefined },
           { icone: 'file', tipo: 'Entregas (NF e DOF)', valor: `${lista.length} entrega(s)`, para: `/documentos?q=${c.numero}` },
-          { icone: 'inspecao', tipo: 'Empresa inspetora', valor: c.empresaInspetora },
+          { icone: 'inspecao', tipo: 'Empresa inspetora', valor: cad.nomeEmpresa(c.empresaInspetoraId) },
         ]} />
       </div>
 

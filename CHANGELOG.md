@@ -6,6 +6,14 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Adicionado
+- 2026-11-06: **empresas inspetoras como cadastro e reativação de cadastros.**
+  - **Por quê:** a empresa inspetora se repete entre contratos e o Painel vai comparar a reprovação na inspeção da CPTM por empresa; e um cadastro inativado por engano precisava voltar.
+  - **Empresa inspetora:** nova aba em Cadastros (nome, CNPJ opcional, ativa/inativa). O contrato passa a guardar `empresaInspetoraId` e o `ContratoModal` usa uma seleção do cadastro (só as ativas). Serviço `empresasInspetoras`; estado do mock na versão 3 (a demonstração recomeça uma vez). A taxa de reprovação por empresa inspetora entra no Painel na Etapa 9 (plano e especificação atualizados).
+  - **Reativar:** ação nova em todas as abas de Cadastros, com confirmação; `reativar` em todo cadastro. Regras: já ativo é recusado; fornecedor reativado continua bloqueado enquanto o CTF estiver vencido; local volta com o mesmo código e QR.
+  - Testes: 69 (empresa inspetora, contrato só com empresa ativa, reativação de espécie, fornecedor bloqueado e local).
+  - Arquivos: `src/pages/EmpresasInspetoras.tsx`, `src/pages/{Cadastros,Especies,Tamanhos,Tratamentos,Fornecedores,LocaisCadastro,Contratos,ContratoDetalhe}.tsx`, `src/components/{ContratoModal,ConfirmarInativacao}.tsx`, `src/hooks/useCadastros.ts`, `src/types/models.ts`, `src/services/contracts.ts`, `src/services/mock/{cadastros,estado,index,data}.ts`, testes, `docs/PLANO-V2.md`, `docs/ESPECIFICACAO-FUNCIONAL.md`, `CLAUDE.md`.
+
+### Adicionado
 - 2026-11-06: **Etapa 3 da v2: Cadastros e Contratos.**
   - **Por quê:** contratos e cadastros são a base de toda a jornada do dormente (simulador, NF e DOF, recebimento, estoque).
   - **Cadastros** (`/cadastros?aba=`): Espécies, Tamanhos (volume calculado, medidas provisórias), Tratamentos, Fornecedores (CNPJ, CTF Ibama com bloqueio automático quando vence, espécies que fornece) e Locais (código que vai no QR e não muda, tipo, capacidade e ocupação). Inclusão em linha, edição em modal, inativação com confirmação; nada é apagado. Só quem tem `cadastros:editar` altera.

@@ -1,5 +1,5 @@
 import type {
-  Alerta, Ata, Categoria, Contrato, Dof, Dormente, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
+  Alerta, Ata, Categoria, Contrato, Dof, Dormente, EmpresaInspetora, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros,
   Pendencia, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
@@ -15,12 +15,13 @@ export interface ServicoLista<T> {
   listar(q?: ListQuery): Promise<Paginado<T>>;
 }
 
-/** Cadastro: nada é apagado, só inativado. */
+/** Cadastro: nada é apagado, só inativado (e reativado, respeitando as regras de cada um). */
 export interface ServicoCadastro<T, N> extends ServicoLista<T> {
   obter(id: Id): Promise<T>;
   criar(dados: N): Promise<T>;
   atualizar(id: Id, dados: Partial<N>): Promise<T>;
   inativar(id: Id): Promise<T>;
+  reativar(id: Id): Promise<T>;
 }
 
 // ---------- Entradas das operações ----------
@@ -29,13 +30,14 @@ export interface DadosFornecedor { razaoSocial: string; cnpj: string; cidadeUf: 
 export interface DadosEspecie { nomeCientifico: string; nomePopular: string; classe?: string }
 export interface DadosTamanho { codigo: string; comprimentoCm: number; larguraCm: number; alturaCm: number; medidas: 'provisorio' | 'confirmado' }
 export interface DadosTratamento { preservativo: string; empresa: string }
+export interface DadosEmpresaInspetora { nome: string; cnpj?: string }
 export interface DadosLocal { codigo: string; descricao: string; tipo: Local['tipo']; capacidade: number }
 
 export interface DadosAta { numero: string; fornecedorId: Id; vigenciaInicio: string; vigenciaFim: string }
 export interface DadosItemContrato { especieId: Id; tamanhoId: Id; tratamentoId: Id; quantidade: number; unidade: 'un' | 'm3' }
-export interface DadosContrato { numero: string; ataId: Id; empresaInspetora: string; ano: number; itens: DadosItemContrato[] }
+export interface DadosContrato { numero: string; ataId: Id; empresaInspetoraId: Id; ano: number; itens: DadosItemContrato[] }
 /** Item existente (com `id`) só muda de quantidade; sem `id`, é item novo. */
-export interface DadosAtualizacaoContrato { empresaInspetora?: string; itens?: (DadosItemContrato & { id?: Id })[] }
+export interface DadosAtualizacaoContrato { empresaInspetoraId?: Id; itens?: (DadosItemContrato & { id?: Id })[] }
 
 export interface DadosGerarEntrega { contratoId: Id; itens: { itemContratoId: Id; fardos: number; dormentesPorFardo: number }[] }
 
@@ -77,6 +79,7 @@ export interface Servicos {
   especies: ServicoCadastro<Especie, DadosEspecie>;
   tamanhos: ServicoCadastro<Tamanho, DadosTamanho>;
   tratamentos: ServicoCadastro<Tratamento, DadosTratamento>;
+  empresasInspetoras: ServicoCadastro<EmpresaInspetora, DadosEmpresaInspetora>;
   locais: ServicoCadastro<Local, DadosLocal> & { obterPorCodigo(codigo: string): Promise<Local> };
   /** As contas são criadas no painel do Supabase; aqui só perfil e situação. */
   usuarios: ServicoLista<Usuario> & { atualizar(id: Id, dados: { perfil?: Usuario['perfil']; ativo?: boolean }): Promise<Usuario> };

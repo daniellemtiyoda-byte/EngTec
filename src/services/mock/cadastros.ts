@@ -1,8 +1,8 @@
 import { RE_ATA, RE_CODIGO_LOCAL, RE_CONTRATO } from '../../dominio/identificacao';
 import { unidadesDeM3, volumeM3 } from '../../dominio/parametros';
-import type { Ata, Especie, Id, Tratamento } from '../../types/models';
+import type { Ata, EmpresaInspetora, Especie, Id, Tratamento } from '../../types/models';
 import type {
-  DadosAta, DadosAtualizacaoContrato, DadosContrato, DadosEspecie, DadosFornecedor, DadosItemContrato, DadosLocal, DadosTamanho, DadosTratamento,
+  DadosAta, DadosAtualizacaoContrato, DadosContrato, DadosEmpresaInspetora, DadosEspecie, DadosFornecedor, DadosItemContrato, DadosLocal, DadosTamanho, DadosTratamento,
 } from '../contracts';
 import { contratoView, fornecedorView, localView } from './consultas';
 import {
@@ -85,6 +85,40 @@ export function salvarTratamento(e: Estado, dados: Partial<DadosTratamento>, id?
   return atual ?? reg;
 }
 
+export function salvarEmpresaInspetora(e: Estado, dados: Partial<DadosEmpresaInspetora>, id?: Id): EmpresaInspetora {
+  const atual = id ? achar(e.empresasInspetoras, (x) => x.id === id, 'Empresa inspetora') : undefined;
+  const v = { ...atual, ...dados } as DadosEmpresaInspetora;
+  const cnpj = (v.cnpj ?? '').replace(/\D/g, '');
+  const campos: Record<string, string> = {};
+  if (!v.nome?.trim()) campos.nome = 'Informe o nome.';
+  else if (e.empresasInspetoras.some((x) => x.id !== id && igual(x.nome, v.nome))) campos.nome = 'Empresa já cadastrada.';
+  if (cnpj && cnpj.length !== 14) campos.cnpj = 'O CNPJ tem 14 dígitos (ou deixe em branco).';
+  else if (cnpj && e.empresasInspetoras.some((x) => x.id !== id && x.cnpj === cnpj)) campos.cnpj = 'CNPJ já cadastrado.';
+  exigirCampos(campos);
+  const reg: EmpresaInspetora = { id: atual?.id ?? novoId(e, 'ei'), nome: v.nome.trim(), cnpj: cnpj || undefined, ativo: atual?.ativo ?? true };
+  if (atual) Object.assign(atual, reg); else e.empresasInspetoras.push(reg);
+  return atual ?? reg;
+}
+
+/**
+ * Inativa ou reativa um cadastro simples (espécie, tamanho, tratamento, empresa inspetora). Nada é apagado; o que
+ * está inativo não entra em novos contratos, mas continua nos registros antigos.
+ */
+export function alterarAtivo<T extends { id: Id; ativo: boolean }>(lista: T[], id: Id, ativo: boolean, oQue: string): T {
+  const x = achar(lista, (i) => i.id === id, oQue);
+  if (x.ativo === ativo) falha(409, `${oQue} já está ${ativo ? 'ativo' : 'inativo'}.`);
+  x.ativo = ativo;
+  return x;
+}
+
+export function situacaoFornecedor(e: Estado, id: Id, situacao: 'ativo' | 'inativo') {
+  const f = achar(e.fornecedores, (x) => x.id === id, 'Fornecedor');
+  if (f.situacao === situacao) falha(409, `O fornecedor já está ${situacao}.`);
+  // Reativar não desbloqueia: o bloqueio pelo CTF vencido continua calculado pela validade.
+  f.situacao = situacao;
+  return f;
+}
+
 export function salvarLocal(e: Estado, dados: Partial<DadosLocal>, ctx: Ctx, id?: Id): LocalReg {
   const atual = id ? achar(e.locais, (x) => x.id === id, 'Local') : undefined;
   const v = { ...atual, ...dados } as DadosLocal;
@@ -106,12 +140,24 @@ export function salvarLocal(e: Estado, dados: Partial<DadosLocal>, ctx: Ctx, id?
 
 export function inativarLocal(e: Estado, id: Id, ctx: Ctx) {
   const l = achar(e.locais, (x) => x.id === id, 'Local');
+  if (!l.ativo) falha(409, `O local ${l.codigo} já está inativo.`);
   if (localView(e, l, hoje(ctx)).ocupacao > 0) falha(409, `O local ${l.codigo} tem dormentes: transfira os fardos antes de inativar.`);
   l.ativo = false;
   return l;
 }
 
+/** Reativar o local: o código continua o mesmo (está no QR impresso). */
+export function reativarLocal(e: Estado, id: Id) {
+  return alterarAtivo(e.locais, id, true, 'Local');
+}
+
 // ---------- Ata e contrato ----------
+
+function exigirEmpresaAtiva(e: Estado, id: Id | undefined, campos: Record<string, string>) {
+  const emp = e.empresasInspetoras.find((x) => x.id === id);
+  if (!emp) campos.empresaInspetoraId = 'Escolha a empresa inspetora.';
+  else if (!emp.ativo) campos.empresaInspetoraId = `A empresa ${emp.nome} está inativa.`;
+}
 
 function exigirFornecedorLiberado(e: Estado, fornecedorId: Id, ctx: Ctx, campo: string) {
   const reg = e.fornecedores.find((f) => f.id === fornecedorId);
@@ -167,14 +213,14 @@ export function criarContrato(e: Estado, dados: DadosContrato, ctx: Ctx): Contra
   if (!RE_CONTRATO.test(numero)) campos.numero = 'Número no formato AA00000-00 (ex. AR00224-01).';
   else if (ata && !numero.startsWith(`${ata.numero}-`)) campos.numero = `O contrato começa pelo número da ata (${ata.numero}-).`;
   else if (e.contratos.some((c) => c.numero === numero)) campos.numero = 'Contrato já cadastrado.';
-  if (!dados.empresaInspetora?.trim()) campos.empresaInspetora = 'Informe a empresa inspetora.';
+  exigirEmpresaAtiva(e, dados.empresaInspetoraId, campos);
   if (!Number.isInteger(dados.ano) || dados.ano < 2000) campos.ano = 'Informe o ano.';
   exigirCampos(campos);
   const fornecedor = exigirFornecedorLiberado(e, ata!.fornecedorId, ctx, 'ataId');
   const itens = itensDoContrato(e, dados.itens, fornecedor.especiesIds, campos);
   exigirCampos(campos);
   const reg: ContratoReg = {
-    id: novoId(e, 'ct'), numero, ataId: ata!.id, empresaInspetora: dados.empresaInspetora.trim(), ano: dados.ano, situacao: 'vigente',
+    id: novoId(e, 'ct'), numero, ataId: ata!.id, empresaInspetoraId: dados.empresaInspetoraId, ano: dados.ano, situacao: 'vigente',
     itens: itens.map((i) => ({ ...i, id: novoId(e, 'ic') })), criadoEm: instante(ctx), criadoPor: ctx.quem,
   };
   e.contratos.push(reg);
@@ -186,7 +232,7 @@ export function atualizarContrato(e: Estado, numero: string, dados: DadosAtualiz
   if (reg.situacao === 'cancelado') falha(409, `O contrato ${numero} está cancelado.`);
   const v = contratoView(e, reg);
   const campos: Record<string, string> = {};
-  if (dados.empresaInspetora !== undefined && !dados.empresaInspetora.trim()) campos.empresaInspetora = 'Informe a empresa inspetora.';
+  if (dados.empresaInspetoraId !== undefined && dados.empresaInspetoraId !== reg.empresaInspetoraId) exigirEmpresaAtiva(e, dados.empresaInspetoraId, campos);
   if (dados.itens) {
     const fornecedor = achar(e.fornecedores, (f) => f.id === v.fornecedorId, 'Fornecedor');
     const novos = dados.itens.filter((i) => !i.id);
@@ -202,7 +248,7 @@ export function atualizarContrato(e: Estado, numero: string, dados: DadosAtualiz
     reg.itens.push(...convertidos.map((i) => ({ ...i, id: novoId(e, 'ic') })));
   }
   exigirCampos(campos);
-  if (dados.empresaInspetora !== undefined) reg.empresaInspetora = dados.empresaInspetora.trim();
+  if (dados.empresaInspetoraId !== undefined) reg.empresaInspetoraId = dados.empresaInspetoraId;
   return reg;
 }
 

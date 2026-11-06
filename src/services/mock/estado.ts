@@ -1,6 +1,6 @@
 import { dataSP } from '../../dominio/parametros';
 import type {
-  Anexo, Ata, Contrato, Dof, Dormente, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
+  Anexo, Ata, Contrato, Dof, Dormente, EmpresaInspetora, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
   Movimentacao, NotaFiscal, Parametros, Recebimento, Rme, Tamanho, Tratamento, Usuario,
 } from '../../types/models';
 import { ApiError } from '../http';
@@ -28,6 +28,7 @@ export interface Estado {
   especies: Especie[];
   tamanhos: TamanhoReg[];
   tratamentos: Tratamento[];
+  empresasInspetoras: EmpresaInspetora[];
   locais: LocalReg[];
   atas: Ata[];
   contratos: ContratoReg[];
@@ -45,7 +46,7 @@ export interface Estado {
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 2;
+export const VERSAO_ESTADO = 3;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }

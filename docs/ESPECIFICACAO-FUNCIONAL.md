@@ -129,10 +129,11 @@ O banco tem dois níveis de detalhe, o fardo e o dormente, e todo dormente apont
 | Espécie | Nome científico, nome popular, classe | Tamanhos, itens do contrato |
 | Tamanho | Código, comprimento, largura, altura, volume calculado | Itens do contrato |
 | Tratamento | Preservativo, empresa de tratamento | Itens do contrato |
+| Empresa inspetora | Nome, CNPJ (opcional), ativa ou inativa | Contratos |
 | Local | Código, descrição, tipo, capacidade em dormentes, QR | Fardos guardados |
 | Usuário | Nome, e-mail, perfil, ativo | Todo registro guarda quem fez |
 | Ata | Número, fornecedor, vigência | Contratos |
-| Contrato | Número, ata, empresa inspetora, situação (o fornecedor vem da ata) | Itens, entregas, fardos, dormentes, NFs |
+| Contrato | Número, ata, empresa inspetora (do cadastro), situação (o fornecedor vem da ata) | Itens, entregas, fardos, dormentes, NFs |
 | Item do contrato | Espécie, tamanho, tratamento, quantidade em unidades | Contrato, dormentes |
 | Entrega | NF, DOF, fardos esperados, situação (a caminho, recebida em parte, recebida) | Contrato, NF, DOF, fardos, recebimento |
 | Fardo | ID, contrato, quantidade inicial, saldo físico e disponível (calculados), local, situação | Dormentes, recebimento, movimentações |
@@ -152,7 +153,7 @@ São dez módulos, um para cada etapa da jornada mais os de apoio. O detalhe das
 
 | Módulo | O que faz | Regras principais |
 | --- | --- | --- |
-| Cadastros | Espécies, tamanhos, tratamentos, fornecedores, locais | Nada é apagado, só inativado; volume do tamanho sempre calculado; fornecedor com CTF vencido fica bloqueado automaticamente para novas atas e contratos, calculado pela validade; cada local tem um QR (LOC-código) |
+| Cadastros | Espécies, tamanhos, tratamentos, fornecedores, empresas inspetoras, locais | Nada é apagado, só inativado, e o inativado pode ser reativado respeitando as regras de cada cadastro (o fornecedor com CTF vencido continua bloqueado); o contrato escolhe a empresa inspetora no cadastro (só as ativas); volume do tamanho sempre calculado; fornecedor com CTF vencido fica bloqueado automaticamente para novas atas e contratos, calculado pela validade; cada local tem um QR (LOC-código) |
 | Contratos | Ata, contrato e itens | O contrato herda o fornecedor da ata (não é digitado de novo); itens em unidades; se informado em m³, o sistema converte pelo volume do tamanho e arredonda para baixo; mostra quanto já foi entregue de cada item |
 | Simulador do fornecedor | Gera fardos e IDs de dormentes e imprime etiquetas | Só para demonstração, com aviso fixo na tela; o contrato é cumprido por aprovados, então pode emitir reposição dos reprovados, desde que emitidos menos reprovados não passe da quantidade do item; ID nunca repetido |
 | NF e DOF | Cadastro da NF (XML ou digitada) e da DOF antes da chegada, prazo e declaração no Sinaflor | Cadastram o administrador (no escritório, antes da chegada) e o almoxarife; só o almoxarife declara a DOF; cadastrar NF e DOF cria a entrega "a caminho"; sem DOF não há entrega; chave de NF repetida é recusada; os fardos da entrega podem ser indicados no cadastro ou só na leitura do recebimento (provisório); no protótipo, o Simulador gera a entrega já com NF e DOF |
@@ -194,6 +195,7 @@ Os indicadores respondem aos que a CPTM pediu no plano de trabalho (tempo de loc
 | Tempo em estoque | Dias desde o recebimento do fardo; alerta acima de um limite (a definir com a CPTM) |
 | Entregas dos contratos | Quantidade recebida contra a contratada, por item |
 | Taxa de reprovação | Reprovados sobre inspecionados, por fornecedor e espécie |
+| Reprovação por empresa inspetora | Reprovados sobre inspecionados na inspeção da CPTM, agrupados pela empresa inspetora do contrato |
 | Não localizados | Dormentes não lidos na conclusão da inspeção, ainda não encontrados |
 | DOFs a declarar | DOFs com prazo vencido, em até 1 dia e em até 3 dias |
 | Rastreabilidade | Dormentes baixados com histórico completo do contrato à saída |

@@ -47,6 +47,7 @@ describe('história de demonstração', () => {
     expect(e.especies).toHaveLength(4);
     expect(e.tamanhos).toHaveLength(2);
     expect(e.tratamentos).toHaveLength(2);
+    expect(e.empresasInspetoras.map((x) => x.nome)).toEqual(['UFV', 'Inspetora Exemplo Ltda.']);
     expect(e.locais.map((l) => l.tipo).sort()).toEqual(['armazenagem', 'armazenagem', 'armazenagem', 'armazenagem', 'armazenagem', 'expedicao', 'inspecao', 'segregacao']);
     expect(e.atas).toHaveLength(2);
     expect(e.contratos.map((c) => contratoView(e, c).situacao)).toEqual(['vigente', 'concluido', 'vigente', 'vigente']);

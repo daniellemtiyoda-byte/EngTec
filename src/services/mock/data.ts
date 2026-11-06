@@ -1,7 +1,7 @@
 import { dataSP, somarDias, ALERTA_DOF_DIAS_PADRAO, DORMENTES_POR_FARDO_PADRAO, LIMITE_DIAS_ESTOQUE_PADRAO, LIMITES_CATEGORIA_PADRAO, TOLERANCIA_VOLUME_PCT } from '../../dominio/parametros';
 import { PERFIS, PERFIS_LISTA, type Perfil } from '../../dominio/permissoes';
 import type { Id, Usuario } from '../../types/models';
-import { criarAta, criarContrato, salvarEspecie, salvarFornecedor, salvarLocal, salvarTamanho, salvarTratamento } from './cadastros';
+import { criarAta, criarContrato, salvarEmpresaInspetora, salvarEspecie, salvarFornecedor, salvarLocal, salvarTamanho, salvarTratamento } from './cadastros';
 import { declararDof } from './documentos';
 import { VERSAO_ESTADO, type Ctx, type EntregaReg, type Estado } from './estado';
 import { concluirInspecao, registrarInspecao, simularFardo } from './inspecao';
@@ -31,7 +31,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   const e: Estado = {
     versao: VERSAO_ESTADO, dataBase: base,
     usuarios: PERFIS_LISTA.map(usuarioDemo),
-    fornecedores: [], especies: [], tamanhos: [], tratamentos: [], locais: [], atas: [], contratos: [], fardos: [], dormentes: [],
+    fornecedores: [], especies: [], tamanhos: [], tratamentos: [], empresasInspetoras: [], locais: [], atas: [], contratos: [], fardos: [], dormentes: [],
     nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [],
     parametros: {
       limiteDiasEstoque: LIMITE_DIAS_ESTOQUE_PADRAO, alertaDofDias: [...ALERTA_DOF_DIAS_PADRAO], toleranciaVolumePct: TOLERANCIA_VOLUME_PCT,
@@ -61,6 +61,8 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   const t280 = salvarTamanho(e, { codigo: 'T280', comprimentoCm: 280, larguraCm: 24, alturaCm: 17, medidas: 'provisorio' });
   const cca = salvarTratamento(e, { preservativo: 'CCA', empresa: 'Granoski' });
   const ccb = salvarTratamento(e, { preservativo: 'CCB', empresa: 'Tratadora Exemplo Ltda.' });
+  const ufv = salvarEmpresaInspetora(e, { nome: 'UFV' });
+  const inspetoraB = salvarEmpresaInspetora(e, { nome: 'Inspetora Exemplo Ltda.', cnpj: '00000000000201' });
   const local = (codigo: string, descricao: string, tipo: 'armazenagem' | 'inspecao' | 'segregacao' | 'expedicao', capacidade: number) =>
     salvarLocal(e, { codigo, descricao, tipo, capacidade }, adm());
   const [a01, a02, a03, a04, a05] = ['A-01', 'A-02', 'A-03', 'A-04', 'A-05'].map((c, i) => local(c, `Pátio A, área ${i + 1}`, 'armazenagem', 200));
@@ -75,19 +77,19 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   // ---------- Atas e contratos ----------
   em(300);
   const ataA = criarAta(e, { numero: 'AR00224', fornecedorId: fA.id, vigenciaInicio: somarDias(base, -300), vigenciaFim: somarDias(base, 430) }, adm());
-  const c1 = criarContrato(e, { numero: 'AR00224-01', ataId: ataA.id, empresaInspetora: 'UFV', ano: Number(base.slice(0, 4)), itens: [
+  const c1 = criarContrato(e, { numero: 'AR00224-01', ataId: ataA.id, empresaInspetoraId: ufv.id, ano: Number(base.slice(0, 4)), itens: [
     { especieId: jataipeba.id, tamanhoId: t280.id, tratamentoId: cca.id, quantidade: 280, unidade: 'un' },
     { especieId: macaranduba.id, tamanhoId: t200.id, tratamentoId: cca.id, quantidade: 140, unidade: 'un' },
   ] }, adm());
-  const c2 = criarContrato(e, { numero: 'AR00224-02', ataId: ataA.id, empresaInspetora: 'UFV', ano: Number(base.slice(0, 4)), itens: [
+  const c2 = criarContrato(e, { numero: 'AR00224-02', ataId: ataA.id, empresaInspetoraId: ufv.id, ano: Number(base.slice(0, 4)), itens: [
     { especieId: cumaru.id, tamanhoId: t280.id, tratamentoId: ccb.id, quantidade: 28, unidade: 'un' },
   ] }, adm());
   em(200);
   const ataB = criarAta(e, { numero: 'AR00311', fornecedorId: fB.id, vigenciaInicio: somarDias(base, -200), vigenciaFim: somarDias(base, 530) }, adm());
-  const c3 = criarContrato(e, { numero: 'AR00311-01', ataId: ataB.id, empresaInspetora: 'Inspetora Exemplo', ano: Number(base.slice(0, 4)), itens: [
+  const c3 = criarContrato(e, { numero: 'AR00311-01', ataId: ataB.id, empresaInspetoraId: inspetoraB.id, ano: Number(base.slice(0, 4)), itens: [
     { especieId: jatoba.id, tamanhoId: t200.id, tratamentoId: cca.id, quantidade: 200, unidade: 'un' },
   ] }, adm());
-  const c4 = criarContrato(e, { numero: 'AR00311-02', ataId: ataB.id, empresaInspetora: 'Inspetora Exemplo', ano: Number(base.slice(0, 4)), itens: [
+  const c4 = criarContrato(e, { numero: 'AR00311-02', ataId: ataB.id, empresaInspetoraId: inspetoraB.id, ano: Number(base.slice(0, 4)), itens: [
     { especieId: macaranduba.id, tamanhoId: t280.id, tratamentoId: ccb.id, quantidade: 100, unidade: 'un' },
   ] }, adm());
   const [ic1, ic2] = c1.itens;

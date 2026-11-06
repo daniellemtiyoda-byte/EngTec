@@ -333,7 +333,7 @@ describe('estoque, cadastros e contratos', () => {
     expect(invariantes()).toEqual([]);
   });
   it('contrato herda o fornecedor da ata, recusa espécie que ele não fornece e converte m³', async () => {
-    const { s } = montar('administrador');
+    const { s, invariantes } = montar('administrador');
     const ata = (await s.atas.listar()).items.find((a) => a.numero === 'AR00224')!;
     const especies = (await s.especies.listar()).items;
     const tamanhos = (await s.tamanhos.listar()).items;
@@ -341,12 +341,45 @@ describe('estoque, cadastros e contratos', () => {
     const jatoba = especies.find((x) => x.nomePopular === 'Jatobá')!;
     const jataipeba = especies.find((x) => x.nomePopular === 'Jataipeba')!;
     const t280 = tamanhos.find((t) => t.codigo === 'T280')!;
-    const base = { numero: 'AR00224-03', ataId: ata.id, empresaInspetora: 'UFV', ano: 2026 };
+    const ufv = (await s.empresasInspetoras.listar()).items.find((x) => x.nome === 'UFV')!;
+    const base = { numero: 'AR00224-03', ataId: ata.id, empresaInspetoraId: ufv.id, ano: 2026 };
     await falhaCom(s.contratos.criar({ ...base, itens: [{ especieId: jatoba.id, tamanhoId: t280.id, tratamentoId: trat.id, quantidade: 10, unidade: 'un' }] }), 422, 'itens.0');
     await falhaCom(s.contratos.criar({ ...base, numero: 'AR00311-09', itens: [{ especieId: jataipeba.id, tamanhoId: t280.id, tratamentoId: trat.id, quantidade: 10, unidade: 'un' }] }), 422, 'numero');
     const c = await s.contratos.criar({ ...base, itens: [{ especieId: jataipeba.id, tamanhoId: t280.id, tratamentoId: trat.id, quantidade: 2, unidade: 'm3' }] });
     expect(c.fornecedorId).toBe(ata.fornecedorId);
     expect(c.itens[0].quantidade).toBe(17); // 2 m³ ÷ 0,11424 m³ = 17,5 → 17
+    expect(c.empresaInspetoraId).toBe(ufv.id);
+    expect(invariantes()).toEqual([]);
+  });
+  it('empresa inspetora: cadastro, contrato só com empresa ativa e troca no contrato', async () => {
+    const { s } = montar('administrador');
+    await falhaCom(s.empresasInspetoras.criar({ nome: 'ufv' }), 422, 'nome');
+    await falhaCom(s.empresasInspetoras.criar({ nome: 'Nova', cnpj: '123' }), 422, 'cnpj');
+    const nova = await s.empresasInspetoras.criar({ nome: 'Inspetora Nova', cnpj: '00.000.000/0002-99' });
+    expect(nova.cnpj).toBe('00000000000299');
+    await s.empresasInspetoras.inativar(nova.id);
+    await falhaCom(s.contratos.atualizar('AR00224-01', { empresaInspetoraId: nova.id }), 422, 'empresaInspetoraId');
+    await s.empresasInspetoras.reativar(nova.id);
+    expect((await s.contratos.atualizar('AR00224-01', { empresaInspetoraId: nova.id })).empresaInspetoraId).toBe(nova.id);
+  });
+  it('reativar respeita as regras de cada cadastro', async () => {
+    const { s, invariantes } = montar('administrador');
+    const especie = (await s.especies.listar()).items[0];
+    await falhaCom(s.especies.reativar(especie.id), 409);
+    await s.especies.inativar(especie.id);
+    expect((await s.especies.reativar(especie.id)).ativo).toBe(true);
+    // Fornecedor reativado continua bloqueado enquanto o CTF estiver vencido.
+    const bloqueado = (await s.fornecedores.listar()).items.find((f) => f.bloqueado)!;
+    await s.fornecedores.inativar(bloqueado.id);
+    const reativado = await s.fornecedores.reativar(bloqueado.id);
+    expect([reativado.situacao, reativado.bloqueado]).toEqual(['ativo', true]);
+    // Local com dormentes não inativa; o vazio inativa e reativa com o mesmo código.
+    const a01 = await s.locais.obterPorCodigo('A-01');
+    await falhaCom(s.locais.inativar(a01.id), 409);
+    const exp = await s.locais.obterPorCodigo('EXP-01');
+    await s.locais.inativar(exp.id);
+    expect((await s.locais.reativar(exp.id)).codigo).toBe('EXP-01');
+    expect(invariantes()).toEqual([]);
   });
   it('resumo do fornecedor: contratos e taxa de reprovação por espécie; contratos filtrados por espécie', async () => {
     const { s } = montar('gestor');

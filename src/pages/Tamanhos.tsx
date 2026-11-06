@@ -70,7 +70,8 @@ export default function Tamanhos({ aoAlterar }: { aoAlterar: () => void }) {
         filtros={[{ chave: 'medidas', rotulo: 'Medidas', opcoes: SITUACAO_MEDIDAS_OPCOES }]}
         acoesLinha={edita ? [
           { rotulo: 'Editar', aoClicar: setEditar },
-          { rotulo: 'Inativar', visivel: (t) => t.ativo, aoClicar: (t) => setInativar({ nome: `o tamanho ${t.codigo}`, efeito: 'Ele não entra em novos contratos.', inativar: () => servicos.tamanhos.inativar(t.id) }) },
+          { rotulo: 'Inativar', visivel: (t) => t.ativo, aoClicar: (t) => setInativar({ nome: `o tamanho ${t.codigo}`, efeito: 'Ele não entra em novos contratos.', executar: () => servicos.tamanhos.inativar(t.id) }) },
+          { rotulo: 'Reativar', visivel: (t) => !t.ativo, aoClicar: (t) => setInativar({ nome: `o tamanho ${t.codigo}`, acao: 'reativar', efeito: 'Ele volta a poder entrar em contratos.', executar: () => servicos.tamanhos.reativar(t.id) }) },
         ] : undefined}
       />
       <FormModal

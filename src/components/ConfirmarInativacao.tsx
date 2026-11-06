@@ -3,21 +3,29 @@ import { mensagemSegura } from '../services/http';
 import { ConfirmModal } from './Modal';
 import { useToast } from './Toast';
 
-export interface AlvoInativacao { nome: string; efeito: string; inativar: () => Promise<unknown> }
+export interface AlvoInativacao {
+  nome: string;
+  /** O que muda, em uma frase (vai na confirmação). */
+  efeito: string;
+  /** Padrão: inativar. */
+  acao?: 'inativar' | 'reativar';
+  executar: () => Promise<unknown>;
+}
 
 /**
- * Confirmação de inativação dos cadastros (nada é apagado). Sucesso só depois da resposta do serviço;
- * erro (ex. local com dormentes) aparece no toast.
+ * Confirmação de inativação e de reativação dos cadastros (nada é apagado). Sucesso só depois da resposta do
+ * serviço; recusa da regra (ex. local com dormentes) aparece no toast.
  */
 export function ConfirmarInativacao({ alvo, aoFechar, aoConcluir }: { alvo: AlvoInativacao | null; aoFechar: () => void; aoConcluir: () => void }) {
   const notificar = useToast();
   const [enviando, setEnviando] = useState(false);
+  const reativar = alvo?.acao === 'reativar';
   async function confirmar() {
     if (!alvo) return;
     setEnviando(true);
     try {
-      await alvo.inativar();
-      notificar('sucesso', `${alvo.nome} inativado.`);
+      await alvo.executar();
+      notificar('sucesso', `${alvo.nome}: ${reativar ? 'reativado' : 'inativado'}.`);
       aoConcluir();
     } catch (e) {
       notificar('erro', mensagemSegura(e));
@@ -28,8 +36,8 @@ export function ConfirmarInativacao({ alvo, aoFechar, aoConcluir }: { alvo: Alvo
   }
   return (
     <ConfirmModal
-      titulo="Inativar" aberto={!!alvo} carregando={enviando} perigo rotuloConfirmar="Inativar"
-      mensagem={alvo ? `Inativar ${alvo.nome}? ${alvo.efeito} O cadastro não é apagado.` : ''}
+      titulo={reativar ? 'Reativar' : 'Inativar'} aberto={!!alvo} carregando={enviando} perigo={!reativar} rotuloConfirmar={reativar ? 'Reativar' : 'Inativar'}
+      mensagem={alvo ? `${reativar ? 'Reativar' : 'Inativar'} ${alvo.nome}? ${alvo.efeito}${reativar ? '' : ' O cadastro não é apagado.'}` : ''}
       aoCancelar={aoFechar} aoConfirmar={() => void confirmar()}
     />
   );
