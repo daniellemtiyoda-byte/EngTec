@@ -283,7 +283,7 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `contratos` | `listar`, `obter(numero)`, `criar`, `atualizar`, `cancelar`; `atas`: `listar`, `criar` |
 | `simulador` | `gerarEntrega({ contratoId, itens: [{ itemContratoId, fardos, dormentesPorFardo }] })` → cria fardos `em_transito`, dormentes `emitido`, NF e DOF de exemplo e a entrega `a_caminho` (como se tivesse sido cadastrada em NF e DOF); recusa acima do `saldoAEmitir`; `etiquetas(entregaId)` |
 | `recebimentos` | `listar`, `obter`, `entregasACaminho()` (inclui as parciais, com os fardos que faltam), `receber(entregaId, dados, arquivos)` |
-| `documentos` | `cadastrarEntrega({ nf, dof, fardosIds? }, arquivos)` → cria NF, DOF e a entrega `a_caminho` (chave repetida recusada, sem DOF não cadastra); `listarEntregas`, `listarNfs`, `listarDofs`, `fardosSemEntrega(contratoId)`, `declararDof(id)`; leitura do XML no front com `utils/nfeXml.ts` |
+| `documentos` | `cadastrarEntrega({ nf, dof, fardosIds? }, arquivos)` (permissão `nf:cadastrar`: administrador e almoxarife) → cria NF, DOF e a entrega `a_caminho` (chave repetida recusada, sem DOF não cadastra); `listarEntregas`, `listarNfs`, `listarDofs`, `fardosSemEntrega(contratoId)`, `declararDof(id)`; leitura do XML no front com `utils/nfeXml.ts` |
 | `inspecao` | `fila()`, `naoLocalizados()`, `obterFardo(id)`, `registrar(dormenteId, resultado)` (aceita dormente `nao_localizado` encontrado depois), `simularFardo(id)`, `concluir(fardoId, localId, justificativa?)` |
 | `fardos` | `listar`, `obter(id)`, `transferir(id, localId)` |
 | `dormentes` | `listar`, `obter(id)` (devolve a ficha completa já montada, seção 9.13) |
@@ -448,7 +448,7 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
   2. **Leitura dos fardos**: lista dos fardos esperados com caixa de checagem; botão **Ler QR** em modo contínuo marca cada fardo lido; fardo lido do mesmo contrato, emitido e sem entrega entra na entrega; fardo de outro contrato, de outra entrega ou desconhecido vira ocorrência "fardo desconhecido"; também dá para marcar à mão. Fardo esperado e não lido gera ocorrência de **falta** automática, continua `em_transito` e pode ser recebido depois (a entrega fica `recebida_parcial` e continua em "A caminho" com os fardos que faltam).
   3. **Conferência**: conforme ou com ocorrência (avaria, falta, sobra); ocorrência exige descrição e foto.
   4. **Local de espera**: local do tipo inspeção (sugerido o com mais espaço).
-  5. **Revisar e confirmar**: resumo, divergência de volume por espécie (acima de 10% mostra aviso crítico e pede justificativa, não bloqueia).
+  5. **Revisar e confirmar**: resumo, divergência de volume por espécie (acima de 10% mostra aviso crítico e pede justificativa, não bloqueia). Se a divergência vem só dos fardos que faltaram (contando-os, a DOF fecha), o campo já vem preenchido com a lista deles (`justificativaPorFalta` em `dominio/parametros.ts`) e a pessoa pode complementar. A divergência é sempre a acumulada da entrega: quando os fardos que faltaram são recebidos, ela é recalculada (`entrega.divergenciaVolume`).
 - Resultado: fardos e dormentes lidos passam a `aguardando_inspecao`; os não lidos continuam `em_transito`; abre a página do recebimento.
 
 ### 9.8 Página do recebimento (`/recebimentos/:id`) · padrão Objeto
@@ -613,12 +613,12 @@ Quem usa a câmera trabalha no pátio, com o celular numa mão e às vezes luva 
 - **Camada de serviços como fronteira**: nenhuma tela conhece HTTP; trocar mock por API real é configuração. Integrações futuras (portal real do fornecedor, Inspector, Sinaflor) entram como serviços novos com a mesma interface.
 - **Domínio centralizado**: IDs (`identificacao.ts`), rótulos e cores (`rotulos.ts`), opções (`opcoes.ts`), permissões (`permissoes.ts`) e parâmetros ficam em `src/dominio/`. Mudar o formato do ID ou acrescentar uma situação é editar um arquivo.
 - **Telas por configuração**: nova tela = uma linha em `ROTAS`; novo módulo de menu = um grupo em `GRUPOS_MENU`.
-- **Permissões granulares** (nomes provisórios, entram na Etapa 1): `admin`, `operacao:consultar`, `cadastros:editar`, `contratos:editar`, `simulador:usar`, `recebimento:registrar`, `dof:declarar`, `inspecao:operar`, `estoque:movimentar`, `rme:abrir`, `rme:separar`, `painel:gestao`. Perfil = conjunto de permissões, não regra no código. `operacao:consultar` dá acesso de leitura às telas de suprimento, entrada, estoque e cadastros.
+- **Permissões granulares** (nomes provisórios, entram na Etapa 1): `admin`, `operacao:consultar`, `cadastros:editar`, `contratos:editar`, `simulador:usar`, `nf:cadastrar`, `recebimento:registrar`, `dof:declarar`, `inspecao:operar`, `estoque:movimentar`, `rme:abrir`, `rme:separar`, `painel:gestao`. Perfil = conjunto de permissões, não regra no código. `operacao:consultar` dá acesso de leitura às telas de suprimento, entrada, estoque e cadastros.
 
 | Perfil | Permissões |
 | --- | --- |
-| Administrador | `admin`, `operacao:consultar`, `cadastros:editar`, `contratos:editar`, `simulador:usar`, `painel:gestao` |
-| Almoxarife | `operacao:consultar`, `simulador:usar`, `recebimento:registrar`, `dof:declarar`, `inspecao:operar`, `estoque:movimentar`, `rme:separar` |
+| Administrador | `admin`, `operacao:consultar`, `cadastros:editar`, `contratos:editar`, `simulador:usar`, `nf:cadastrar`, `painel:gestao` |
+| Almoxarife | `operacao:consultar`, `simulador:usar`, `nf:cadastrar`, `recebimento:registrar`, `dof:declarar`, `inspecao:operar`, `estoque:movimentar`, `rme:separar` |
 | Gestor | `operacao:consultar`, `painel:gestao` |
 | Requisitante | `rme:abrir` |
 - **Modo demonstração** como parâmetro: o Simulador e os botões "Simular" somem quando desligado, sem remover código.
@@ -761,3 +761,4 @@ Executado na Etapa 11, já com o Supabase, para computador e celular compartilha
 | Quem pode cancelar a RME | O requisitante que abriu e o almoxarife, antes da entrega |
 | ATENÇÃO do Inspector | Conta como reprovado (a confirmar com o time da inspeção) |
 | Categorias e limites do índice | 1, 2 e 3, com limites 80 e 50 (a confirmar com o time da inspeção) |
+| Nome popular de *Dialium guianense* | "Jataipeba" (a confirmar com a CPTM) |

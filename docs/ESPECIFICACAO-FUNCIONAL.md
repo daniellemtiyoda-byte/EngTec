@@ -37,7 +37,7 @@ O sistema dá a cada dormente um QR code individual e acompanha sua vida do cont
 | Painel com indicadores e alertas | |
 | Login e banco no Supabase (até lá, login simulado com escolha de perfil e dados de demonstração) | |
 
-Em aberto: até onde vai a localização no armazém, só a área ou também a posição do fardo dentro dela.
+Em aberto: até onde vai a localização no armazém, só a área ou também a posição do fardo dentro dela; e o nome popular das espécies (ex. "Jataipeba" para *Dialium guianense*), a confirmar com a CPTM.
 
 ## 2. Glossário e regra de identificação
 
@@ -155,8 +155,8 @@ São dez módulos, um para cada etapa da jornada mais os de apoio. O detalhe das
 | Cadastros | Espécies, tamanhos, tratamentos, fornecedores, locais | Nada é apagado, só inativado; volume do tamanho sempre calculado; fornecedor com CTF vencido fica bloqueado automaticamente para novas atas e contratos, calculado pela validade; cada local tem um QR (LOC-código) |
 | Contratos | Ata, contrato e itens | O contrato herda o fornecedor da ata (não é digitado de novo); itens em unidades; se informado em m³, o sistema converte pelo volume do tamanho e arredonda para baixo; mostra quanto já foi entregue de cada item |
 | Simulador do fornecedor | Gera fardos e IDs de dormentes e imprime etiquetas | Só para demonstração, com aviso fixo na tela; o contrato é cumprido por aprovados, então pode emitir reposição dos reprovados, desde que emitidos menos reprovados não passe da quantidade do item; ID nunca repetido |
-| NF e DOF | Cadastro da NF (XML ou digitada) e da DOF antes da chegada, prazo e declaração no Sinaflor | Cadastrar NF e DOF cria a entrega "a caminho"; sem DOF não há entrega; chave de NF repetida é recusada; os fardos da entrega podem ser indicados no cadastro ou só na leitura do recebimento (provisório); no protótipo, o Simulador gera a entrega já com NF e DOF |
-| Recebimento | Escolha da entrega, leitura dos fardos e conferência | O almoxarife escolhe uma entrega "a caminho"; cadastrar NF e DOF na hora é exceção; sem DOF não há recebimento; diferença de quantidade ou avaria exige foto; divergência de volume por espécie acima de 10% gera alerta (IN IBAMA); fardo esperado e não lido continua em trânsito, o recebimento é concluído com ocorrência de falta e o fardo pode ser recebido depois |
+| NF e DOF | Cadastro da NF (XML ou digitada) e da DOF antes da chegada, prazo e declaração no Sinaflor | Cadastram o administrador (no escritório, antes da chegada) e o almoxarife; só o almoxarife declara a DOF; cadastrar NF e DOF cria a entrega "a caminho"; sem DOF não há entrega; chave de NF repetida é recusada; os fardos da entrega podem ser indicados no cadastro ou só na leitura do recebimento (provisório); no protótipo, o Simulador gera a entrega já com NF e DOF |
+| Recebimento | Escolha da entrega, leitura dos fardos e conferência | O almoxarife escolhe uma entrega "a caminho"; cadastrar NF e DOF na hora é exceção; sem DOF não há recebimento; diferença de quantidade ou avaria exige foto; divergência de volume por espécie acima de 10% gera alerta (IN IBAMA) e pede justificativa; quando a divergência vem só dos fardos que faltaram, a justificativa é preenchida pelo sistema com a lista deles (a pessoa pode complementar) e, quando eles chegam, a divergência da DOF é recalculada; fardo esperado e não lido continua em trânsito, o recebimento é concluído com ocorrência de falta e o fardo pode ser recebido depois |
 | Inspeção | Recebe o resultado de cada dormente | Vem do sistema de inspeção pelo banco compartilhado; no protótipo, simulada por botão; resultado só aprovado ou reprovado (o ATENÇÃO do sistema de inspeção conta como reprovado) e categoria 1, 2 ou 3 pelos limites 80 e 50 do índice, ambos provisórios, a confirmar com o time da inspeção; reprovados saem do fardo; ID que não pertence ao fardo vira pendência; o fardo pode ser concluído com dormentes não lidos, com justificativa obrigatória, e eles ficam não localizados |
 | Estoque | Saldo, fardos, locais e movimentações | Saldo físico do fardo = dormentes em estoque + reservados; disponível para nova saída = só em estoque; guardar e transferir é lendo o QR do fardo e o QR do local (ou escolhendo o local) |
 | Ficha do dormente | Tela aberta pelo QR | Mostra contrato, fornecedor, NF, DOF, inspeção, local e histórico; só leitura |
@@ -174,7 +174,7 @@ Cada perfil vê no menu só o que pode usar, e a leitura da ficha do dormente pe
 | Cadastros | Edita | Consulta | Consulta | Não vê |
 | Contratos | Edita | Consulta | Consulta | Não vê |
 | Simulador do fornecedor | Usa | Usa | Não vê | Não vê |
-| NF e DOF | Consulta | Cadastra e declara | Consulta | Não vê |
+| NF e DOF | Cadastra | Cadastra e declara | Consulta | Não vê |
 | Recebimento | Consulta | Registra | Consulta | Não vê |
 | Inspeção | Consulta | Acompanha e simula | Consulta | Não vê |
 | Estoque | Consulta | Guarda e transfere | Consulta | Consulta saldo |
@@ -207,4 +207,4 @@ Os indicadores respondem aos que a CPTM pediu no plano de trabalho (tempo de loc
 - Inventário físico por leitura de QR e ajustes com aprovação
 - Uso offline no pátio e leitura por RFID
 
-Em aberto: até onde vai a localização (área ou posição do fardo), valores de mínimo e máximo por item e limite de dias em estoque.
+Em aberto: até onde vai a localização (área ou posição do fardo), valores de mínimo e máximo por item, limite de dias em estoque e o nome popular das espécies ("Jataipeba" para *Dialium guianense*).

@@ -9,6 +9,7 @@ export const PERMISSOES = [
   'cadastros:editar',
   'contratos:editar',
   'simulador:usar',
+  'nf:cadastrar', // NF e DOF antes da chegada (cria a entrega "a caminho")
   'recebimento:registrar',
   'dof:declarar',
   'inspecao:operar',
@@ -24,8 +25,8 @@ export type Perfil = 'administrador' | 'almoxarife' | 'gestor' | 'requisitante';
 
 /** Perfil = conjunto de permissões; nenhuma tela testa o perfil, só as permissões. */
 export const PERFIS: Record<Perfil, { rotulo: string; permissoes: Permissao[] }> = {
-  administrador: { rotulo: 'Administrador', permissoes: ['admin', 'operacao:consultar', 'cadastros:editar', 'contratos:editar', 'simulador:usar', 'painel:gestao'] },
-  almoxarife: { rotulo: 'Almoxarife', permissoes: ['operacao:consultar', 'simulador:usar', 'recebimento:registrar', 'dof:declarar', 'inspecao:operar', 'estoque:movimentar', 'rme:separar'] },
+  administrador: { rotulo: 'Administrador', permissoes: ['admin', 'operacao:consultar', 'cadastros:editar', 'contratos:editar', 'simulador:usar', 'nf:cadastrar', 'painel:gestao'] },
+  almoxarife: { rotulo: 'Almoxarife', permissoes: ['operacao:consultar', 'simulador:usar', 'nf:cadastrar', 'recebimento:registrar', 'dof:declarar', 'inspecao:operar', 'estoque:movimentar', 'rme:separar'] },
   gestor: { rotulo: 'Gestor', permissoes: ['operacao:consultar', 'painel:gestao'] },
   requisitante: { rotulo: 'Requisitante', permissoes: ['rme:abrir'] },
 };

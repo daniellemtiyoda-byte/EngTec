@@ -3,8 +3,10 @@ import type { Perfil } from '../../dominio/permissoes';
 import type { Usuario } from '../../types/models';
 import { chaveComDigito } from '../../utils/nfeXml';
 import { ApiError } from '../http';
-import { usuarioDemo } from './data';
+import { justificativaPorFalta } from '../../dominio/parametros';
+import { criarDados, usuarioDemo } from './data';
 import { criarServicosSimulados } from './index';
+import { receber } from './recebimento';
 import { violacoes } from './invariantes';
 
 const AGORA = new Date('2026-11-06T12:00:00-03:00');
@@ -79,6 +81,17 @@ describe('NF e DOF antes da chegada', () => {
     expect((await s.recebimentos.entregasACaminho()).map((x) => x.id)).toContain(en.id);
     await falhaCom(s.documentos.cadastrarEntrega({ ...dados, dof: { ...dados.dof, numero: '26999002' } }), 409, 'nf.chaveAcesso');
   });
+  it('administrador e almoxarife cadastram NF e DOF; gestor não', async () => {
+    const { s, como } = montar('administrador');
+    const c = await contrato(s, 'AR00224-01');
+    const dados = (n: number) => ({
+      nf: { numero: String(n), serie: '1', chaveAcesso: chave(CNPJ_A, n), contratoId: c.id, emissao: '2026-11-05', itens: [{ itemContratoId: c.itens[0].id, quantidade: 14, volumeM3: 1.6 }] },
+      dof: { numero: `26${n}`, validade: '2026-11-20', volumes: [{ especieId: c.itens[0].especieId, volumeM3: 1.6 }] },
+    });
+    expect((await s.documentos.cadastrarEntrega(dados(9021))).criadoPor).toBe('Administrador (demonstração)');
+    como('gestor');
+    await falhaCom(s.documentos.cadastrarEntrega(dados(9022)), 403);
+  });
   it('recusa chave de outro CNPJ, chave inválida e entrega sem DOF', async () => {
     const { s } = montar();
     const c = await contrato(s, 'AR00224-01');
@@ -103,10 +116,14 @@ describe('recebimento', () => {
     const { s, invariantes } = montar();
     const en = await entregaACaminho(s);
     const insp = await localPorCodigo(s, 'INSP-01');
-    // Faltou o fardo de Maçaranduba: o volume dessa espécie diverge 100% e pede justificativa.
+    // Faltou o fardo de Maçaranduba: o volume dessa espécie diverge 100%, mas só por causa da falta. O sistema
+    // preenche a justificativa com a lista dos fardos que faltaram e mantém o complemento da pessoa.
     const parcial = { fardosLidos: ['AR00224-01-F006', 'AR00224-01-F007', 'AR00311-01-F001'], ocorrencias: [], localEsperaId: insp.id };
-    await falhaCom(s.recebimentos.receber(en.id, parcial), 422, 'justificativaDivergencia');
-    const rec = await s.recebimentos.receber(en.id, { ...parcial, justificativaDivergencia: 'Fardo de Maçaranduba veio em outro caminhão.' });
+    const automatica = justificativaPorFalta(['AR00224-01-F008']);
+    const rec = await s.recebimentos.receber(en.id, { ...parcial, justificativaDivergencia: `${automatica} Veio em outro caminhão.` });
+    expect(rec.justificativaAutomatica).toBe(true);
+    expect(rec.justificativaDivergencia).toBe(`${automatica} Veio em outro caminhão.`);
+    expect(rec.divergenciaVolume.find((d) => d.acimaTolerancia)?.percentual).toBe(100);
     expect(rec.fardosLidos).toEqual(['AR00224-01-F006', 'AR00224-01-F007']);
     expect(rec.ocorrencias.map((o) => `${o.tipo}:${o.fardoId}`)).toEqual(['falta:AR00224-01-F008', 'fardo_desconhecido:AR00311-01-F001']);
     expect(rec.conforme).toBe(false);
@@ -116,10 +133,37 @@ describe('recebimento', () => {
     expect((await s.fardos.obter('AR00224-01-F008')).fardo.situacao).toBe('em_transito');
     expect((await s.recebimentos.entregasACaminho()).find((x) => x.id === en.id)?.situacao).toBe('recebida_parcial');
 
+    expect((await s.recebimentos.entregasACaminho()).find((x) => x.id === en.id)?.divergenciaVolume.some((d) => d.acimaTolerancia)).toBe(true);
+
+    // Chegou o fardo que faltava: a divergência da DOF é recalculada e fecha.
     const resto = await s.recebimentos.receber(en.id, { fardosLidos: ['AR00224-01-F008'], ocorrencias: [], localEsperaId: insp.id });
     expect(resto.conforme).toBe(true);
-    expect((await s.documentos.listarEntregas({ pageSize: 50 })).items.find((x) => x.id === en.id)?.situacao).toBe('recebida');
+    expect(resto.justificativaDivergencia).toBeUndefined();
+    expect(resto.divergenciaVolume.every((d) => !d.acimaTolerancia)).toBe(true);
+    const entrega = (await s.documentos.listarEntregas({ pageSize: 50 })).items.find((x) => x.id === en.id)!;
+    expect(entrega.situacao).toBe('recebida');
+    expect(entrega.divergenciaVolume.every((d) => !d.acimaTolerancia)).toBe(true);
     expect(invariantes()).toEqual([]);
+  });
+  it('sem justificativa da pessoa, a da falta é preenchida pelo sistema', async () => {
+    const { s } = montar();
+    const en = await entregaACaminho(s);
+    const insp = await localPorCodigo(s, 'INSP-01');
+    const rec = await s.recebimentos.receber(en.id, { fardosLidos: ['AR00224-01-F006', 'AR00224-01-F007'], ocorrencias: [], localEsperaId: insp.id });
+    expect(rec.justificativaDivergencia).toBe(justificativaPorFalta(['AR00224-01-F008']));
+  });
+  it('divergência que não vem da falta continua exigindo justificativa', async () => {
+    // Na regra: a DOF da entrega fixa com o dobro do volume. Todos os fardos lidos, sem falta: a pessoa justifica.
+    const e = criarDados(AGORA);
+    const en = e.entregas.find((x) => x.situacao === 'a_caminho')!;
+    const dof = e.dofs.find((d) => d.id === en.dofId)!;
+    dof.volumes = dof.volumes.map((v) => ({ ...v, volumeM3: v.volumeM3 * 2 }));
+    const insp = e.locais.find((l) => l.codigo === 'INSP-01')!;
+    const ctx = { agora: () => AGORA, quem: 'teste' };
+    const dados = { fardosLidos: [...en.fardosIds], ocorrencias: [], localEsperaId: insp.id };
+    await falhaCom(Promise.resolve().then(() => receber(e, en.id, dados, ctx)), 422, 'justificativaDivergencia');
+    const rec = receber(e, en.id, { ...dados, justificativaDivergencia: 'DOF emitida com o volume errado; fornecedor vai corrigir.' }, ctx);
+    expect(rec.justificativaAutomatica).toBe(false);
   });
   it('ocorrência declarada exige foto; local de espera tem de ser de inspeção', async () => {
     const { s } = montar();

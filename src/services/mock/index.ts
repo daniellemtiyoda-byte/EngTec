@@ -155,7 +155,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
     },
 
     documentos: {
-      cadastrarEntrega: (d, arquivos) => escrever(['recebimento:registrar'], (e, ctx) => entregaView(e, cadastrarEntrega(e, d, 'cadastro', ctx, arquivos), dia())),
+      cadastrarEntrega: (d, arquivos) => escrever(['nf:cadastrar'], (e, ctx) => entregaView(e, cadastrarEntrega(e, d, 'cadastro', ctx, arquivos), dia())),
       listarEntregas: (q) => ler((e) => paginar(e.entregas.map((x) => entregaView(e, x, dia())), maisRecentes('criadoEm')(q))),
       listarNfs: (q) => ler((e) => paginar(e.nfs, maisRecentes('emissao')(q))),
       listarDofs: (q) => ler((e) => paginar(e.dofs.map((d) => dofView(e, d, dia())), q?.sortBy || q?.sort ? q : { ...q, sort: [{ campo: 'prazoDeclaracao', dir: 'asc' }] })),

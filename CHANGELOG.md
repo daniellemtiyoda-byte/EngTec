@@ -5,6 +5,15 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Alterado
+- 2026-11-06: **NF e DOF também pelo administrador e justificativa automática no recebimento parcial.**
+  - **Por quê:** o cadastro de NF e DOF acontece antes da chegada, normalmente no escritório; e, quando a divergência de volume vem só dos fardos que faltaram, a causa já é conhecida pelo sistema.
+  - **Permissão nova `nf:cadastrar`** (administrador e almoxarife) para `documentos.cadastrarEntrega`; o administrador não ganha a permissão de recebimento. Especificação (tabela de permissões e módulo NF e DOF) e plano (seção 12) atualizados.
+  - **Recebimento parcial:** se, contando os fardos que faltaram, a DOF fecha dentro da tolerância, o sistema preenche a justificativa com a lista deles (`justificativaPorFalta` em `dominio/parametros.ts`, para a tela pré-preencher o campo) e guarda o complemento da pessoa (`recebimento.justificativaAutomatica`). Outras divergências continuam exigindo justificativa. A divergência da DOF é a acumulada da entrega e é recalculada quando os fardos que faltaram chegam (`entrega.divergenciaVolume`, calculada). Estado salvo do mock passa para a versão 2 (o anterior é descartado e a demonstração recomeça).
+  - "Jataipeba" (*Dialium guianense*) registrado nas perguntas em aberto, a confirmar com a CPTM.
+  - Testes: 66 (permissão de NF e DOF, justificativa automática com e sem complemento, divergência recalculada, divergência que não vem da falta).
+  - Arquivos: `src/dominio/permissoes.ts`, `src/dominio/parametros.ts`, `src/types/models.ts`, `src/services/mock/{recebimento,consultas,estado,index,data}.ts`, `src/services/mock/regras.test.ts`, `docs/ESPECIFICACAO-FUNCIONAL.md`, `docs/PLANO-V2.md`, `CLAUDE.md`.
+
 ### Adicionado
 - 2026-11-06: **Etapa 2 da v2: domínio, modelo, serviços e testes.**
   - **Por quê:** as telas das próximas etapas precisam do modelo v2, do contrato de serviços e de um mock que já cumpra as regras de negócio, com uma história de demonstração completa e coerente.

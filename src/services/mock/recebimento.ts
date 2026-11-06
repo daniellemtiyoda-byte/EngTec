@@ -1,7 +1,7 @@
-import { diferencaVolumePct, foraDaTolerancia } from '../../dominio/parametros';
-import type { DivergenciaVolume, Id, Ocorrencia, Recebimento } from '../../types/models';
+import { justificativaPorFalta } from '../../dominio/parametros';
+import type { Id, Ocorrencia, Recebimento } from '../../types/models';
 import type { DadosRecebimento } from '../contracts';
-import { dormentesDoFardo, itemDescrito } from './consultas';
+import { divergenciaVolume as calcularDivergencia, dormentesDoFardo } from './consultas';
 import { achar, anexo, evento, falha, instante, novoId, type Ctx, type Estado, type FardoReg } from './estado';
 import { movimentarDormentes } from './estoque';
 
@@ -10,7 +10,9 @@ import { movimentarDormentes } from './estoque';
  * emitido e sem entrega, também entra (a entrega pode não ter indicado os fardos, regra provisória); qualquer outro
  * vira ocorrência "fardo desconhecido". Esperado e não lido gera ocorrência de falta, continua em trânsito e pode
  * ser recebido depois. Ocorrência declarada exige descrição e foto. Divergência de volume por espécie acima da
- * tolerância não bloqueia, mas exige justificativa.
+ * tolerância não bloqueia, mas exige justificativa; quando ela vem só dos fardos que faltaram (contando-os, a DOF
+ * fecha), o sistema preenche a justificativa com a lista deles e a pessoa pode complementar. A divergência é sempre
+ * a acumulada da entrega: ao receber depois os fardos que faltaram, ela é recalculada.
  */
 export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: Ctx): Recebimento {
   const entrega = achar(e.entregas, (x) => x.id === entregaId, 'Entrega');
@@ -41,26 +43,33 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
   });
   if (Object.keys(campos).length) falha(422, 'Complete as ocorrências: descrição e foto são obrigatórias.', campos);
 
-  // Divergência de volume por espécie: DOF da espécie × volume calculado de tudo o que já chegou desta entrega.
+  // Divergência de volume por espécie: DOF × tudo o que já chegou desta entrega (acumulada).
   const recebidosDaEntrega = [...e.fardos.filter((f) => f.entregaId === entrega.id && f.recebidoEm), ...aceitos];
-  const calculado = new Map<Id, number>();
-  for (const f of recebidosDaEntrega) {
-    const d = itemDescrito(e, f.itemContratoId);
-    calculado.set(d.especie.id, (calculado.get(d.especie.id) ?? 0) + dormentesDoFardo(e, f.id).length * d.tamanho.volumeM3);
-  }
-  const especies = new Set([...dof.volumes.map((v) => v.especieId), ...calculado.keys()]);
-  const divergenciaVolume: DivergenciaVolume[] = [...especies].map((especieId) => {
-    const documentalM3 = dof.volumes.find((v) => v.especieId === especieId)?.volumeM3 ?? 0;
-    const calculadoM3 = Math.round((calculado.get(especieId) ?? 0) * 1000) / 1000;
-    const percentual = diferencaVolumePct(documentalM3, calculadoM3);
-    return { especieId, documentalM3, calculadoM3, percentual: Number.isFinite(percentual) ? Math.round(percentual * 10) / 10 : percentual, acimaTolerancia: foraDaTolerancia(percentual) };
-  });
-  if (divergenciaVolume.some((d) => d.acimaTolerancia) && !dados.justificativaDivergencia?.trim()) {
-    falha(422, 'A divergência de volume passa de 10% em alguma espécie (IN Ibama): informe a justificativa.', { justificativaDivergencia: 'Justificativa obrigatória.' });
+  const divergenciaVolume = calcularDivergencia(e, dof, recebidosDaEntrega);
+  const lidosAgora = new Set(aceitos.map((f) => f.id));
+  const faltantes = esperados.filter((f) => !lidosAgora.has(f.id));
+  const informada = dados.justificativaDivergencia?.trim() ?? '';
+  let justificativaDivergencia: string | undefined;
+  let justificativaAutomatica = false;
+  if (divergenciaVolume.some((d) => d.acimaTolerancia)) {
+    // Se, contando os fardos que faltaram, a DOF fecha dentro da tolerância, a divergência vem só da falta deles.
+    const soPorFalta = faltantes.length > 0 && calcularDivergencia(e, dof, [...recebidosDaEntrega, ...faltantes]).every((d) => !d.acimaTolerancia);
+    if (soPorFalta) {
+      const automatica = justificativaPorFalta(faltantes.map((f) => f.id));
+      const complemento = informada.startsWith(automatica) ? informada.slice(automatica.length).trim() : informada;
+      justificativaDivergencia = complemento ? `${automatica} ${complemento}` : automatica;
+      justificativaAutomatica = true;
+    } else if (!informada) {
+      falha(422, 'A divergência de volume passa de 10% em alguma espécie (IN Ibama): informe a justificativa.', { justificativaDivergencia: 'Justificativa obrigatória.' });
+    } else {
+      justificativaDivergencia = informada;
+    }
+  } else if (informada) {
+    justificativaDivergencia = informada;
   }
 
   // Ocorrências: as declaradas e as que o sistema gera (falta de fardo esperado e fardo desconhecido).
-  const lidos = new Set(aceitos.map((f) => f.id));
+  const lidos = lidosAgora;
   const ocorrencias: Ocorrencia[] = [
     ...dados.ocorrencias.map((o) => ({
       tipo: o.tipo, descricao: o.descricao.trim(), fardoId: o.fardoId, automatica: false,
@@ -88,7 +97,7 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
   const rec: Recebimento = {
     id: recebimentoId, entregaId: entrega.id, nfId: nf.id, dofId: dof.id, recebidoEm: instante(ctx), recebidoPor: ctx.quem,
     fardosEsperados: esperados.map((f) => f.id), fardosLidos: aceitos.map((f) => f.id), conforme: ocorrencias.length === 0,
-    ocorrencias, divergenciaVolume, justificativaDivergencia: dados.justificativaDivergencia?.trim() || undefined, localEsperaId: local.id,
+    ocorrencias, divergenciaVolume, justificativaDivergencia, justificativaAutomatica, localEsperaId: local.id,
   };
   e.recebimentos.push(rec);
   return rec;

@@ -16,7 +16,7 @@ export type ItemContratoReg = Pick<ItemContrato, 'id' | 'especieId' | 'tamanhoId
 export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao'> & { situacao: 'vigente' | 'cancelado'; itens: ItemContratoReg[] };
 export type FardoReg = Omit<Fardo, 'saldo' | 'disponivel' | 'situacao' | 'idadeDias' | 'acimaLimiteDias'>;
 export type DofReg = Omit<Dof, 'prazoDeclaracao' | 'diasParaPrazo' | 'nivelPrazo'>;
-export type EntregaReg = Omit<Entrega, 'nfNumero' | 'fornecedorId' | 'fardosRecebidos' | 'dormentes' | 'prazoDeclaracao' | 'nivelPrazo'>;
+export type EntregaReg = Omit<Entrega, 'nfNumero' | 'fornecedorId' | 'fardosRecebidos' | 'dormentes' | 'prazoDeclaracao' | 'nivelPrazo' | 'divergenciaVolume'>;
 
 export interface Estado {
   /** Muda quando o formato do estado muda: estado salvo de outra versão é descartado e a demonstração recomeça. */
@@ -45,7 +45,7 @@ export interface Estado {
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 1;
+export const VERSAO_ESTADO = 2;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }

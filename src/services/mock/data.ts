@@ -184,7 +184,8 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   }
   // E7: DOF que vence em 1 dia; recebida em parte (um fardo ainda em trânsito).
   const e7 = gerar(8, c3.id, [{ itemContratoId: ic4.id, fardos: 2 }], 8);
-  receberEm(1, e7, [e7.fardosIds[0]], 'Um dos dois fardos não veio neste caminhão; o fornecedor envia no próximo.');
+  // A divergência de volume vem só do fardo que faltou: a justificativa é preenchida pelo sistema.
+  receberEm(1, e7, [e7.fardosIds[0]]);
 
   // RMEs em andamento: pronta, em separação e aberta.
   const r4 = abrir(6, 'Linha 10 · Trecho Mauá', jataipeba.id, t280.id, 10);

@@ -248,6 +248,8 @@ export interface Entrega {
   dormentes: number;
   prazoDeclaracao: string;
   nivelPrazo: NivelPrazo;
+  /** Volume por espécie: DOF × tudo o que já chegou. Recalculada a cada recebimento (inclusive dos fardos que faltaram). */
+  divergenciaVolume: DivergenciaVolume[];
 }
 
 export type TipoOcorrencia = 'avaria' | 'falta' | 'sobra' | 'fardo_desconhecido';
@@ -267,6 +269,8 @@ export interface Recebimento {
   ocorrencias: Ocorrencia[];
   divergenciaVolume: DivergenciaVolume[];
   justificativaDivergencia?: string;
+  /** A justificativa foi preenchida pelo sistema: a divergência vinha só dos fardos que faltaram. */
+  justificativaAutomatica: boolean;
   localEsperaId: Id;
 }
 

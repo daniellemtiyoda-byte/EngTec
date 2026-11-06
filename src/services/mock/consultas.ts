@@ -1,8 +1,8 @@
 import {
-  diasEntre, dataSP, nivelPrazo, prazoDeclaracao, situacaoSaldo, volumeM3,
+  diasEntre, dataSP, diferencaVolumePct, foraDaTolerancia, nivelPrazo, prazoDeclaracao, situacaoSaldo, volumeM3,
 } from '../../dominio/parametros';
 import type {
-  Contrato, Dof, Dormente, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, Id, InspecaoFardo, ItemContrato,
+  Contrato, DivergenciaVolume, Dof, Dormente, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, Id, InspecaoFardo, ItemContrato,
   ItemDescrito, Local, SaldoItem, SituacaoFardo, Tamanho,
 } from '../../types/models';
 import { achar, type ContratoReg, type DofReg, type EntregaReg, type Estado, type FardoReg, type FornecedorReg, type LocalReg, type TamanhoReg } from './estado';
@@ -92,12 +92,34 @@ export function dofView(e: Estado, d: DofReg, hoje: string): Dof {
   };
 }
 
+/**
+ * Divergência de volume por espécie: volume da DOF × volume calculado dos fardos informados (dormentes × volume
+ * do tamanho). Espécie sem volume na DOF e com material recebido aparece com divergência infinita.
+ */
+export function divergenciaVolume(e: Estado, dof: DofReg, fardos: FardoReg[]): DivergenciaVolume[] {
+  const calculado = new Map<Id, number>();
+  for (const f of fardos) {
+    const d = itemDescrito(e, f.itemContratoId);
+    calculado.set(d.especie.id, (calculado.get(d.especie.id) ?? 0) + dormentesDoFardo(e, f.id).length * d.tamanho.volumeM3);
+  }
+  const especies = new Set([...dof.volumes.map((v) => v.especieId), ...calculado.keys()]);
+  return [...especies].map((especieId) => {
+    const documentalM3 = dof.volumes.find((v) => v.especieId === especieId)?.volumeM3 ?? 0;
+    const calculadoM3 = Math.round((calculado.get(especieId) ?? 0) * 1000) / 1000;
+    const percentual = diferencaVolumePct(documentalM3, calculadoM3);
+    return { especieId, documentalM3, calculadoM3, percentual: Number.isFinite(percentual) ? Math.round(percentual * 10) / 10 : percentual, acimaTolerancia: foraDaTolerancia(percentual) };
+  });
+}
+
 export function entregaView(e: Estado, en: EntregaReg, hoje: string): Entrega {
   const nf = achar(e.nfs, (n) => n.id === en.nfId, 'NF');
   const dof = dofView(e, achar(e.dofs, (d) => d.id === en.dofId, 'DOF'), hoje);
   const fardos = e.fardos.filter((f) => en.fardosIds.includes(f.id));
+  const recebidos = fardos.filter((f) => f.recebidoEm);
+  const dofReg = achar(e.dofs, (d) => d.id === en.dofId, 'DOF');
   return {
     ...en, nfNumero: nf.numero, fornecedorId: nf.fornecedorId,
+    divergenciaVolume: recebidos.length ? divergenciaVolume(e, dofReg, recebidos) : [],
     fardosRecebidos: fardos.filter((f) => f.recebidoEm).map((f) => f.id),
     dormentes: fardos.reduce((s, f) => s + dormentesDoFardo(e, f.id).length, 0),
     prazoDeclaracao: dof.prazoDeclaracao, nivelPrazo: dof.nivelPrazo,
