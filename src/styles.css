@@ -1,7 +1,6 @@
 @import './styles/tokens.css';
 :root {
-  /* Cores, tipografia e espaços vêm de styles/tokens.css; aqui só as medidas do layout. */
-  --lateral: 260px; --lateral-min: 68px;
+  /* Cores, tipografia, espaços e medidas do menu vêm de styles/tokens.css. */
   font-family: var(--fonte);
   color: var(--texto);
 }
@@ -20,14 +19,21 @@ button, input, select, textarea { font: inherit; }
 .app { display: grid; grid-template-columns: var(--lateral) 1fr; min-height: 100vh; }
 .app.recolhido { grid-template-columns: var(--lateral-min) 1fr; }
 .sidebar { background: var(--cor-menu); color: #dbe4f3; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; z-index: 40; }
-.marca { display: flex; align-items: center; gap: 10px; padding: 16px 14px; border-bottom: 1px solid rgba(255,255,255,.12); }
-.marca-texto { display: flex; flex-direction: column; line-height: 1.2; color: #fff; }
-.marca-texto span { font-size: 13px; color: #b9c7e0; }
-.nav-grupo { padding: 10px 8px 0; }
-.nav-titulo { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #9db0d0; padding: 6px 10px; }
-.nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: var(--raio); color: #dbe4f3; text-decoration: none; }
+.marca { display: flex; align-items: center; gap: 8px; padding: 12px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.marca .logo-pequeno { width: 28px; }
+.marca .logo-pequeno.logo-monograma { font-size: 11px; border-radius: 6px; box-shadow: inset 0 -2px 0 var(--cor-acao); }
+.marca-texto { display: flex; flex-direction: column; line-height: 1.2; color: #fff; min-width: 0; }
+.marca-texto strong { font-size: var(--fs-14); }
+.marca-texto span { font-size: var(--fs-12); color: #b9c7e0; }
+/* Grupos separados por uma linha fina; títulos em versalete pequeno. */
+.nav-grupo { padding: 8px 8px; }
+.nav-grupo + .nav-grupo { border-top: 1px solid var(--borda); }
+.nav-titulo { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #9db0d0; padding: 4px 12px 6px; }
+.nav-item { display: flex; align-items: center; gap: 10px; min-height: var(--menu-item-altura); padding: 8px 12px; border-radius: var(--raio); color: #dbe4f3; text-decoration: none; font-size: var(--menu-item-fonte); line-height: 1.25; }
+.nav-item svg { flex: none; width: var(--menu-icone); height: var(--menu-icone); }
 .nav-item:hover { background: rgba(255,255,255,.08); }
 .nav-item.ativo { background: var(--cor-primaria); color: #fff; font-weight: 600; box-shadow: inset 3px 0 0 var(--cor-acao); }
+.nav-item + .nav-item { margin-top: 2px; }
 /* Recolher: ícone discreto no topo, ao lado do logo. */
 .recolher { margin-left: auto; display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; background: transparent; border: 0; color: #dbe4f3; border-radius: var(--raio); cursor: pointer; opacity: .7; }
 .recolher:hover, .recolher:focus-visible { opacity: 1; }
@@ -35,7 +41,8 @@ button, input, select, textarea { font: inherit; }
 .recolhido .recolher svg { transform: rotate(180deg); }
 .recolhido .marca-texto, .recolhido .nav-item span, .recolhido .nav-titulo { display: none; }
 .recolhido .nav-item { justify-content: center; }
-.recolhido .marca { flex-direction: column; justify-content: center; padding: 12px 6px; }
+.recolhido .marca { flex-direction: column; justify-content: center; padding: 10px 6px; }
+.recolhido .nav-item { padding: 8px; }
 .recolhido .recolher { margin-left: 0; }
 .principal { min-width: 0; display: flex; flex-direction: column; }
 .topo { background: var(--cor-shell); color: #fff; display: flex; align-items: center; gap: 14px; padding: 10px 20px; position: sticky; top: 0; z-index: 30; }
@@ -151,6 +158,9 @@ a.btn { display: inline-block; text-decoration: none; }
   .menu-aberto .sombra { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 35; }
   .recolhido .marca-texto, .recolhido .nav-item span, .recolhido .nav-titulo { display: initial; }
   .recolher { display: none; }
+  /* Na gaveta do celular, alvos de toque maiores. */
+  .nav-item { min-height: var(--alvo-toque); }
+  .recolhido .nav-item { justify-content: flex-start; padding: 8px 12px; }
   .menu-mobile { display: inline-grid; }
   .usuario div { display: none; }
   .conteudo { padding: 14px; }

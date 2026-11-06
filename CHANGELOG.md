@@ -6,6 +6,11 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Alterado
+- 2026-11-06: **menu lateral mais compacto**, com as mesmas cores.
+  - **Por quê:** o menu ocupava muito espaço vertical e horizontal para a quantidade de itens da v2.
+  - Largura de 240 px (recolhido continua só com ícones); itens com 36 px de altura, fonte de 14 px, ícones de 18 px e espaçamento de 8 × 12 px; títulos dos grupos em 11 px maiúsculos com espaçamento entre letras e linha fina entre os grupos; logo e nome menores no topo; item ativo com o mesmo destaque, proporcional. Na gaveta do celular os itens mantêm 44 px.
+  - Novos tokens: `--lateral`, `--lateral-min`, `--menu-item-altura`, `--menu-item-fonte`, `--menu-icone` (saíram do `styles.css` para `tokens.css`).
+  - Arquivos: `src/styles/tokens.css`, `src/styles.css`, `src/components/Layout.tsx`, `CLAUDE.md`.
 - 2026-11-06: **NF e DOF cadastradas antes da chegada do material** (plano e especificação) e **botão de copiar do ID só ao passar o mouse nas tabelas**.
   - **Por quê:** o material chega com a NF e a DOF já emitidas; cadastrá-las antes deixa a entrega pronta para o almoxarife só escolher e ler os fardos no pátio, e concentra o prazo da DOF numa tela. O copiar em toda linha deixava as tabelas pesadas.
   - **Fluxo:** em NF e DOF, importar o XML da NF (ou digitar) e cadastrar a DOF cria a **entrega "A caminho"** (o termo "remessa" foi trocado por "entrega" em todo o plano e na especificação); no Recebimento, o primeiro passo do assistente é "Escolher a entrega", com a exceção de cadastrar NF e DOF na hora; NF e DOF continua com o controle de prazo e a declaração no Sinaflor. No protótipo, o Simulador gera a entrega já com NF e DOF. Fardos esperados da entrega são opcionais no cadastro (regra provisória). Modelo: `Entrega` (antes `Remessa`), `entregaId` em fardo, NF e recebimento; serviços `documentos.cadastrarEntrega`, `recebimentos.entregasACaminho`, `simulador.gerarEntrega`. Etapa 5 reescrita. A especificação ganhou o módulo NF e DOF (agora dez módulos) e a linha dele na tabela de permissões.

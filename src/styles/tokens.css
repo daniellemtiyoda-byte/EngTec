@@ -51,4 +51,11 @@
   --linha-tabela: 40px;
   --alvo-toque: 44px;
   --alvo-campo: 48px;
+
+  /* Menu lateral (compacto no computador; na gaveta do celular os itens voltam a --alvo-toque) */
+  --lateral: 240px;
+  --lateral-min: 64px;
+  --menu-item-altura: 36px;
+  --menu-item-fonte: 14px;
+  --menu-icone: 18px;
 }

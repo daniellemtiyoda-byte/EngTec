@@ -75,7 +75,7 @@ function Layout() {
               <span className="nav-titulo">{g.titulo}</span>
               {g.itens.map((i) => (
                 <NavLink key={i.caminho} to={i.caminho} end={i.fim} className={({ isActive }) => `nav-item ${isActive ? 'ativo' : ''}`} title={i.rotulo}>
-                  <Icone nome={i.icone} /><span>{i.rotulo}</span>{i.demo && <SeloDemo curto />}
+                  <Icone nome={i.icone} tamanho={18} /><span>{i.rotulo}</span>{i.demo && <SeloDemo curto />}
                 </NavLink>
               ))}
             </div>
