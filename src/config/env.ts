@@ -5,6 +5,8 @@ export const env = {
   USE_MOCK: import.meta.env.VITE_USE_MOCK === 'true',
   LOGO_URL: (import.meta.env.VITE_LOGO_URL as string | undefined) || '/assets/logo.svg',
   UPLOAD_MAX_MB: Number((import.meta.env.VITE_UPLOAD_MAX_MB as string | undefined) ?? 10) || 10,
+  // Base do link gravado nos QR (a URL da Vercel, Etapa 4). Vazia: usa o endereço em que o app está aberto.
+  APP_URL: ((import.meta.env.VITE_APP_URL as string | undefined) ?? '').replace(/\/$/, ''),
 };
 
 /**

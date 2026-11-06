@@ -1,0 +1,348 @@
+import { describe, expect, it } from 'vitest';
+import type { Perfil } from '../../dominio/permissoes';
+import type { Usuario } from '../../types/models';
+import { chaveComDigito } from '../../utils/nfeXml';
+import { ApiError } from '../http';
+import { usuarioDemo } from './data';
+import { criarServicosSimulados } from './index';
+import { violacoes } from './invariantes';
+
+const AGORA = new Date('2026-11-06T12:00:00-03:00');
+
+/** Serviços simulados com relógio fixo, sem armazenamento e sem espera; `como` troca o usuário logado. */
+function montar(perfil: Perfil | null = 'almoxarife', armazenamento: Map<string, string> = new Map()) {
+  let usuario: Usuario | null = perfil ? usuarioDemo(perfil) : null;
+  const store = { getItem: (k: string) => armazenamento.get(k) ?? null, setItem: (k: string, v: string) => void armazenamento.set(k, v), removeItem: (k: string) => void armazenamento.delete(k) };
+  const s = criarServicosSimulados({ agora: () => AGORA, armazenamento: store, atrasoMs: 0, usuarioAtual: async () => usuario });
+  /** Violações dos invariantes no estado salvo (vazia = tudo certo). */
+  const invariantes = () => violacoes(JSON.parse(armazenamento.get('holz:demo:estado')!), '2026-11-06');
+  return { s, como: (p: Perfil | null) => { usuario = p ? usuarioDemo(p) : null; }, invariantes };
+}
+
+/** Espera um ApiError com o status (e o campo, se informado). */
+async function falhaCom(p: Promise<unknown>, status: number, campo?: string) {
+  const erro = await p.then(() => null, (e: unknown) => e);
+  expect(erro).toBeInstanceOf(ApiError);
+  expect((erro as ApiError).status).toBe(status);
+  if (campo) expect(Object.keys((erro as ApiError).detalhes ?? {})).toContain(campo);
+  return erro as ApiError;
+}
+
+const chave = (cnpj: string, n: number) => chaveComDigito(`352611${cnpj}55001${String(n).padStart(9, '0')}1${String(n).padStart(8, '0')}`);
+const CNPJ_A = '00000000000101';
+
+async function contrato(s: ReturnType<typeof montar>['s'], numero: string) {
+  return s.contratos.obter(numero);
+}
+async function entregaACaminho(s: ReturnType<typeof montar>['s']) {
+  const lista = await s.recebimentos.entregasACaminho();
+  return lista.find((x) => x.situacao === 'a_caminho')!;
+}
+async function localPorCodigo(s: ReturnType<typeof montar>['s'], codigo: string) {
+  return s.locais.obterPorCodigo(codigo);
+}
+
+describe('sessão e permissões', () => {
+  it('sem sessão, nada é lido', async () => {
+    const { s } = montar(null);
+    await falhaCom(s.fornecedores.listar(), 401);
+  });
+  it('cada perfil só faz o que pode', async () => {
+    const { s, como } = montar('requisitante');
+    const c = await contrato(s, 'AR00224-01');
+    await falhaCom(s.simulador.gerarEntrega({ contratoId: c.id, itens: [{ itemContratoId: c.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 403);
+    como('gestor');
+    const en = await entregaACaminho(s);
+    await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: en.fardosIds, ocorrencias: [], localEsperaId: 'x' }), 403);
+    await falhaCom(s.parametros.reiniciarDemonstracao(), 403);
+  });
+  it('leituras devolvem cópias: alterar o resultado não altera os dados', async () => {
+    const { s } = montar();
+    const f = await s.fornecedores.listar();
+    f.items[0].razaoSocial = 'alterado';
+    expect((await s.fornecedores.listar()).items[0].razaoSocial).not.toBe('alterado');
+  });
+});
+
+describe('NF e DOF antes da chegada', () => {
+  it('cadastrar NF e DOF cria a entrega "a caminho"; a mesma chave é recusada', async () => {
+    const { s } = montar();
+    const c = await contrato(s, 'AR00224-01');
+    const dados = {
+      nf: { numero: '9001', serie: '1', chaveAcesso: chave(CNPJ_A, 9001), contratoId: c.id, emissao: '2026-11-05', itens: [{ itemContratoId: c.itens[0].id, quantidade: 28, volumeM3: 3.2 }] },
+      dof: { numero: '26999001', validade: '2026-11-20', volumes: [{ especieId: c.itens[0].especieId, volumeM3: 3.2 }] },
+    };
+    const en = await s.documentos.cadastrarEntrega(dados);
+    expect(en.situacao).toBe('a_caminho');
+    expect(en.origem).toBe('cadastro');
+    expect(en.prazoDeclaracao).toBe('2026-11-21');
+    expect((await s.recebimentos.entregasACaminho()).map((x) => x.id)).toContain(en.id);
+    await falhaCom(s.documentos.cadastrarEntrega({ ...dados, dof: { ...dados.dof, numero: '26999002' } }), 409, 'nf.chaveAcesso');
+  });
+  it('recusa chave de outro CNPJ, chave inválida e entrega sem DOF', async () => {
+    const { s } = montar();
+    const c = await contrato(s, 'AR00224-01');
+    const nf = { numero: '9002', serie: '1', chaveAcesso: chave('00000000000999', 9002), contratoId: c.id, emissao: '2026-11-05', itens: [{ itemContratoId: c.itens[0].id, quantidade: 1, volumeM3: 0.1 }] };
+    const dof = { numero: '26999003', validade: '2026-11-20', volumes: [{ especieId: c.itens[0].especieId, volumeM3: 0.1 }] };
+    await falhaCom(s.documentos.cadastrarEntrega({ nf, dof }), 422, 'nf.chaveAcesso');
+    await falhaCom(s.documentos.cadastrarEntrega({ nf: { ...nf, chaveAcesso: '123' }, dof }), 422, 'nf.chaveAcesso');
+    await falhaCom(s.documentos.cadastrarEntrega({ nf: { ...nf, chaveAcesso: chave(CNPJ_A, 9002) }, dof: { ...dof, numero: '' } }), 422, 'dof.numero');
+  });
+  it('declara a DOF uma vez só', async () => {
+    const { s } = montar();
+    const en = await entregaACaminho(s);
+    const dof = (await s.documentos.listarDofs({ pageSize: 50 })).items.find((d) => d.nfId === en.nfId)!;
+    const declarada = await s.documentos.declararDof(dof.id);
+    expect(declarada.declarado?.quem).toBe('Almoxarife (demonstração)');
+    await falhaCom(s.documentos.declararDof(dof.id), 409);
+  });
+});
+
+describe('recebimento', () => {
+  it('recebe em parte com falta automática e recebe o fardo que faltava depois', async () => {
+    const { s, invariantes } = montar();
+    const en = await entregaACaminho(s);
+    const insp = await localPorCodigo(s, 'INSP-01');
+    // Faltou o fardo de Maçaranduba: o volume dessa espécie diverge 100% e pede justificativa.
+    const parcial = { fardosLidos: ['AR00224-01-F006', 'AR00224-01-F007', 'AR00311-01-F001'], ocorrencias: [], localEsperaId: insp.id };
+    await falhaCom(s.recebimentos.receber(en.id, parcial), 422, 'justificativaDivergencia');
+    const rec = await s.recebimentos.receber(en.id, { ...parcial, justificativaDivergencia: 'Fardo de Maçaranduba veio em outro caminhão.' });
+    expect(rec.fardosLidos).toEqual(['AR00224-01-F006', 'AR00224-01-F007']);
+    expect(rec.ocorrencias.map((o) => `${o.tipo}:${o.fardoId}`)).toEqual(['falta:AR00224-01-F008', 'fardo_desconhecido:AR00311-01-F001']);
+    expect(rec.conforme).toBe(false);
+    const fardo = await s.fardos.obter('AR00224-01-F006');
+    expect(fardo.fardo.situacao).toBe('aguardando_inspecao');
+    expect(fardo.dormentes.every((d) => d.situacao === 'aguardando_inspecao')).toBe(true);
+    expect((await s.fardos.obter('AR00224-01-F008')).fardo.situacao).toBe('em_transito');
+    expect((await s.recebimentos.entregasACaminho()).find((x) => x.id === en.id)?.situacao).toBe('recebida_parcial');
+
+    const resto = await s.recebimentos.receber(en.id, { fardosLidos: ['AR00224-01-F008'], ocorrencias: [], localEsperaId: insp.id });
+    expect(resto.conforme).toBe(true);
+    expect((await s.documentos.listarEntregas({ pageSize: 50 })).items.find((x) => x.id === en.id)?.situacao).toBe('recebida');
+    expect(invariantes()).toEqual([]);
+  });
+  it('ocorrência declarada exige foto; local de espera tem de ser de inspeção', async () => {
+    const { s } = montar();
+    const en = await entregaACaminho(s);
+    const insp = await localPorCodigo(s, 'INSP-01');
+    const a01 = await localPorCodigo(s, 'A-01');
+    await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: en.fardosIds, ocorrencias: [], localEsperaId: a01.id }), 422, 'localEsperaId');
+    await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: en.fardosIds, ocorrencias: [{ tipo: 'avaria', descricao: 'Fardo amassado', fotos: [] }], localEsperaId: insp.id }), 422, 'ocorrencias.0');
+    const foto = new File(['x'], 'avaria.jpg', { type: 'image/jpeg' });
+    const rec = await s.recebimentos.receber(en.id, { fardosLidos: en.fardosIds, ocorrencias: [{ tipo: 'avaria', descricao: 'Fardo amassado', fardoId: 'AR00224-01-F006', fotos: [foto] }], localEsperaId: insp.id });
+    expect(rec.ocorrencias[0].fotos[0].nome).toBe('avaria.jpg');
+  });
+});
+
+describe('inspeção', () => {
+  async function receberTudo(s: ReturnType<typeof montar>['s']) {
+    const en = await entregaACaminho(s);
+    const insp = await localPorCodigo(s, 'INSP-01');
+    await s.recebimentos.receber(en.id, { fardosLidos: en.fardosIds, ocorrencias: [], localEsperaId: insp.id });
+  }
+  it('simula, conclui e guarda: o saldo fica igual aos aprovados', async () => {
+    const { s, invariantes } = montar();
+    await receberTudo(s);
+    await falhaCom(s.inspecao.registrar('AR00224-01-000099', { origem: 'manual', resultado: 'aprovado', categoria: 1 }, 'AR00224-01-F006'), 409, 'dormenteId');
+    await falhaCom(s.inspecao.registrar('AR00224-01-000071', { origem: 'manual', resultado: 'aprovado' }, 'AR00224-01-F006'), 422, 'categoria');
+    const tela = await s.inspecao.simularFardo('AR00224-01-F006');
+    expect(tela.pendentes).toBe(0);
+    expect(tela.fardo.situacao).toBe('em_inspecao');
+    const insp = await localPorCodigo(s, 'INSP-01');
+    await falhaCom(s.inspecao.concluir('AR00224-01-F006', { localId: insp.id }), 422, 'localId');
+    const a01 = await localPorCodigo(s, 'A-01');
+    const fardo = await s.inspecao.concluir('AR00224-01-F006', { localId: a01.id });
+    const aprovados = tela.dormentes.filter((d) => d.inspecao?.resultado === 'aprovado').length;
+    expect(fardo.saldo).toBe(aprovados);
+    expect(fardo.situacao).toBe('em_estoque');
+    expect(fardo.localId).toBe(a01.id);
+    const ficha = await s.dormentes.obter('AR00224-01-000071');
+    expect(ficha.inspecao?.origem).toBe('simulado');
+    expect(ficha.local?.codigo).toBe('A-01');
+    expect(invariantes()).toEqual([]);
+  });
+  it('conclui com dormentes não lidos só com justificativa; o não localizado encontrado depois segue o fluxo', async () => {
+    const { s, invariantes } = montar();
+    await receberTudo(s);
+    const tela = await s.inspecao.obterFardo('AR00224-01-F007');
+    const [faltaA, faltaB, ...lidos] = tela.dormentes.map((d) => d.id);
+    for (const id of lidos) await s.inspecao.registrar(id, { origem: 'inspector', veredito: 'APROVADO', indice: 85 }, 'AR00224-01-F007');
+    const a02 = await localPorCodigo(s, 'A-02');
+    await falhaCom(s.inspecao.concluir('AR00224-01-F007', { localId: a02.id }), 422, 'justificativa');
+    const fardo = await s.inspecao.concluir('AR00224-01-F007', { localId: a02.id, justificativa: 'Duas plaquinhas ilegíveis.' });
+    expect(fardo.saldo).toBe(12);
+    expect(fardo.conclusaoInspecao?.naoLocalizados).toEqual([faltaA, faltaB]);
+    expect((await s.inspecao.naoLocalizados({ pageSize: 50 })).items.map((d) => d.id)).toEqual(expect.arrayContaining([faltaA, faltaB]));
+
+    await s.inspecao.registrar(faltaA, { origem: 'manual', resultado: 'aprovado', categoria: 2 });
+    await s.inspecao.registrar(faltaB, { origem: 'inspector', veredito: 'ATENCAO', indice: 60 });
+    const depois = await s.fardos.obter('AR00224-01-F007');
+    expect(depois.fardo.saldo).toBe(13);
+    expect(depois.dormentes.find((d) => d.id === faltaA)?.situacao).toBe('em_estoque');
+    const reprovado = await s.dormentes.obter(faltaB);
+    expect(reprovado.dormente.situacao).toBe('reprovado'); // ATENÇÃO conta como reprovado
+    expect(reprovado.local?.tipo).toBe('segregacao');
+    expect((await s.movimentacoes.listar({ filters: { tipo: 'segregacao' }, pageSize: 50 })).items[0].dormentesIds).toEqual([faltaB]);
+    expect(invariantes()).toEqual([]);
+  });
+});
+
+describe('simulador', () => {
+  it('não passa do saldo a emitir (emitidos − reprovados) e continua as sequências do contrato', async () => {
+    const { s, invariantes } = montar('administrador');
+    const c = await contrato(s, 'AR00224-01');
+    const mac = c.itens[1];
+    expect(mac.saldoAEmitir).toBe(100); // 140 − (42 emitidos − 2 reprovados)
+    const antes = (await s.fardos.listar({ pageSize: 1 })).total;
+    await falhaCom(s.simulador.gerarEntrega({ contratoId: c.id, itens: [{ itemContratoId: mac.id, fardos: 3, dormentesPorFardo: 34 }] }), 422, 'itens.0');
+    expect((await s.fardos.listar({ pageSize: 1 })).total).toBe(antes);
+    const en = await s.simulador.gerarEntrega({ contratoId: c.id, itens: [{ itemContratoId: mac.id, fardos: 2, dormentesPorFardo: 50 }] });
+    expect(en.fardosIds).toEqual(['AR00224-01-F009', 'AR00224-01-F010']);
+    expect(en.origem).toBe('simulador');
+    const etiquetas = await s.simulador.etiquetas(en.id);
+    expect(etiquetas.fardos[0].dormentesIds[0]).toBe('AR00224-01-000113');
+    expect((await contrato(s, 'AR00224-01')).itens[1].saldoAEmitir).toBe(0);
+    const xml = await s.simulador.xmlNf(en.id);
+    expect(xml).toContain(`<nNF>${en.nfNumero}</nNF>`);
+    expect(invariantes()).toEqual([]);
+  });
+  it('recusa contrato concluído e respeita o modo demonstração', async () => {
+    const { s } = montar('administrador');
+    const c2 = await contrato(s, 'AR00224-02');
+    expect(c2.situacao).toBe('concluido');
+    await falhaCom(s.simulador.gerarEntrega({ contratoId: c2.id, itens: [{ itemContratoId: c2.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 422);
+    await s.parametros.atualizar({ modoDemonstracao: false });
+    const c1 = await contrato(s, 'AR00224-01');
+    await falhaCom(s.simulador.gerarEntrega({ contratoId: c1.id, itens: [{ itemContratoId: c1.itens[0].id, fardos: 1, dormentesPorFardo: 1 }] }), 409);
+  });
+});
+
+describe('saída por RME', () => {
+  it('abre, separa a sugestão (reserva) e entrega (baixa); o fardo fica aberto', async () => {
+    const { s, como, invariantes } = montar('requisitante');
+    const c = await contrato(s, 'AR00224-01');
+    const item = c.itens[0];
+    const rme = await s.rme.abrir({ destino: 'Linha 10 · Trecho Teste', necessidadeEm: '2026-11-20', itens: [{ especieId: item.especieId, tamanhoId: item.tamanhoId, quantidade: 5 }] });
+    expect(rme.situacao).toBe('aberta');
+    como('almoxarife');
+    await s.rme.iniciarSeparacao(rme.numero);
+    const sug = await s.rme.sugerirSeparacao(rme.numero);
+    const [primeiro] = sug.itens[0].fardos;
+    expect(sug.itens[0].faltam).toBe(0);
+    await falhaCom(s.rme.entregar(rme.numero), 409);
+    // Quantidade diferente da pedida é recusada.
+    await falhaCom(s.rme.separar(rme.numero, [{ fardoId: primeiro.fardoId, dormentesIds: primeiro.dormentesIds.slice(0, 4) }]), 422);
+    const pronta = await s.rme.separar(rme.numero, [{ fardoId: primeiro.fardoId, dormentesIds: primeiro.dormentesIds }]);
+    expect(pronta.situacao).toBe('pronta');
+    expect(pronta.separacao?.[0].seguiuSugestao).toBe(true);
+    const reservado = await s.dormentes.obter(primeiro.dormentesIds[0]);
+    expect(reservado.dormente.situacao).toBe('reservado');
+    expect((await s.fardos.obter(primeiro.fardoId)).fardo.saldo).toBeGreaterThan((await s.fardos.obter(primeiro.fardoId)).fardo.disponivel);
+
+    const entregue = await s.rme.entregar(rme.numero);
+    expect(entregue.situacao).toBe('entregue');
+    const ficha = await s.dormentes.obter(primeiro.dormentesIds[0]);
+    expect(ficha.dormente.situacao).toBe('baixado');
+    expect(ficha.rme?.destino).toBe('Linha 10 · Trecho Teste');
+    expect((await s.fardos.obter(primeiro.fardoId)).fardo.situacao).toBe('aberto');
+    expect((await s.movimentacoes.listar({ filters: { tipo: 'saida', referencia: rme.numero } })).total).toBe(1);
+    expect(invariantes()).toEqual([]);
+  });
+  it('trocar de fardo exige justificativa; cancelar libera a reserva', async () => {
+    const { s, como, invariantes } = montar('requisitante');
+    const c = await contrato(s, 'AR00224-01');
+    const item = c.itens[0];
+    const rme = await s.rme.abrir({ destino: 'Linha 11 · Trecho Teste', necessidadeEm: '2026-11-25', itens: [{ especieId: item.especieId, tamanhoId: item.tamanhoId, quantidade: 3 }] });
+    como('almoxarife');
+    const sug = await s.rme.sugerirSeparacao(rme.numero);
+    const sugerido = sug.itens[0].fardos[0].fardoId;
+    const outro = (await s.estoque.porFardo({ pageSize: 50 })).items.find((f) => f.itemContratoId === item.id && f.id !== sugerido && f.disponivel >= 3)!;
+    const dormentes = (await s.fardos.obter(outro.id)).dormentes.filter((d) => d.situacao === 'em_estoque').slice(0, 3).map((d) => d.id);
+    await falhaCom(s.rme.separar(rme.numero, [{ fardoId: outro.id, dormentesIds: dormentes }]), 422, 'separacao.0');
+    const pronta = await s.rme.separar(rme.numero, [{ fardoId: outro.id, dormentesIds: dormentes, justificativa: 'Fardo mais perto da expedição.' }]);
+    expect(pronta.separacao?.[0].seguiuSugestao).toBe(false);
+    como('gestor');
+    await falhaCom(s.rme.cancelar(rme.numero, 'teste'), 403);
+    como('requisitante');
+    await falhaCom(s.rme.cancelar(rme.numero, ' '), 422, 'motivo');
+    const cancelada = await s.rme.cancelar(rme.numero, 'Obra suspensa.');
+    expect(cancelada.situacao).toBe('cancelada');
+    expect((await s.dormentes.obter(dormentes[0])).dormente.situacao).toBe('em_estoque');
+    expect(invariantes()).toEqual([]);
+  });
+});
+
+describe('estoque, cadastros e contratos', () => {
+  it('transfere fardo com saldo e atualiza local, movimentações e ficha', async () => {
+    const { s, invariantes } = montar();
+    const a05 = await localPorCodigo(s, 'A-05');
+    const insp = await localPorCodigo(s, 'INSP-01');
+    await falhaCom(s.fardos.transferir('AR00224-01-F003', insp.id), 422, 'localId');
+    const ocupacaoAntes = a05.ocupacao;
+    const f = await s.fardos.transferir('AR00224-01-F003', a05.id);
+    expect(f.localId).toBe(a05.id);
+    expect((await localPorCodigo(s, 'LOC-A-05')).ocupacao).toBe(ocupacaoAntes + f.saldo);
+    const mov = (await s.movimentacoes.listar({ filters: { tipo: 'transferencia' } })).items[0];
+    expect(mov.fardoId).toBe('AR00224-01-F003');
+    const umDormente = (await s.fardos.obter('AR00224-01-F003')).dormentes.find((d) => d.situacao === 'em_estoque')!;
+    expect((await s.dormentes.obter(umDormente.id)).local?.codigo).toBe('A-05');
+    expect(invariantes()).toEqual([]);
+  });
+  it('contrato herda o fornecedor da ata, recusa espécie que ele não fornece e converte m³', async () => {
+    const { s } = montar('administrador');
+    const ata = (await s.atas.listar()).items.find((a) => a.numero === 'AR00224')!;
+    const especies = (await s.especies.listar()).items;
+    const tamanhos = (await s.tamanhos.listar()).items;
+    const trat = (await s.tratamentos.listar()).items[0];
+    const jatoba = especies.find((x) => x.nomePopular === 'Jatobá')!;
+    const jataipeba = especies.find((x) => x.nomePopular === 'Jataipeba')!;
+    const t280 = tamanhos.find((t) => t.codigo === 'T280')!;
+    const base = { numero: 'AR00224-03', ataId: ata.id, empresaInspetora: 'UFV', ano: 2026 };
+    await falhaCom(s.contratos.criar({ ...base, itens: [{ especieId: jatoba.id, tamanhoId: t280.id, tratamentoId: trat.id, quantidade: 10, unidade: 'un' }] }), 422, 'itens.0');
+    await falhaCom(s.contratos.criar({ ...base, numero: 'AR00311-09', itens: [{ especieId: jataipeba.id, tamanhoId: t280.id, tratamentoId: trat.id, quantidade: 10, unidade: 'un' }] }), 422, 'numero');
+    const c = await s.contratos.criar({ ...base, itens: [{ especieId: jataipeba.id, tamanhoId: t280.id, tratamentoId: trat.id, quantidade: 2, unidade: 'm3' }] });
+    expect(c.fornecedorId).toBe(ata.fornecedorId);
+    expect(c.itens[0].quantidade).toBe(17); // 2 m³ ÷ 0,11424 m³ = 17,5 → 17
+  });
+  it('fornecedor com CTF vencido fica bloqueado para nova ata', async () => {
+    const { s } = montar('administrador');
+    const bloqueado = (await s.fornecedores.listar()).items.find((f) => f.bloqueado)!;
+    expect(bloqueado.razaoSocial).toBe('Serraria Exemplo C Ltda.');
+    await falhaCom(s.atas.criar({ numero: 'AR00999', fornecedorId: bloqueado.id, vigenciaInicio: '2026-11-06', vigenciaFim: '2027-11-06' }), 422, 'fornecedorId');
+  });
+  it('local: código único, que não muda depois, e ID do QR lido como LOC-código', async () => {
+    const { s } = montar('administrador');
+    await falhaCom(s.locais.criar({ codigo: 'a-01', descricao: 'Repetido', tipo: 'armazenagem', capacidade: 10 }), 422, 'codigo');
+    const novo = await s.locais.criar({ codigo: 'b-01', descricao: 'Pátio B', tipo: 'armazenagem', capacidade: 100 });
+    expect(novo.codigo).toBe('B-01');
+    expect((await s.locais.obterPorCodigo('LOC-B-01')).id).toBe(novo.id);
+    await falhaCom(s.locais.atualizar(novo.id, { codigo: 'B-02' }), 422, 'codigo');
+  });
+});
+
+describe('painel', () => {
+  it('pendências conforme o perfil', async () => {
+    const { s, como } = montar('almoxarife');
+    expect((await s.dashboard.pendencias()).map((p) => p.id)).toEqual(expect.arrayContaining(['receber', 'inspecionar', 'separar', 'entregar', 'dof']));
+    como('requisitante');
+    expect((await s.dashboard.pendencias()).map((p) => p.id)).toEqual(['minhas-rmes']);
+    como('gestor');
+    expect((await s.dashboard.pendencias()).map((p) => p.id)).toEqual(expect.arrayContaining(['falta-excesso', 'parados', 'nao-localizados']));
+    const ind = await s.dashboard.indicadores();
+    expect([ind.itensAbaixoMinimo, ind.itensAcimaMaximo, ind.fardosAcimaLimite, ind.naoLocalizados, ind.rmesAbertas]).toEqual([1, 1, 1, 2, 1]);
+    expect((await s.dashboard.alertas()).some((a) => a.nivel === 'critico' && a.titulo.startsWith('DOF'))).toBe(true);
+  });
+});
+
+describe('persistência', () => {
+  it('guarda no armazenamento, sobrevive a recarregar e reinicia a demonstração', async () => {
+    const store = new Map<string, string>();
+    const a = montar('administrador', store);
+    await a.s.locais.criar({ codigo: 'C-01', descricao: 'Pátio C', tipo: 'armazenagem', capacidade: 50 });
+    const b = montar('administrador', store);
+    expect((await b.s.locais.obterPorCodigo('C-01')).descricao).toBe('Pátio C');
+    await b.s.parametros.reiniciarDemonstracao();
+    const c = montar('administrador', store);
+    await falhaCom(c.s.locais.obterPorCodigo('C-01'), 404);
+  });
+});

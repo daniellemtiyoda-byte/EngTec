@@ -5,6 +5,20 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-11-06: **Etapa 2 da v2: domínio, modelo, serviços e testes.**
+  - **Por quê:** as telas das próximas etapas precisam do modelo v2, do contrato de serviços e de um mock que já cumpra as regras de negócio, com uma história de demonstração completa e coerente.
+  - **Domínio:** `dominio/identificacao.ts` (formatos e geração de IDs de dormente, fardo, contrato, ata, RME e local; `lerCodigo` aceita o ID ou o link do QR; `linkQr` com a nova variável `VITE_APP_URL`); `dominio/parametros.ts` (tolerância de volume, regras provisórias da inspeção, conversão de m³, prazo e nível da DOF, situação do saldo); `rotulos.ts` e `opcoes.ts` com as situações v2.
+  - **Modelo** (`types/models.ts`): cadastros, ata, contrato e itens, fardo e dormente, NF, DOF, entrega, recebimento, inspeção, movimentação, RME, parâmetros, painel e as visões das páginas de objeto (ficha do dormente, fardo, inspeção do fardo, etiquetas). Campos calculados marcados, pensados como views do futuro banco.
+  - **Contrato** (`services/contracts.ts`): todos os serviços da seção 6 do plano, com os tipos de entrada. Acrescentados `rme.iniciarSeparacao`, `inspecao.naoLocalizados`, `atas`, `simulador.xmlNf` e `parametros.reiniciarDemonstracao`.
+  - **Mock reescrito** em módulos por assunto (cadastros, simulador, documentos, recebimento, inspeção, estoque, RME, painel) e `consultas.ts` com todos os campos calculados. Sessão e permissões conferidas em cada operação (401/403), escritas atômicas (rodam numa cópia do estado) e **persistência no `localStorage`**, com "reiniciar demonstração".
+  - **História de demonstração** gerada pelas regras, determinística e com datas relativas ao dia de criação: 4 contratos (um concluído com reposição de reprovados), entregas em todas as fases, 254 dormentes, não localizados, fardo acima do limite, falta e excesso, DOFs vencida/1 dia/3 dias e RMEs em cada situação. **Entrega "a caminho" com IDs fixos:** AR00224-01-F006 a F008, dormentes AR00224-01-000071 a 000112.
+  - **Testes (Vitest, 63):** identificação, parâmetros, a história contra a seção 15 do plano e cada fluxo pelos serviços (NF e DOF, recebimento com falta e fardo desconhecido, inspeção com não localizados e reprovação tardia, simulador com limite de reposição, RME com sugestão, justificativa e cancelamento, transferência, contratos, CTF vencido, locais, painel, persistência), sempre conferindo os invariantes do modelo. `npm test`.
+  - Arquivos: `src/dominio/{identificacao,parametros,rotulos,opcoes}.ts` (+ testes), `src/types/models.ts`, `src/services/contracts.ts`, `src/services/mock/*`, `src/config/env.ts`, `.env.example`, `package.json`, `CLAUDE.md`, `README.md`, `docs/PLANO-V2.md`.
+
+### Removido
+- 2026-11-06: `services/endpoints.ts` e a implementação HTTP de `services/real/` (virou um stub que avisa para usar o modo simulado): não há back-end próprio e a pasta sai na Etapa 10. `rotuloClasse`, `rotuloCategoria` e `classeCategoria` saíram de `utils/format.ts` (os dois primeiros agora estão em `dominio/rotulos.ts`).
+
 ### Alterado
 - 2026-11-06: **menu lateral mais compacto**, com as mesmas cores.
   - **Por quê:** o menu ocupava muito espaço vertical e horizontal para a quantidade de itens da v2.

@@ -17,6 +17,7 @@ npm install
 cp .env.example .env.local   # ajuste se necessário
 npm run dev                  # http://localhost:5173
 npm run build                # typecheck + build em dist/
+npm test                     # testes (Vitest) do domínio e das regras do mock
 ```
 
 Login de demonstração: use como usuário `administrador`, `almoxarife`, `gestor` ou `requisitante` e qualquer senha (nenhuma autenticação real).

@@ -48,7 +48,7 @@ A arquitetura da v1 foi aproveitada: camada de serviços com contrato único (`s
 
 | Item | Situação após a Etapa 0 | Próximo passo |
 | --- | --- | --- |
-| `services/http.ts`, `endpoints.ts`, `real/index.ts` | Só com `auth` | Saem na Etapa 10 (Supabase); `ApiError` e `mensagemSegura` vão para um módulo próprio de erros |
+| `services/http.ts`, `real/index.ts` | `real/` virou stub na Etapa 2 (sem back-end próprio) e `endpoints.ts` saiu | Saem na Etapa 10 (Supabase); `ApiError` e `mensagemSegura` vão para um módulo próprio de erros |
 | `services/index.ts`, `contracts.ts`, `mock/index.ts`, `mock/util.ts`, `mock/data.ts` | Só com `auth` e o usuário de demonstração | Etapa 1: autenticação vira serviço separado; Etapa 2: serviços v2, regras e história de demonstração |
 | `config/env.ts` | Mantido | Etapa 4: `VITE_APP_URL`; Etapa 10: variáveis do Supabase |
 | `types/models.ts` | Só `Origem`, `Paginado`, `ListQuery`, `Usuario` | Etapa 2: modelo v2 (seção 5) |
@@ -289,7 +289,7 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `dormentes` | `listar`, `obter(id)` (devolve a ficha completa já montada, seção 9.13) |
 | `estoque` | `porItem()`, `porFardo(q)` |
 | `movimentacoes` | `listar` |
-| `rme` | `listar`, `obter`, `abrir`, `sugerirSeparacao(numero)`, `separar`, `entregar`, `cancelar` |
+| `rme` | `listar`, `obter`, `abrir`, `iniciarSeparacao(numero)`, `sugerirSeparacao(numero)`, `separar`, `entregar`, `cancelar` |
 | `parametros` | `obter`, `atualizar`, `reiniciarDemonstracao()` (só no mock) |
 
 **Mock (até a Etapa 10).**
@@ -646,7 +646,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Vitrine `/vitrine` (seção 9.20).
 - Pronto quando: cada perfil vê o seu menu; a vitrine mostra os padrões de lista e de objeto funcionando no desktop e em 360 px.
 
-### Etapa 2 · Domínio, modelo, serviços e testes
+### Etapa 2 · Domínio, modelo, serviços e testes (concluída)
 - `vitest` como dependência de desenvolvimento e `npm test`.
 - `identificacao.ts` (dormente, fardo, contrato, RME, local) com testes.
 - `models.ts` v2, `rotulos.ts`, `opcoes.ts`, `parametros.ts` (tolerância de volume, regras provisórias da inspeção).
