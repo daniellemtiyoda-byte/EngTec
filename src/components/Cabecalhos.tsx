@@ -68,7 +68,9 @@ export function FatoChave({ rotulo, valor, para }: { rotulo: string; valor: Reac
 interface PropsObjeto {
   /** Tipo do objeto ("Fardo", "Contrato"...), lido antes do ID. */
   tipo: string;
-  id: string;
+  /** ID impresso (mono, com copiar). Objetos sem ID impresso, como o fornecedor, usam `titulo`. */
+  id?: string;
+  titulo?: string;
   situacao?: ReactNode;
   /** 3 a 6 `<FatoChave />`. */
   fatos?: ReactNode;
@@ -79,7 +81,7 @@ interface PropsObjeto {
 }
 
 /** Cabeçalho da página de objeto: ID grande em mono, situação, fatos-chave e barra de ações. */
-export function CabecalhoObjeto({ tipo, id, situacao, fatos, acoes, migalhas, nivel = 1 }: PropsObjeto) {
+export function CabecalhoObjeto({ tipo, id, titulo, situacao, fatos, acoes, migalhas, nivel = 1 }: PropsObjeto) {
   const H = nivel === 1 ? 'h1' : 'h2';
   return (
     <header className="cabecalho-objeto">
@@ -88,8 +90,7 @@ export function CabecalhoObjeto({ tipo, id, situacao, fatos, acoes, migalhas, ni
         <div className="cabecalho-textos">
           <span className="objeto-tipo">{tipo}</span>
           <div className="objeto-titulo">
-            <H className="sr-only">{tipo} {id}</H>
-            <IdCodigo id={id} tamanho="grande" />
+            {id ? <><H className="sr-only">{tipo} {id}</H><IdCodigo id={id} tamanho="grande" /></> : <H className="objeto-nome">{titulo}</H>}
             {situacao}
           </div>
         </div>

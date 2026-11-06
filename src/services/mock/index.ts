@@ -8,7 +8,7 @@ import {
   atualizarContrato, cancelarContrato, criarAta, criarContrato, inativarLocal, salvarEspecie, salvarFornecedor, salvarLocal, salvarTamanho, salvarTratamento,
 } from './cadastros';
 import {
-  contratoView, dofView, entregaView, etiquetasEntrega, fardoDetalhe, fardoView, fichaDormente, fornecedorView, inspecaoFardo, localView, saldoPorItem, tamanhoView,
+  contratoView, dofView, entregaView, etiquetasEntrega, fardoDetalhe, fardoView, fichaDormente, fornecedorView, inspecaoFardo, localView, resumoFornecedor, saldoPorItem, tamanhoView,
 } from './consultas';
 import { criarDados } from './data';
 import { cadastrarEntrega, declararDof } from './documentos';
@@ -96,6 +96,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       criar: (d) => escrever(CADASTROS, (e) => fornecedorView(salvarFornecedor(e, d), dia())),
       atualizar: (id, d) => escrever(CADASTROS, (e) => fornecedorView(salvarFornecedor(e, d, id), dia())),
       inativar: (id) => escrever(CADASTROS, (e) => { const f = achar(e.fornecedores, (x) => x.id === id, 'Fornecedor'); f.situacao = 'inativo'; return fornecedorView(f, dia()); }),
+      resumo: (id) => ler((e) => resumoFornecedor(e, id, dia())),
     },
     especies: {
       listar: (q) => ler((e) => paginar(e.especies, q)),
@@ -141,7 +142,11 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       criar: (d) => escrever(['contratos:editar'], (e, ctx) => criarAta(e, d, ctx)),
     },
     contratos: {
-      listar: (q) => ler((e) => paginar(e.contratos.map((c) => contratoView(e, c)), q)),
+      listar: (q = {}) => ler((e) => {
+        const { especieId, ...filters } = q.filters ?? {};
+        const lista = e.contratos.map((c) => contratoView(e, c)).filter((c) => !especieId || c.itens.some((i) => i.especieId === especieId));
+        return paginar(lista, { ...q, filters });
+      }),
       obter: (numero) => ler((e) => contratoView(e, achar(e.contratos, (c) => c.numero === numero.trim().toUpperCase(), `Contrato ${numero}`))),
       criar: (d) => escrever(['contratos:editar'], (e, ctx) => contratoView(e, criarContrato(e, d, ctx))),
       atualizar: (numero, d) => escrever(['contratos:editar'], (e) => contratoView(e, atualizarContrato(e, numero, d))),

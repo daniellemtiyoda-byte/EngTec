@@ -14,6 +14,8 @@ export const ALERTA_DOF_DIAS_PADRAO: [number, number] = [3, 1];
 /** PROVISÓRIO, a confirmar com o time da inspeção: índice ≥ 80 → categoria 1; ≥ 50 → 2; abaixo → 3. */
 export const LIMITES_CATEGORIA_PADRAO: [number, number] = [80, 50];
 export const DORMENTES_POR_FARDO_PADRAO = 14;
+/** CTF Ibama vencendo em até tantos dias aparece em atenção (o vencido bloqueia o fornecedor). */
+export const DIAS_AVISO_CTF = 30;
 
 const DIA_MS = 86_400_000;
 

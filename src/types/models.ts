@@ -439,6 +439,14 @@ export interface InspecaoFardo {
   pendentes: number;
 }
 
+/** Página do fornecedor: atas, contratos e taxa de reprovação por espécie (reprovados sobre inspecionados). */
+export interface FornecedorResumo {
+  fornecedor: Fornecedor;
+  atas: Ata[];
+  contratos: Contrato[];
+  reprovacao: { especieId: Id; inspecionados: number; reprovados: number; percentual: number }[];
+}
+
 /** Etiquetas de uma entrega para impressão: o fardo e os seus dormentes. */
 export interface EtiquetasEntrega {
   entrega: Entrega;

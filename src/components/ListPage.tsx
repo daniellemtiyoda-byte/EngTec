@@ -121,6 +121,13 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
     setFiltros((atual) => (JSON.stringify(atual) === JSON.stringify(f) ? atual : f));
     setSituacao(situacaoDaUrl());
   }, [params, p.secao]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Opções carregadas depois (ex. fornecedores vindos do serviço): o filtro que já estava no endereço passa a valer.
+  const assinaturaOpcoes = (p.filtros ?? []).map((f) => f.opcoes.length).join(',');
+  useEffect(() => {
+    if (p.secao) return;
+    const f = filtrosDaUrl();
+    setFiltros((atual) => (Object.keys(f).every((k) => atual[k] === f[k]) ? atual : { ...atual, ...f }));
+  }, [assinaturaOpcoes]); // eslint-disable-line react-hooks/exhaustive-deps
   // Estado → endereço (substitui a entrada do histórico, preservando os outros parâmetros da tela).
   useEffect(() => {
     if (p.secao) return;

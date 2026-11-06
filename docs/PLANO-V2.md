@@ -525,7 +525,7 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 
 ### 9.18 Cadastros (`/cadastros?aba=`) · `PainelAbas` (manter o padrão atual)
 - Abas: Espécies · Tamanhos · Tratamentos · Fornecedores · Locais.
-- Inclusão em linha (`FormLinha`), edição em `FormModal`, nada é apagado (inativar).
+- Inclusão em linha (`FormLinha`), edição em `FormModal`, nada é apagado (inativar). O fornecedor é incluído por modal ("Novo fornecedor"), porque tem campos demais para a linha, inclusive as espécies que fornece.
 - Fornecedor: razão social, CNPJ, cidade/UF, CTF IBAMA e validade, espécies que fornece (seleção múltipla), certificados (anexos). Linha leva à **Página do fornecedor** (`/fornecedores/:id`): contratos, entregas, taxa de reprovação, certificados.
 
 ### 9.19 Usuários (`/usuarios`) e Configurações (`/configuracoes`)
@@ -654,7 +654,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Reescrever a seção de regras de domínio do `CLAUDE.md`.
 - Pronto quando: build e testes passam, o mock gera a história completa e consistente.
 
-### Etapa 3 · Cadastros e Contratos
+### Etapa 3 · Cadastros e Contratos (concluída)
 - Cadastros (5 abas), Página do fornecedor, Contratos (lista, `ContratoModal` com ata e fornecedor herdado, página do contrato).
 - Pronto quando: é possível criar fornecedor, espécie, tamanho, tratamento, local e um contrato com itens (inclusive em m³ convertido); fornecedor com CTF vencido aparece bloqueado.
 

@@ -1,4 +1,4 @@
-import { diasEntre } from '../../dominio/parametros';
+import { DIAS_AVISO_CTF, diasEntre } from '../../dominio/parametros';
 import type { Permissao } from '../../dominio/permissoes';
 import type { Alerta, Indicadores, Pendencia, Usuario } from '../../types/models';
 import { dofView, fardoView, fornecedorView, saldoPorItem } from './consultas';
@@ -51,7 +51,7 @@ export function pendencias(e: Estado, u: Usuario, dia: string): Pendencia[] {
     add({ id: 'minhas-rmes', titulo: 'Minhas RMEs em andamento', quantidade: e.rmes.filter((r) => r.solicitanteId === u.id && r.situacao !== 'entregue' && r.situacao !== 'cancelada').length, nivel: 'info', link: '/saidas', acao: 'Acompanhar' });
   }
   if (pode('admin')) {
-    add({ id: 'ctf', titulo: 'Fornecedores com CTF vencido ou vencendo em 30 dias', quantidade: e.fornecedores.filter((f) => f.situacao === 'ativo' && diasEntre(dia, f.ctfValidade) <= 30).length, nivel: 'atencao', link: '/cadastros?aba=fornecedores', acao: 'Ver fornecedores' });
+    add({ id: 'ctf', titulo: `Fornecedores com CTF vencido ou vencendo em ${DIAS_AVISO_CTF} dias`, quantidade: e.fornecedores.filter((f) => f.situacao === 'ativo' && diasEntre(dia, f.ctfValidade) <= DIAS_AVISO_CTF).length, nivel: 'atencao', link: '/cadastros?aba=fornecedores', acao: 'Ver fornecedores' });
   }
   return lista;
 }
@@ -80,7 +80,7 @@ export function alertas(e: Estado, dia: string): Alerta[] {
     const v = fornecedorView(f, dia);
     const dias = diasEntre(dia, f.ctfValidade);
     if (v.bloqueado) lista.push({ id: `ctf-${f.id}`, nivel: 'critico', titulo: `CTF vencido: ${f.razaoSocial}`, descricao: 'Fornecedor bloqueado para novas atas e contratos.', link: `/fornecedores/${f.id}` });
-    else if (dias <= 30) lista.push({ id: `ctf-${f.id}`, nivel: 'atencao', titulo: `CTF vence em ${dias} dia(s): ${f.razaoSocial}`, descricao: 'Peça a renovação ao fornecedor.', link: `/fornecedores/${f.id}` });
+    else if (dias <= DIAS_AVISO_CTF) lista.push({ id: `ctf-${f.id}`, nivel: 'atencao', titulo: `CTF vence em ${dias} dia(s): ${f.razaoSocial}`, descricao: 'Peça a renovação ao fornecedor.', link: `/fornecedores/${f.id}` });
   }
   return lista;
 }

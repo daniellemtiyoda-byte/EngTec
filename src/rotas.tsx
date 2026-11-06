@@ -1,7 +1,11 @@
 import type { ComponentType } from 'react';
 import type { NomeIcone } from './components/Icone';
 import type { Permissao } from './dominio/permissoes';
+import Cadastros from './pages/Cadastros';
+import ContratoDetalhe from './pages/ContratoDetalhe';
+import Contratos from './pages/Contratos';
 import EmConstrucao from './pages/EmConstrucao';
+import FornecedorDetalhe from './pages/FornecedorDetalhe';
 import Vitrine from './pages/Vitrine';
 
 /** Grupos do menu na ordem da jornada do dormente (seção 3.2 do docs/PLANO-V2.md). */
@@ -39,7 +43,8 @@ const OPERACAO: Permissao[] = ['operacao:consultar'];
  */
 export const ROTAS: Rota[] = [
   { caminho: '/', tela: emConstrucao('Painel', 9), rotulo: 'Painel', icone: 'grid', grupo: 'Início', fim: true },
-  { caminho: '/contratos', tela: emConstrucao('Contratos', 3), rotulo: 'Contratos', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO },
+  { caminho: '/contratos', tela: Contratos, rotulo: 'Contratos', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO },
+  { caminho: '/contratos/:numero', tela: ContratoDetalhe, rotulo: 'Contrato', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/simulador', tela: emConstrucao('Simulador do fornecedor', 4), rotulo: 'Simulador do fornecedor', icone: 'fabrica', grupo: 'Suprimento', permissoes: ['simulador:usar'], demo: true },
   // NF e DOF primeiro: a entrega nasce no cadastro da NF e da DOF, antes da chegada.
   { caminho: '/documentos', tela: emConstrucao('NF e DOF', 5), rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: OPERACAO },
@@ -50,7 +55,8 @@ export const ROTAS: Rota[] = [
   { caminho: '/locais', tela: emConstrucao('Locais', 7), rotulo: 'Locais', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO },
   { caminho: '/movimentacoes', tela: emConstrucao('Movimentações', 7), rotulo: 'Movimentações', icone: 'swap', grupo: 'Estoque', permissoes: OPERACAO },
   { caminho: '/saidas', tela: emConstrucao('Requisições (RME)', 8), rotulo: 'Requisições (RME)', icone: 'pedido', grupo: 'Saída' },
-  { caminho: '/cadastros', tela: emConstrucao('Cadastros', 3), rotulo: 'Cadastros', icone: 'building', grupo: 'Cadastros', permissoes: OPERACAO },
+  { caminho: '/cadastros', tela: Cadastros, rotulo: 'Cadastros', icone: 'building', grupo: 'Cadastros', permissoes: OPERACAO },
+  { caminho: '/fornecedores/:id', tela: FornecedorDetalhe, rotulo: 'Fornecedor', icone: 'fabrica', grupo: 'Cadastros', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/usuarios', tela: emConstrucao('Usuários', 11), rotulo: 'Usuários', icone: 'users', grupo: 'Cadastros', permissoes: ['admin'] },
   { caminho: '/configuracoes', tela: emConstrucao('Configurações', 11), rotulo: 'Configurações', icone: 'gear', grupo: 'Cadastros', permissoes: ['admin'] },
   // Interna: valida os padrões de lista e de objeto com dados fixos.

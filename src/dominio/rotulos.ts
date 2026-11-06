@@ -69,6 +69,11 @@ export const SITUACAO_SALDO: Rotulos<SituacaoSaldo> = {
   excesso: ['laranja', 'Excesso'],
 };
 
+export const SITUACAO_MEDIDAS: Rotulos<'provisorio' | 'confirmado'> = {
+  provisorio: ['laranja', 'Provisório'],
+  confirmado: ['verde', 'Confirmado'],
+};
+
 export const SITUACAO_CADASTRO: Rotulos<SituacaoCadastro> = {
   ativo: ['verde', 'Ativo'],
   inativo: ['cinza', 'Inativo'],

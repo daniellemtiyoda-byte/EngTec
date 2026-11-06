@@ -348,6 +348,15 @@ describe('estoque, cadastros e contratos', () => {
     expect(c.fornecedorId).toBe(ata.fornecedorId);
     expect(c.itens[0].quantidade).toBe(17); // 2 m³ ÷ 0,11424 m³ = 17,5 → 17
   });
+  it('resumo do fornecedor: contratos e taxa de reprovação por espécie; contratos filtrados por espécie', async () => {
+    const { s } = montar('gestor');
+    const fA = (await s.fornecedores.listar()).items.find((f) => f.razaoSocial.startsWith('Madeireira'))!;
+    const r = await s.fornecedores.resumo(fA.id);
+    expect(r.contratos.map((c) => c.numero)).toEqual(['AR00224-01', 'AR00224-02']);
+    const cumaru = (await s.especies.listar()).items.find((x) => x.nomePopular === 'Cumaru')!;
+    expect(r.reprovacao.find((x) => x.especieId === cumaru.id)).toEqual({ especieId: cumaru.id, inspecionados: 30, reprovados: 2, percentual: 6.7 });
+    expect((await s.contratos.listar({ filters: { especieId: cumaru.id } })).items.map((c) => c.numero)).toEqual(['AR00224-02']);
+  });
   it('fornecedor com CTF vencido fica bloqueado para nova ata', async () => {
     const { s } = montar('administrador');
     const bloqueado = (await s.fornecedores.listar()).items.find((f) => f.bloqueado)!;

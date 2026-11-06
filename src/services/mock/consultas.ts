@@ -2,7 +2,7 @@ import {
   diasEntre, dataSP, diferencaVolumePct, foraDaTolerancia, nivelPrazo, prazoDeclaracao, situacaoSaldo, volumeM3,
 } from '../../dominio/parametros';
 import type {
-  Contrato, DivergenciaVolume, Dof, Dormente, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, Id, InspecaoFardo, ItemContrato,
+  Contrato, DivergenciaVolume, Dof, Dormente, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo, Id, InspecaoFardo, ItemContrato,
   ItemDescrito, Local, SaldoItem, SituacaoFardo, Tamanho,
 } from '../../types/models';
 import { achar, type ContratoReg, type DofReg, type EntregaReg, type Estado, type FardoReg, type FornecedorReg, type LocalReg, type TamanhoReg } from './estado';
@@ -216,5 +216,26 @@ export function etiquetasEntrega(e: Estado, entregaId: Id, hoje: string): Etique
     fardos: e.fardos.filter((f) => en.fardosIds.includes(f.id)).map((f) => ({
       fardo: fardoView(e, f, hoje), item: itemDescrito(e, f.itemContratoId), dormentesIds: dormentesDoFardo(e, f.id).map((d) => d.id),
     })),
+  };
+}
+
+/** Página do fornecedor: atas, contratos e taxa de reprovação por espécie (reprovados ÷ inspecionados). */
+export function resumoFornecedor(e: Estado, id: Id, hoje: string): FornecedorResumo {
+  const f = achar(e.fornecedores, (x) => x.id === id, 'Fornecedor');
+  const atas = e.atas.filter((a) => a.fornecedorId === f.id);
+  const contratos = e.contratos.filter((c) => atas.some((a) => a.id === c.ataId)).map((c) => contratoView(e, c));
+  const especieDoItem = new Map(contratos.flatMap((c) => c.itens).map((i) => [i.id, i.especieId]));
+  const porEspecie = new Map<Id, { inspecionados: number; reprovados: number }>();
+  for (const d of e.dormentes) {
+    const especieId = especieDoItem.get(d.itemContratoId);
+    if (!especieId || !['em_estoque', 'reservado', 'baixado', 'reprovado'].includes(d.situacao)) continue;
+    const t = porEspecie.get(especieId) ?? { inspecionados: 0, reprovados: 0 };
+    t.inspecionados++;
+    if (d.situacao === 'reprovado') t.reprovados++;
+    porEspecie.set(especieId, t);
+  }
+  return {
+    fornecedor: fornecedorView(f, hoje), atas, contratos,
+    reprovacao: [...porEspecie].map(([especieId, t]) => ({ especieId, ...t, percentual: Math.round((t.reprovados / t.inspecionados) * 1000) / 10 })),
   };
 }

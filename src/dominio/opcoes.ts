@@ -1,6 +1,6 @@
 import type { Categoria } from '../types/models';
 import {
-  NIVEL_PRAZO, SITUACAO_CADASTRO, SITUACAO_CONTRATO, SITUACAO_DORMENTE, SITUACAO_ENTREGA, SITUACAO_FARDO, SITUACAO_RME,
+  NIVEL_PRAZO, SITUACAO_CADASTRO, SITUACAO_MEDIDAS, SITUACAO_CONTRATO, SITUACAO_DORMENTE, SITUACAO_ENTREGA, SITUACAO_FARDO, SITUACAO_RME,
   SITUACAO_SALDO, TIPO_LOCAL, TIPO_MOVIMENTACAO, TIPO_OCORRENCIA, rotuloCategoria, type Rotulos,
 } from './rotulos';
 
@@ -21,6 +21,7 @@ export const SITUACAO_RME_OPCOES = opcoesDe(SITUACAO_RME);
 export const NIVEL_PRAZO_OPCOES = opcoesDe(NIVEL_PRAZO);
 export const SITUACAO_SALDO_OPCOES = opcoesDe(SITUACAO_SALDO);
 export const SITUACAO_CADASTRO_OPCOES = opcoesDe(SITUACAO_CADASTRO);
+export const SITUACAO_MEDIDAS_OPCOES = opcoesDe(SITUACAO_MEDIDAS);
 export const TIPO_LOCAL_OPCOES = opcoesDe(TIPO_LOCAL);
 export const TIPO_MOVIMENTACAO_OPCOES = opcoesDe(TIPO_MOVIMENTACAO);
 /** Ocorrências que a pessoa declara no recebimento (falta e fardo desconhecido também nascem automáticas). */
@@ -30,5 +31,5 @@ export const TIPO_OCORRENCIA_OPCOES = opcoesDe(TIPO_OCORRENCIA, ['avaria', 'falt
 export const CATEGORIAS: Categoria[] = [1, 2, 3];
 export const CATEGORIA_OPCOES: Opcao[] = CATEGORIAS.map((c) => ({ valor: String(c), rotulo: rotuloCategoria(c) }));
 
-export const UNIDADE_ITEM_OPCOES: Opcao<'un' | 'm3'>[] = [{ valor: 'un', rotulo: 'Unidades' }, { valor: 'm3', rotulo: 'm³ (convertido em unidades)' }];
+export const UNIDADE_ITEM_OPCOES: Opcao<'un' | 'm3'>[] = [{ valor: 'un', rotulo: 'un' }, { valor: 'm3', rotulo: 'm³' }];
 export const SIM_NAO_OPCOES: Opcao<'true' | 'false'>[] = [{ valor: 'true', rotulo: 'Sim' }, { valor: 'false', rotulo: 'Não' }];

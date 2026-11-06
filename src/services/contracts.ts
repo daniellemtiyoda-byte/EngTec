@@ -1,5 +1,5 @@
 import type {
-  Alerta, Ata, Categoria, Contrato, Dof, Dormente, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor,
+  Alerta, Ata, Categoria, Contrato, Dof, Dormente, Entrega, EtiquetasEntrega, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros,
   Pendencia, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
@@ -73,7 +73,7 @@ export interface Servicos {
     alertas(): Promise<Alerta[]>;
   };
 
-  fornecedores: ServicoCadastro<Fornecedor, DadosFornecedor>;
+  fornecedores: ServicoCadastro<Fornecedor, DadosFornecedor> & { resumo(id: Id): Promise<FornecedorResumo> };
   especies: ServicoCadastro<Especie, DadosEspecie>;
   tamanhos: ServicoCadastro<Tamanho, DadosTamanho>;
   tratamentos: ServicoCadastro<Tratamento, DadosTratamento>;
@@ -82,6 +82,7 @@ export interface Servicos {
   usuarios: ServicoLista<Usuario> & { atualizar(id: Id, dados: { perfil?: Usuario['perfil']; ativo?: boolean }): Promise<Usuario> };
 
   atas: ServicoLista<Ata> & { criar(dados: DadosAta): Promise<Ata> };
+  /** `filters.especieId` traz os contratos que têm item da espécie. */
   contratos: ServicoLista<Contrato> & {
     obter(numero: string): Promise<Contrato>;
     criar(dados: DadosContrato): Promise<Contrato>;

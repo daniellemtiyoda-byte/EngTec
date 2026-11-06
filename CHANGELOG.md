@@ -5,6 +5,17 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-11-06: **Etapa 3 da v2: Cadastros e Contratos.**
+  - **Por quê:** contratos e cadastros são a base de toda a jornada do dormente (simulador, NF e DOF, recebimento, estoque).
+  - **Cadastros** (`/cadastros?aba=`): Espécies, Tamanhos (volume calculado, medidas provisórias), Tratamentos, Fornecedores (CNPJ, CTF Ibama com bloqueio automático quando vence, espécies que fornece) e Locais (código que vai no QR e não muda, tipo, capacidade e ocupação). Inclusão em linha, edição em modal, inativação com confirmação; nada é apagado. Só quem tem `cadastros:editar` altera.
+  - **Página do fornecedor** (`/fornecedores/:id`): contratos com as entregas, taxa de reprovação por espécie e certificados. Serviço novo `fornecedores.resumo`.
+  - **Contratos** (`/contratos`): abas por situação com contador, filtros por fornecedor, espécie e ano, entregas por contrato e **Novo contrato** (`ContratoModal`): ata existente ou nova, fornecedor herdado da ata (bloqueado ou inativo não aparece), só as espécies que ele fornece, itens em unidades ou em m³ com a conversão mostrada na hora (arredondada para baixo).
+  - **Página do contrato** (`/contratos/:numero`): fatos-chave, itens com o saldo a emitir e a barra de entregas, fardos, entregas (NF e DOF), histórico e relacionados; editar, cancelar (motivo) e atalho para gerar entrega no simulador.
+  - Componentes: `ContratoModal`, `ConfirmarInativacao`, campo `multipla` no `FormModal`, título em texto no `CabecalhoObjeto`, `useCadastros`; `ListPage` aplica o filtro do endereço quando as opções chegam do serviço. `DIAS_AVISO_CTF` (30) em `dominio/parametros.ts`, usado pela tela e pelo painel.
+  - Verificado no Chrome headless (1280 e 360 px): cada aba e página, gestor e almoxarife sem inclusão nem edição, requisitante sem acesso, inclusão de tratamento e criação de contrato com 2 m³ de Jataipeba T280 convertidos em 17 dormentes, sem rolagem horizontal e sem erros no console. Testes: 67.
+  - Arquivos: `src/pages/{Cadastros,Especies,Tamanhos,Tratamentos,Fornecedores,LocaisCadastro,FornecedorDetalhe,Contratos,ContratoDetalhe}.tsx`, `src/components/{ContratoModal,ConfirmarInativacao,FormModal,Cabecalhos,ListPage}.tsx`, `src/hooks/useCadastros.ts`, `src/rotas.tsx`, `src/services/contracts.ts`, `src/services/mock/{index,consultas,painel}.ts`, `src/types/models.ts`, `src/dominio/{rotulos,opcoes,parametros}.ts`, `src/styles.css`, `CLAUDE.md`, `docs/PLANO-V2.md`.
+
 ### Alterado
 - 2026-11-06: **NF e DOF também pelo administrador e justificativa automática no recebimento parcial.**
   - **Por quê:** o cadastro de NF e DOF acontece antes da chegada, normalmente no escritório; e, quando a divergência de volume vem só dos fardos que faltaram, a causa já é conhecida pelo sistema.

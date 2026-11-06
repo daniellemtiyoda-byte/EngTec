@@ -6,7 +6,8 @@ import { ConfirmModal, Modal } from './Modal';
 export interface Campo {
   nome: string;
   rotulo: string;
-  tipo?: 'text' | 'number' | 'select' | 'date' | 'textarea' | 'arquivo';
+  /** 'multipla': caixas de seleção com as `opcoes`; o valor é a lista separada por vírgula. */
+  tipo?: 'text' | 'number' | 'select' | 'date' | 'textarea' | 'arquivo' | 'multipla';
   obrigatorio?: boolean;
   opcoes?: { valor: string; rotulo: string }[];
   min?: number;
@@ -124,8 +125,17 @@ export function FormModal({ titulo, campos, aberto, aoFechar, aoEnviar, rotuloEn
             };
             return (
               <div className="campo" key={c.nome}>
-                <label htmlFor={id}>{c.rotulo}{c.obrigatorio && <span className="obrig" aria-hidden="true"> *</span>}</label>
-                {c.tipo === 'select' ? (
+                {c.tipo === 'multipla' ? (
+                  <fieldset className="campo-multipla" aria-describedby={erros[c.nome] ? `${id}-erro` : undefined}>
+                    <legend>{c.rotulo}{c.obrigatorio && <span className="obrig" aria-hidden="true"> *</span>}</legend>
+                    {c.opcoes?.map((o) => {
+                      const marcados = (valores[c.nome] ?? '').split(',').filter(Boolean);
+                      const alternar = () => setValores((s) => ({ ...s, [c.nome]: (marcados.includes(o.valor) ? marcados.filter((x) => x !== o.valor) : [...marcados, o.valor]).join(',') }));
+                      return <label key={o.valor} className="caixa"><input type="checkbox" checked={marcados.includes(o.valor)} onChange={alternar} /> {o.rotulo}</label>;
+                    })}
+                  </fieldset>
+                ) : <label htmlFor={id}>{c.rotulo}{c.obrigatorio && <span className="obrig" aria-hidden="true"> *</span>}</label>}
+                {c.tipo === 'multipla' ? null : c.tipo === 'select' ? (
                   <select {...comum}>
                     <option value="">Selecione…</option>
                     {c.opcoes?.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
