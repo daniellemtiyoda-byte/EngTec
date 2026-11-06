@@ -2,11 +2,11 @@
 
 Gestão de dormentes ferroviários de madeira.
 
-Interface web (React + TypeScript + Vite) do sistema de gestão de dormentes de madeira.
-**Escopo:** apenas front-end. Back-end, persistência, autenticação real e visão computacional são de outros integrantes.
+Interface web (React + TypeScript + Vite) do sistema de rastreabilidade de dormentes de madeira por QR code (versão 2).
+**Escopo:** apenas front-end, com a camada de serviços simulada; o banco (Supabase) entra depois.
 
-> ⚠️ **Estado atual:** navegável com **dados simulados**. Nada aqui indica que o sistema completo esteja operacional:
-> back-end, persistência, autenticação e visão computacional continuam pendentes.
+> ⚠️ **Estado atual:** em reestruturação para a v2. O app abre numa tela "Em construção" e as telas voltam etapa a etapa,
+> conforme `docs/PLANO-V2.md`. Regras de negócio: `docs/ESPECIFICACAO-FUNCIONAL.md`. A versão 1 (por lote) está em `docs/arquivo/`.
 
 ## Executar
 
@@ -19,7 +19,7 @@ npm run dev                  # http://localhost:5173
 npm run build                # typecheck + build em dist/
 ```
 
-No modo simulado qualquer usuário/senha preenchidos entram (nenhuma autenticação real).
+No modo simulado qualquer usuário e senha preenchidos entram como administrador (nenhuma autenticação real).
 Para testar estados de erro/vazio: `http://localhost:5173/?simular=erro` ou `?simular=vazio`.
 
 ## Logo
@@ -53,27 +53,26 @@ src/
     real/                  implementação HTTP
     mock/                  dados e serviços simulados
     index.ts               escolhe mock ou real
-  components/              Layout, ListPage (tabela/filtros/paginação), FormModal, Modal, UploadModal, gráficos, estados, toasts
-  contexts/                autenticação (somente memória)
-  pages/                   16 telas
-docs/CONTRATOS-API.md      contratos e checklist para o back-end
+  components/              Layout, ListPage (tabela/filtros/paginação), FormModal, Modal, UploadModal, assistentes, estados, toasts
+  contexts/                autenticação
+  pages/                   Login e a tela provisória "Em construção"
+docs/ESPECIFICACAO-FUNCIONAL.md  regras de negócio da v2 (fonte de verdade)
+docs/PLANO-V2.md           plano de desenvolvimento por etapas
+docs/arquivo/              documentos da v1 (PRD, contratos de API, integração com a inspeção)
 ```
 
 ## Integrar um módulo real
 
-1. Receba a documentação da API do responsável (checklist em `docs/CONTRATOS-API.md`).
+1. Receba a documentação da API do responsável (o checklist da v1 está em `docs/arquivo/CONTRATOS-API.md`).
 2. Ajuste caminhos em `src/services/endpoints.ts` e, se preciso, parâmetros/conversão em `src/services/real/index.ts`.
 3. Marque o endpoint como `confirmado`, defina `VITE_USE_MOCK=false` e `VITE_API_URL`.
 4. As telas não mudam: elas dependem só da interface `Servicos`.
 
 ## Regras respeitadas pela interface
 
-- Classe (1ª/2ª) separada da categoria visual (A/B); metragem linear, volume documental e volume calculado em colunas distintas.
-- Estoque disponível × em análise × bloqueado × com divergência.
-- Ajustes de inventário aparecem como pendentes até a aprovação.
-- Contagem por imagem é estimativa, mostra confiança/revisão e não altera saldo; espécie não é identificada por imagem.
-- Mensagens de sucesso só após a resposta do serviço; dados simulados identificados (faixa, etiqueta e selo "Simulado").
+- Mensagens de sucesso só após a resposta do serviço; dados simulados identificados (faixa "Modo simulado").
 - Botões ocultos e rotas protegidas são só UX; o servidor deve validar permissões.
+- As regras de negócio da v2 estão em `docs/ESPECIFICACAO-FUNCIONAL.md` e entram no código a partir da Etapa 2 do plano.
 
 ## Segurança
 
@@ -82,7 +81,6 @@ sessão apenas em memória (sem `localStorage`); use HTTPS nos ambientes implant
 
 ## Pendências conhecidas
 
-- Back-end, autenticação e visão computacional reais (não existem neste repositório).
-- Tela dedicada de registro de contagem/divergências do inventário (serviços prontos).
-- Administração de usuários somente leitura.
+- Telas da v2 (ver as etapas em `docs/PLANO-V2.md`).
+- Banco e login reais pelo Supabase.
 - Testes automatizados.

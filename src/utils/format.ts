@@ -48,7 +48,7 @@ export function dataHora(iso?: string): string {
   return d.toLocaleString('pt-BR', { timeZone: TZ, hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(', ', ' ');
 }
 
-/** Classe e categoria são campos diferentes e sempre aparecem com o nome do campo (regra do PRD). */
+/** Classe e categoria são campos diferentes e sempre aparecem com o nome do campo (glossário da especificação v2). */
 export const rotuloClasse = (c?: string) => (c ? `Classe ${c}` : 'Classe a definir');
 export const rotuloCategoria = (c?: number) => (c ? `Categoria ${c}` : 'Categoria a definir');
 /** Para tabelas: só o que já foi definido ("Classe 1ª · Categoria 2"); vazio quando nenhum dos dois foi lançado, para não repetir "a definir" em toda linha. */
@@ -94,7 +94,7 @@ export function urlSegura(u?: string): string | null {
   } catch { return null; }
 }
 
-/** Aceita só caminhos internos ("/lotes"); rejeita "//site", "/\site" e similares vindos da API (open redirect). */
+/** Aceita só caminhos internos ("/estoque"); rejeita "//site", "/\site" e similares vindos da API (open redirect). */
 export function linkInterno(l?: string): string {
   return l && /^\/(?![/\\])[^\\]*$/.test(l) ? l : '/';
 }

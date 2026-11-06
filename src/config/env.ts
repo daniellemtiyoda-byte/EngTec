@@ -8,9 +8,9 @@ export const env = {
 };
 
 /**
- * Endereço que abre o sistema de inspeção (Railway Edge Inspector, app de desktop) com os dados do lote (RF05).
+ * Endereço que abre o sistema de inspeção (Railway Edge Inspector, app de desktop) com os dados do fardo.
  * Fixo no código, nunca vindo da API. Só funciona onde o Inspector estiver instalado e registrado para este protocolo
- * (pendente na equipe do Inspector: ver docs/INTEGRACAO-INSPECAO.md).
+ * (pendente na equipe do Inspector: proposta da v1 em docs/arquivo/INTEGRACAO-INSPECAO.md).
  */
 export const PROTOCOLO_INSPECTOR = 'railway-inspector://inspecionar';
 

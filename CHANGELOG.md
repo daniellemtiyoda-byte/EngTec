@@ -5,6 +5,21 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Alterado
+- 2026-11-05: **início da v2 (rastreabilidade de dormentes por QR code), Etapa 0 do plano**: documentação nova no lugar e limpeza do código da v1.
+  - **Por quê:** a v2 troca o domínio (sai o lote, entram contrato, fardo e dormente com QR) e parte de uma base limpa, aproveitando só a infraestrutura (seções 1 e 2 do `docs/PLANO-V2.md`).
+  - **Fonte de verdade:** `docs/ESPECIFICACAO-FUNCIONAL.md` (regras de negócio) e `docs/PLANO-V2.md` (arquitetura, telas e etapas) substituem o PRD. `docs/PRD.md` foi para `docs/arquivo/PRD-v1.md`; `docs/CONTRATOS-API.md` e `docs/INTEGRACAO-INSPECAO.md` também foram para `docs/arquivo/`.
+  - **App:** abre numa tela "Em construção" (`pages/EmConstrucao.tsx`), única rota do menu. O login simulado entra sempre como administrador (os perfis da v2 entram na Etapa 2). Sem o sino de alertas e a busca global, que dependiam do domínio antigo e voltam nas Etapas 1, 4 e 9.
+  - **Infraestrutura mantida e enxugada:** `services/contracts.ts`, `endpoints.ts`, `real/index.ts` e `mock/index.ts` só com `auth`; `types/models.ts` só com `Origem`, `Paginado`, `ListQuery` e `Usuario`; `dominio/rotulos.ts` e `opcoes.ts` só com os tipos e `opcoesDe()`; `dominio/permissoes.ts` só com `admin`; `utils/busca.ts` ainda não reconhece códigos (IDs v2 na Etapa 4); `LinhaTempo` passou a receber eventos genéricos (`EventoLinhaTempo`); `Badge` sem os atalhos de status da v1. CSS dos componentes removidos saiu de `styles.css`.
+  - **CLAUDE.md reescrito** para a v2: fonte de verdade, fluxo de trabalho por etapas, arquitetura que ficou, modelo por contrato com fardo e dormente com QR (sem lote), login pelo Supabase Auth, mock com persistência no `localStorage` e dados determinísticos, Supabase como implementação futura da camada de serviços e as dependências previstas (`qrcode`, `jsqr`, `@supabase/supabase-js`). Regras da v1 que deixaram de valer saíram. README e `.gitignore` apontam para os documentos novos.
+  - Arquivos: `CLAUDE.md`, `README.md`, `.gitignore`, `docs/`, `src/rotas.tsx`, `src/pages/EmConstrucao.tsx`, `src/pages/Login.tsx`, `src/components/Layout.tsx`, `src/components/LinhaTempo.tsx`, `src/components/Badge.tsx`, `src/services/*`, `src/types/models.ts`, `src/dominio/*`, `src/utils/busca.ts`, `src/styles.css`.
+
+### Removido
+- 2026-11-05: **código de domínio da v1** (lote, formação de fardos, quarentena, conferência em duas pessoas, perda e ajuste, inventário, visão computacional, relatórios IBAMA), que não vale na v2.
+  - Telas: Administração, Cadastros, Configurações, Painel, Endereços, Espécies, Estoque, Fardo, Fornecedores, Inspeção, Inventário, Lote, Lotes, Movimentações, NF e DOF, Pátio, Recebimento, Relatórios, RME, Saldo, Tamanhos, Visão computacional (`src/pages/`).
+  - Componentes: `DeclararDofModal`, `DocumentosLista`, `FardosModal`, `FormarFardosModal`, `Graficos`, `InspectorModal`, `NfModal`, `Quadro`, `RecebimentoModal`, `RelatorioMovimentacoes`, `RelatorioVolumetria`, `RelatoriosIbama`, `RmeModal`, `SeparacaoModal`; `contexts/AlertasContext.tsx`; `dominio/inspecao.ts`, `dominio/parametros.ts`; `services/mock/ajustes.ts`, `estoque.ts`, `inspecao.ts`, `recebimento.ts`, `rme.ts` e os dados fictícios de `mock/data.ts`.
+  - Os modais que o plano manda adaptar (NF, recebimento, DOF, separação, RME, Inspector) continuam no histórico (`git show main:src/components/NfModal.tsx`, branch `backup/v1`) para servirem de base nas etapas 5, 6 e 8.
+
 ### Adicionado
 - 2026-10-29: **Cadastros com abas na lateral e inclusão em linha**, e os cadastros que faltavam no RF27.
   - **Por quê:** o PRD pede como Essencial (RF27) o cadastro de espécies, tamanhos, fornecedores e endereços, mas fornecedores e endereços eram só leitura e espécies só editava classe e uso. O layout segue o modelo de tela de configuração pedido: cartão com as abas à esquerda (com o total de cada uma) e o conteúdo à direita.
