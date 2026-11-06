@@ -5,6 +5,14 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Alterado
+- 2026-11-06: **NF e DOF cadastradas antes da chegada do material** (plano e especificação) e **botão de copiar do ID só ao passar o mouse nas tabelas**.
+  - **Por quê:** o material chega com a NF e a DOF já emitidas; cadastrá-las antes deixa a entrega pronta para o almoxarife só escolher e ler os fardos no pátio, e concentra o prazo da DOF numa tela. O copiar em toda linha deixava as tabelas pesadas.
+  - **Fluxo:** em NF e DOF, importar o XML da NF (ou digitar) e cadastrar a DOF cria a **entrega "A caminho"** (o termo "remessa" foi trocado por "entrega" em todo o plano e na especificação); no Recebimento, o primeiro passo do assistente é "Escolher a entrega", com a exceção de cadastrar NF e DOF na hora; NF e DOF continua com o controle de prazo e a declaração no Sinaflor. No protótipo, o Simulador gera a entrega já com NF e DOF. Fardos esperados da entrega são opcionais no cadastro (regra provisória). Modelo: `Entrega` (antes `Remessa`), `entregaId` em fardo, NF e recebimento; serviços `documentos.cadastrarEntrega`, `recebimentos.entregasACaminho`, `simulador.gerarEntrega`. Etapa 5 reescrita. A especificação ganhou o módulo NF e DOF (agora dez módulos) e a linha dele na tabela de permissões.
+  - **Menu:** "NF e DOF" passou a ser o primeiro item do grupo Entrada, antes de Recebimentos.
+  - **Copiar:** nas tabelas e nos cartões de lista, o botão aparece só ao passar o mouse na linha (ou com foco pelo teclado) e fica oculto em telas de toque; no cabeçalho de objeto continua sempre visível.
+  - Arquivos: `docs/PLANO-V2.md`, `docs/ESPECIFICACAO-FUNCIONAL.md`, `CLAUDE.md`, `src/rotas.tsx`, `src/styles.css`.
+
 ### Adicionado
 - 2026-11-06: **Etapa 1 da v2: fundação visual, casca, perfis e vitrine.**
   - **Por quê:** antes das telas de negócio, a casca precisa ter a identidade visual, o menu da jornada do dormente, os perfis e os componentes dos padrões de página (lista e objeto) que todas as etapas seguintes vão usar.

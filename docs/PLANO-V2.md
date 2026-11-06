@@ -27,6 +27,7 @@ Documento para orientar o Claude Code na reestruturação do front-end. Ele diz 
 | Conteúdo do QR | Link do sistema com o ID (`<APP_URL>/#/d/<id>` e `<APP_URL>/#/f/<id>`); a câmera comum do celular abre a ficha após login |
 | Quem gera o QR | O fornecedor, seguindo o padrão do contrato. No protótipo, o **Simulador do fornecedor** gera para a demonstração |
 | Compra | Por **Ata de Registro de Preços** e **Contrato** (não "pedido de compra") |
+| NF e DOF | Cadastradas **antes da chegada** (XML da NF ou digitada, mais a DOF) na tela NF e DOF, o que cria a **entrega "A caminho"**; no recebimento, o almoxarife escolhe a entrega e lê os fardos. Cadastrar NF e DOF na hora do recebimento é exceção. No protótipo, o Simulador gera a entrega já com NF e DOF |
 | Fardos | Chegam montados pelo fornecedor; na inspeção são abertos, os reprovados saem e o fardo é fechado de novo |
 | Inspeção | Sistema externo, peça a peça, grava no banco compartilhado; no protótipo é simulada. Resultado só **aprovado** ou **reprovado** (o ATENÇÃO do Inspector conta como reprovado) e **categoria 1, 2 ou 3** pelos limites 80 e 50 do índice, ambos **provisórios**, a confirmar com o time da inspeção |
 | Faltas | Fardo não lido no recebimento continua em trânsito e pode ser recebido depois; dormente não lido na inspeção fica **não localizado** (conclusão com justificativa) |
@@ -63,7 +64,7 @@ A arquitetura da v1 foi aproveitada: camada de serviços com contrato único (`s
 
 ### 3.1 Princípio
 
-O menu segue a **jornada do dormente** (contrato → recebimento → inspeção → estoque → saída), e cada objeto do negócio (contrato, fardo, dormente, recebimento, saída, fornecedor) tem **uma página própria** que funciona como ponto de encontro de tudo que se relaciona com ele. Listas servem para encontrar; páginas de objeto servem para entender e agir.
+O menu segue a **jornada do dormente** (contrato → NF e DOF → recebimento → inspeção → estoque → saída), e cada objeto do negócio (contrato, fardo, dormente, recebimento, saída, fornecedor) tem **uma página própria** que funciona como ponto de encontro de tudo que se relaciona com ele. Listas servem para encontrar; páginas de objeto servem para entender e agir.
 
 ### 3.2 Menu (grupos e itens)
 
@@ -74,9 +75,9 @@ O menu segue a **jornada do dormente** (contrato → recebimento → inspeção 
 | Início | Painel | `/` | Todos |
 | Suprimento | Contratos | `/contratos` | Administrador, Almoxarife, Gestor |
 | Suprimento | Simulador do fornecedor (selo "Demo") | `/simulador` | Administrador, Almoxarife |
+| Entrada | NF e DOF | `/documentos` | Administrador, Almoxarife, Gestor |
 | Entrada | Recebimentos | `/recebimentos` | Administrador, Almoxarife, Gestor |
 | Entrada | Inspeção | `/inspecao` | Administrador, Almoxarife, Gestor |
-| Entrada | NF e DOF | `/documentos` | Administrador, Almoxarife, Gestor |
 | Estoque | Estoque | `/estoque` | Todos (requisitante só a visão por item) |
 | Estoque | Locais | `/locais` | Administrador, Almoxarife, Gestor |
 | Estoque | Movimentações | `/movimentacoes` | Administrador, Almoxarife, Gestor |
@@ -98,7 +99,7 @@ O menu segue a **jornada do dormente** (contrato → recebimento → inspeção 
 | `/saidas/:numero` | Página da requisição | |
 | `/locais/:codigo` | Página do local | Destino do QR do local; `codigo` = `A03` (ID `LOC-A03`) |
 | `/vitrine` | Vitrine de componentes | Interna, só administrador, dados fixos; valida os padrões de lista e de objeto |
-| `/simulador/etiquetas/:remessa` | Folha de impressão de etiquetas | Sem o Layout (só a folha), com CSS de impressão |
+| `/simulador/etiquetas/:entrega` | Folha de impressão de etiquetas | Sem o Layout (só a folha), com CSS de impressão |
 | `/login` | Login | Guarda o destino (ex. `/d/...`) e volta para ele após entrar |
 
 ### 3.4 Elementos globais (em toda tela)
@@ -128,10 +129,11 @@ Regras que valem para todas as telas. O objetivo é que **nenhuma informação f
 
 ```
 Painel ──► listas filtradas (Estoque, Recebimentos, NF e DOF, RME)
+NF e DOF ──► Entrega "A caminho" ──► Recebimento
 Contratos ──► Contrato ──► Fornecedor
                  ├──► Fardos (/f/) ──► Dormentes (/d/)
-                 ├──► NFs / Recebimentos ──► DOF
-                 └──► Simulador (gerar remessa deste contrato)
+                 ├──► Entregas (NF e DOF) ──► Recebimentos
+                 └──► Simulador (gerar entrega deste contrato)
 Recebimentos ──► Recebimento ──► Fardos recebidos ──► Inspeção do fardo
 Inspeção ──► Inspeção do fardo ──► Fardo (após concluir)
 Estoque ──► por item ──► fardos do item ──► Fardo ──► Dormente
@@ -189,10 +191,7 @@ interface ItemContrato { id; especieId; tamanhoId; tratamentoId; quantidade: num
   // calculados pelo serviço:
   emitidos: number; recebidos: number; aprovados: number; reprovados: number;
   saldoAEmitir: number /* = quantidade - (emitidos - reprovados) */ }
-interface Remessa { id; contratoId; nfNumero; criadoEm; fardosIds: string[]; situacao: 'em_transito' | 'recebida_parcial' | 'recebida' }
 ```
-
-`Remessa` representa o que o fornecedor envia de uma vez (uma NF). No protótipo é criada pelo Simulador e consumida pelo Recebimento. Fica `recebida_parcial` enquanto houver fardo dela ainda em trânsito (falta no recebimento).
 
 O contrato é cumprido por dormentes **aprovados**: o fornecedor pode emitir reposição dos reprovados, e o limite de emissão é `emitidos - reprovados <= quantidade`.
 
@@ -200,7 +199,7 @@ O contrato é cumprido por dormentes **aprovados**: o fornecedor pode emitir rep
 
 ```ts
 type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao' | 'em_estoque' | 'aberto' | 'baixado';
-interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId; remessaId; quantidadeInicial: number;
+interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId; entregaId?: string /* definida ao entrar numa entrega */; quantidadeInicial: number;
   saldo: number /* calculado: saldo físico = dormentes em_estoque + reservado */;
   disponivel: number /* calculado: dormentes em_estoque (livres para nova saída) */;
   localId?: string; situacao: SituacaoFardo;
@@ -227,12 +226,17 @@ Invariantes (garantidas no serviço, nunca na tela):
 ### 5.5 Entrada
 
 ```ts
-interface NotaFiscal { id; numero; chaveAcesso; fornecedorId; contratoId; emissao; remessaId?; xml?: Anexo;
+// Entrega: o que o fornecedor envia de uma vez (uma NF, uma DOF e os seus fardos). Nasce "a caminho" no
+// cadastro de NF e DOF (ou no Simulador) e é consumida pelo Recebimento.
+interface Entrega { id; contratoId; nfId; dofId; fardosIds: string[] /* esperados; pode começar vazia */;
+  situacao: 'a_caminho' | 'recebida_parcial' | 'recebida'; origem: 'cadastro' | 'simulador' | 'recebimento';
+  criadoEm; criadoPor }
+interface NotaFiscal { id; numero; chaveAcesso; fornecedorId; contratoId; emissao; entregaId; xml?: Anexo;
   itens: { itemContratoId; quantidade: number; volumeM3: number }[] }
 interface Dof { id; numero; nfId; validade: string; volumes: { especieId; volumeM3 }[]; pdf?: Anexo;
   declarado?: { quando; quem }; prazoDeclaracao /* calculado: dia seguinte à validade */;
   nivelPrazo: 'ok' | 'atencao' | 'critico' | 'vencido' /* calculado */ }
-interface Recebimento { id; nfId; dofId; recebidoEm; recebidoPor; fardosEsperados: string[]; fardosLidos: string[];
+interface Recebimento { id; entregaId; nfId; dofId; recebidoEm; recebidoPor; fardosEsperados: string[]; fardosLidos: string[];
   conforme: boolean; ocorrencias: { tipo: 'avaria' | 'falta' | 'sobra' | 'fardo_desconhecido'; descricao; fotos: Anexo[] }[];
   divergenciaVolume: { especieId; documentalM3; calculadoM3; percentual; acimaTolerancia: boolean }[];
   localEsperaId: string }
@@ -241,6 +245,8 @@ interface Inspecao { id; dormenteId; fardoId; resultado: 'aprovado' | 'reprovado
   medidas: { comprimentoCm; larguraCm; alturaCm }; inspetor; inspecionadoEm; origem: 'inspector' | 'simulado' | 'manual';
   relatorioUrl?: string }
 ```
+
+**Entrega e fardos esperados.** No cadastro de NF e DOF, o usuário pode indicar quais fardos vêm na entrega (fardos já emitidos do contrato, em trânsito e sem entrega). Se não indicar, a entrega começa sem fardos esperados e, no recebimento, todo fardo lido que seja do mesmo contrato, emitido e sem entrega passa a fazer parte dela; fardo de outro contrato, de outra entrega ou com ID inexistente vira ocorrência "fardo desconhecido". A entrega fica `recebida_parcial` enquanto houver fardo esperado dela ainda em trânsito (falta no recebimento). Regra **provisória** (o fornecedor real ainda não informa os fardos da NF ao sistema). Fardos e dormentes sempre existem antes da leitura: são emitidos pelo fornecedor (no protótipo, pelo Simulador).
 
 Regras **provisórias**, a confirmar com o time da inspeção (ficam em `dominio/parametros.ts` e nos parâmetros, nunca espalhadas): veredito APROVADO → `aprovado`; ATENÇÃO e REJEITADO → `reprovado`. Categoria pelo índice: ≥ 80 → 1, ≥ 50 → 2, abaixo → 3 (limites `limitesCategoria`). Vale a inspeção mais recente do dormente.
 
@@ -275,9 +281,9 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `fornecedores`, `especies`, `tamanhos`, `tratamentos`, `locais` | `listar`, `obter`, `criar`, `atualizar`, `inativar` (`locais.obter(codigo)` para a página do local) |
 | `usuarios` | `listar`, `atualizar` (só perfil e situação; as contas são criadas no painel do Supabase) |
 | `contratos` | `listar`, `obter(numero)`, `criar`, `atualizar`, `cancelar`; `atas`: `listar`, `criar` |
-| `simulador` | `gerarRemessa({ contratoId, itens: [{ itemContratoId, fardos, dormentesPorFardo }] })` → cria fardos `em_transito`, dormentes `emitido`, NF e DOF de exemplo; recusa acima do `saldoAEmitir`; `etiquetas(remessaId)` |
-| `recebimentos` | `listar`, `obter`, `remessasACaminho()` (inclui as parciais, com os fardos que faltam), `receber(dados, arquivos)` |
-| `documentos` | `listarNfs`, `listarDofs`, `declararDof(id)`, `importarXml` (validação no front com `utils/nfeXml.ts`) |
+| `simulador` | `gerarEntrega({ contratoId, itens: [{ itemContratoId, fardos, dormentesPorFardo }] })` → cria fardos `em_transito`, dormentes `emitido`, NF e DOF de exemplo e a entrega `a_caminho` (como se tivesse sido cadastrada em NF e DOF); recusa acima do `saldoAEmitir`; `etiquetas(entregaId)` |
+| `recebimentos` | `listar`, `obter`, `entregasACaminho()` (inclui as parciais, com os fardos que faltam), `receber(entregaId, dados, arquivos)` |
+| `documentos` | `cadastrarEntrega({ nf, dof, fardosIds? }, arquivos)` → cria NF, DOF e a entrega `a_caminho` (chave repetida recusada, sem DOF não cadastra); `listarEntregas`, `listarNfs`, `listarDofs`, `fardosSemEntrega(contratoId)`, `declararDof(id)`; leitura do XML no front com `utils/nfeXml.ts` |
 | `inspecao` | `fila()`, `naoLocalizados()`, `obterFardo(id)`, `registrar(dormenteId, resultado)` (aceita dormente `nao_localizado` encontrado depois), `simularFardo(id)`, `concluir(fardoId, localId, justificativa?)` |
 | `fardos` | `listar`, `obter(id)`, `transferir(id, localId)` |
 | `dormentes` | `listar`, `obter(id)` (devolve a ficha completa já montada, seção 9.13) |
@@ -288,9 +294,9 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 
 **Mock (até a Etapa 10).**
 - Guarda o estado no **`localStorage`** (com `try/catch`), para os dados sobreviverem ao recarregar a página; **Reiniciar dados de demonstração** em Configurações volta à história inicial.
-- A história inicial (`data.ts`) é **determinística**: os mesmos IDs sempre, sem `Math.random()` nem datas soltas (datas relativas a uma data-base fixa). Inclui uma **remessa "a caminho" pronta, com IDs fixos**, para computador e celular partirem do mesmo estado e as etiquetas poderem ser impressas com antecedência (seção 15).
+- A história inicial (`data.ts`) é **determinística**: os mesmos IDs sempre, sem `Math.random()` nem datas soltas (datas relativas a uma data-base fixa). Inclui uma **entrega "a caminho" pronta, com IDs fixos**, para computador e celular partirem do mesmo estado e as etiquetas poderem ser impressas com antecedência (seção 15).
 - Regras num módulo por assunto: `mock/simulador.ts`, `mock/recebimento.ts`, `mock/inspecao.ts`, `mock/estoque.ts` (única porta de mudança de saldo: `movimentarDormentes()`), `mock/rme.ts`. `data.ts` gera a história **chamando essas regras**, nunca montando registros à mão. As regras e os invariantes da seção 5.4 têm testes no Vitest.
-- Remessas geradas no Simulador depois do início ficam só no aparelho onde foram geradas.
+- Entregas geradas no Simulador ou cadastradas depois do início ficam só no aparelho onde foram criadas.
 
 **Supabase (Etapa 10).**
 - SQL em `supabase/migrations/` (numerado, um arquivo por mudança): tabela `perfis` ligada a `auth.users`, tabelas dos dados a partir de `models.ts` (campos calculados viram views ou funções), políticas RLS por perfil e a carga da história de demonstração com os mesmos IDs do mock. Claude escreve; a Dani executa no editor SQL do Supabase.
@@ -400,7 +406,7 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 
 ### 9.2 Painel (`/`) · padrão Painel
 - **Indicadores** (clicáveis): Em estoque (dormentes) · Aguardando inspeção · Itens abaixo do mínimo · Fardos acima do limite de dias · DOFs a declarar · RMEs abertas.
-- **Para fazer agora** por perfil: almoxarife (remessas a receber, fardos a inspecionar, fardos a guardar, RMEs a separar e entregar, DOFs a declarar); gestor (itens em falta ou excesso, fardos parados, taxa de reprovação alta, dormentes não localizados); requisitante (suas RMEs e situação); administrador (contratos perto do fim, fornecedores com CTF vencendo).
+- **Para fazer agora** por perfil: almoxarife (entregas a receber, fardos a inspecionar, fardos a guardar, RMEs a separar e entregar, DOFs a declarar); gestor (itens em falta ou excesso, fardos parados, taxa de reprovação alta, dormentes não localizados); requisitante (suas RMEs e situação); administrador (contratos perto do fim, fornecedores com CTF vencendo).
 - **Estoque por item**: gráfico de barras horizontais por espécie + tamanho, com marcas de mínimo e máximo (cor só reforça o rótulo falta/ok/excesso).
 - **Entregas dos contratos**: `BarraProgresso` por contrato vigente.
 - **Alertas**: lista curta com link.
@@ -415,18 +421,18 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 
 ### 9.4 Página do contrato (`/contratos/:numero`) · padrão Objeto
 - Cabeçalho: número, situação, fatos-chave (Fornecedor (da ata), Ata, Contratado, Recebido, Aprovado, Reprovado).
-- Abas: **Itens** (por item: contratado, emitidos, recebidos, aprovados, reprovados, saldo a emitir, barra de progresso) · **Fardos** (lista filtrada por contrato) · **Notas e recebimentos** · **Histórico**.
-- Ações: Editar, Cancelar, **Gerar remessa no simulador** (só com modo demonstração).
+- Abas: **Itens** (por item: contratado, emitidos, recebidos, aprovados, reprovados, saldo a emitir, barra de progresso) · **Fardos** (lista filtrada por contrato) · **Entregas** (NF, DOF, situação e recebimento) · **Histórico**.
+- Ações: Editar, Cancelar, **Gerar entrega no simulador** (só com modo demonstração).
 - Relacionados: fornecedor, ata, NFs, recebimentos.
 
 ### 9.5 Simulador do fornecedor (`/simulador`) · padrão Assistente + Lista
 - Aviso fixo no topo (não recolhível): "Demonstração. Na operação real, o fornecedor grava o QR na plaquinha seguindo o padrão do contrato."
-- Assistente **Gerar remessa**: 1) contrato · 2) itens e quantidades (fardos e dormentes por fardo, padrão do parâmetro; mostra o saldo a emitir do item, `quantidade - (emitidos - reprovados)`, e bloqueia acima dele: reposição de reprovados é permitida) · 3) revisar e confirmar.
-- Ao confirmar: cria fardos `em_transito`, dormentes `emitido` com IDs sequenciais, uma NF e um DOF de exemplo coerentes com o volume, e a remessa `em_transito`.
-- Lista abaixo: remessas geradas (NF, contrato, fardos, dormentes, situação) com ações **Imprimir etiquetas** e **Baixar XML da NF** (XML fictício para testar a importação).
-- Aceite: nenhuma sequência se repete entre remessas do mesmo contrato; emitidos menos reprovados nunca passa do contratado.
+- Assistente **Gerar entrega**: 1) contrato · 2) itens e quantidades (fardos e dormentes por fardo, padrão do parâmetro; mostra o saldo a emitir do item, `quantidade - (emitidos - reprovados)`, e bloqueia acima dele: reposição de reprovados é permitida) · 3) revisar e confirmar.
+- Ao confirmar: cria fardos `em_transito`, dormentes `emitido` com IDs sequenciais, uma NF e uma DOF de exemplo coerentes com o volume, e a entrega `a_caminho`, que aparece em NF e DOF e em Recebimentos como se tivesse sido cadastrada.
+- Lista abaixo: entregas geradas (NF, contrato, fardos, dormentes, situação) com ações **Imprimir etiquetas** e **Baixar XML da NF** (XML fictício para testar a importação).
+- Aceite: nenhuma sequência se repete entre entregas do mesmo contrato; emitidos menos reprovados nunca passa do contratado.
 
-### 9.6 Folha de etiquetas (`/simulador/etiquetas/:remessa`)
+### 9.6 Folha de etiquetas (`/simulador/etiquetas/:entrega`)
 - Sem Layout. Grade de `EtiquetaQr` para impressão em A4: primeiro a etiqueta do fardo, depois as dos dormentes daquele fardo.
 - Etiqueta do dormente (proporção da plaquinha do contrato): QR à esquerda, à direita o ID em mono e grande, contrato, espécie e comprimento. Etiqueta do fardo: maior, com "FARDO", ID, item e quantidade.
 - Usar o texto "CPTM" no cabeçalho, não o arquivo do logo (só usar logo se a CPTM fornecer).
@@ -434,12 +440,12 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 - Aceite: a etiqueta impressa é lida pela câmera do celular e abre a ficha.
 
 ### 9.7 Recebimentos (`/recebimentos`) · padrão Lista
-- Abas: **A caminho** (remessas em trânsito, inclusive as recebidas em parte, com os fardos que faltam) · Aguardando inspeção · Concluídos · Com ocorrência.
+- Abas: **A caminho** (entregas cadastradas em NF e DOF ainda não recebidas, inclusive as recebidas em parte, com os fardos que faltam) · Aguardando inspeção · Concluídos · Com ocorrência.
 - Colunas: NF · Fornecedor · Contrato · Fardos · Dormentes · Prazo DOF (badge) · Situação.
-- Ação na linha "A caminho": **Receber** (abre o assistente com a remessa já escolhida). Ação principal da tela: **Receber sem remessa** (NF por XML ou digitada).
+- Ação na linha "A caminho": **Receber** (abre o assistente com a entrega já escolhida). Ação principal da tela: **Receber** (abre o assistente no passo 1).
 - **Assistente de recebimento** (`RecebimentoAssistente`):
-  1. **Documentos**: NF (da remessa, por XML com `utils/nfeXml.ts` ou digitada; chave repetida é recusada) e DOF (número, validade, volume por espécie, PDF). Sem DOF não avança.
-  2. **Leitura dos fardos**: lista dos fardos esperados com caixa de checagem; botão **Ler QR** em modo contínuo marca cada fardo lido; fardo lido que não é da remessa vira ocorrência "fardo desconhecido"; também dá para marcar à mão. Fardo esperado e não lido gera ocorrência de **falta** automática, continua `em_transito` e pode ser recebido depois (a remessa fica `recebida_parcial` e volta para "A caminho" com os fardos que faltam).
+  1. **Escolher a entrega**: lista das entregas "A caminho" (NF, fornecedor, contrato, fardos esperados, prazo da DOF), com busca pela NF. Exceção: **Cadastrar NF e DOF agora**, para material que chegou sem cadastro prévio; abre os mesmos passos do cadastro de NF e DOF (9.9) e volta com a entrega criada (origem `recebimento`).
+  2. **Leitura dos fardos**: lista dos fardos esperados com caixa de checagem; botão **Ler QR** em modo contínuo marca cada fardo lido; fardo lido do mesmo contrato, emitido e sem entrega entra na entrega; fardo de outro contrato, de outra entrega ou desconhecido vira ocorrência "fardo desconhecido"; também dá para marcar à mão. Fardo esperado e não lido gera ocorrência de **falta** automática, continua `em_transito` e pode ser recebido depois (a entrega fica `recebida_parcial` e continua em "A caminho" com os fardos que faltam).
   3. **Conferência**: conforme ou com ocorrência (avaria, falta, sobra); ocorrência exige descrição e foto.
   4. **Local de espera**: local do tipo inspeção (sugerido o com mais espaço).
   5. **Revisar e confirmar**: resumo, divergência de volume por espécie (acima de 10% mostra aviso crítico e pede justificativa, não bloqueia).
@@ -450,10 +456,18 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 - Abas: Fardos (com situação e link para inspeção) · Documentos (NF, XML, DOF, PDF, volume documental x calculado) · Ocorrências (fotos) · Histórico.
 - Ação: **Marcar DOF como declarado no Sinaflor** (com confirmação; registra quem e quando).
 
-### 9.9 NF e DOF (`/documentos`) · padrão Lista
-- Abas: DOFs a declarar · Declarados · Todas as NFs.
-- Colunas DOF: DOF · NF · Fornecedor · Validade · Prazo de declaração · Nível (crítico, atenção, ok) · Declarado em.
-- Ação na linha: **Declarar**. Ordenação padrão: prazo mais próximo primeiro.
+### 9.9 NF e DOF (`/documentos`) · padrão Lista + Assistente
+Primeiro item do grupo Entrada: é onde a entrega nasce, antes da chegada do material, e onde fica o controle de prazo e a declaração no Sinaflor.
+- Ação principal: **Cadastrar NF e DOF** (assistente `EntregaAssistente`):
+  1. **NF**: importar o XML (lido no navegador por `utils/nfeXml.ts`, sem executar nada) ou digitar; chave de acesso repetida é recusada; contrato (do fornecedor da NF) e itens com quantidade e volume.
+  2. **DOF**: número, validade, volume por espécie e PDF. Sem DOF não avança.
+  3. **Fardos da entrega** (opcional): fardos já emitidos do contrato, em trânsito e sem entrega; pode ficar em branco (seção 5.5).
+  4. **Revisar e confirmar**: resumo e o prazo de declaração calculado.
+  - Resultado: NF, DOF e a entrega "A caminho", que aparece em Recebimentos.
+- Abas: **A caminho** (entregas cadastradas e não recebidas) · DOFs a declarar · Declarados · Todas as NFs.
+- Colunas DOF: DOF · NF · Fornecedor · Validade · Prazo de declaração · Nível (crítico, atenção, ok) · Declarado em. Colunas das entregas: NF · Fornecedor · Contrato · Fardos esperados · Prazo DOF · Situação.
+- Ações na linha: **Declarar** (DOF, com confirmação; registra quem e quando) e **Receber** (entrega a caminho, abre o assistente de recebimento com ela escolhida). Ordenação padrão: prazo mais próximo primeiro.
+- Aceite: cadastrar NF por XML e DOF cria a entrega "A caminho"; a mesma chave de acesso de novo é recusada.
 
 ### 9.10 Inspeção (`/inspecao`) e Inspeção do fardo (`/inspecao/:fardo`)
 - **Fila** (padrão Lista): fardos `aguardando_inspecao` e `em_inspecao` com progresso (x de N dormentes inspecionados), contrato, item, local de espera, há quantos dias. Ação: **Inspecionar**. Aba **Não localizados**: dormentes que ficaram `nao_localizado` (pendência do gestor), com ação **Inspecionar** quando o dormente for encontrado.
@@ -577,14 +591,14 @@ Quem usa a câmera trabalha no pátio, com o celular numa mão e às vezes luva 
 | Separação da RME | Almoxarife | Lista do que falta separar por fardo; cada leitura risca o dormente; aviso imediato se o dormente lido não estiver na sugestão |
 | Página do fardo (`/f/:id`) | Almoxarife | Fatos-chave em grade 2 x 2, ações no rodapé fixo |
 
-**Início de campo.** No celular, o almoxarife não vê o painel completo. Ao entrar, ele encontra o botão **Ler QR** grande no topo e, logo abaixo, as tarefas do dia em cartões com contagem e ação direta, como "Receber 1 remessa", "Inspecionar 2 fardos", "Guardar 3 fardos" e "Separar RME-2026-0012". O painel completo continua acessível pelo menu. Implementar como uma variação do `Dashboard` escolhida por perfil e largura de tela (`useTelaPequena()`), não como rota separada.
+**Início de campo.** No celular, o almoxarife não vê o painel completo. Ao entrar, ele encontra o botão **Ler QR** grande no topo e, logo abaixo, as tarefas do dia em cartões com contagem e ação direta, como "Receber 1 entrega", "Inspecionar 2 fardos", "Guardar 3 fardos" e "Separar RME-2026-0012". O painel completo continua acessível pelo menu. Implementar como uma variação do `Dashboard` escolhida por perfil e largura de tela (`useTelaPequena()`), não como rota separada.
 
 **Regras das telas de campo**
 - Ação principal sempre no **rodapé fixo**, ao alcance do polegar; nada importante só no topo da tela.
 - Alvos de toque de no mínimo 48 px nas telas de campo (acima dos 44 px do resto do sistema), com espaço entre botões para uso com luva.
 - Texto mínimo de 16 px e IDs em 18 px ou mais, legíveis sob sol; contraste alto, sem cinza claro sobre branco em informação importante.
 - Leitura contínua: depois de cada leitura, a câmera continua aberta, com vibração curta e som opcional de confirmação, e o último item lido aparece em destaque por 2 segundos.
-- Erros de leitura em linguagem direta ("Este fardo não é desta remessa") com a ação para resolver na mesma tela.
+- Erros de leitura em linguagem direta ("Este fardo não é desta entrega") com a ação para resolver na mesma tela.
 - Nenhuma tabela larga: no celular, tudo vira cartão ou lista de uma coluna.
 - Sem digitação obrigatória quando houver QR; digitar fica como alternativa.
 - Rede instável: manter o que já foi lido no estado da tela se uma chamada falhar, com botão **Tentar de novo**, sem perder as leituras (offline completo continua fora do escopo).
@@ -621,6 +635,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Código de domínio da v1 removido (telas, mock, modais, componentes de relatório e quadro); ficou só a infraestrutura da seção 2. O app abre numa tela "Em construção".
 - `CLAUDE.md` reescrito para a v2.
 - Revisão das decisões (2026-11-05): plano e especificação sem contradições; sem avisos de dados simulados; botão de recolher o menu no topo.
+- Ajuste (2026-11-06): NF e DOF cadastradas antes da chegada criam a entrega "A caminho"; o recebimento começa escolhendo a entrega.
 
 ### Etapa 1 · Fundação visual, casca, perfis e vitrine (concluída)
 - `styles/tokens.css` e ajuste de `styles.css` para os tokens.
@@ -635,7 +650,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - `vitest` como dependência de desenvolvimento e `npm test`.
 - `identificacao.ts` (dormente, fardo, contrato, RME, local) com testes.
 - `models.ts` v2, `rotulos.ts`, `opcoes.ts`, `parametros.ts` (tolerância de volume, regras provisórias da inspeção).
-- `contracts.ts` v2 e mock reescrito: módulos de regra, persistência no `localStorage`, reinício da demonstração e o `data.ts` da história de demonstração (seção 15), com a remessa "a caminho" de IDs fixos. Testes dos invariantes da seção 5.4 e das regras de recebimento, inspeção (inclusive não localizados), simulador (limite com reposição) e RME.
+- `contracts.ts` v2 e mock reescrito: módulos de regra, persistência no `localStorage`, reinício da demonstração e o `data.ts` da história de demonstração (seção 15), com a entrega "a caminho" de IDs fixos. Testes dos invariantes da seção 5.4 e das regras de recebimento, inspeção (inclusive não localizados), simulador (limite com reposição) e RME.
 - Reescrever a seção de regras de domínio do `CLAUDE.md`.
 - Pronto quando: build e testes passam, o mock gera a história completa e consistente.
 
@@ -647,13 +662,14 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - **Pré-requisito:** projeto na Vercel com HTTPS e a URL definitiva no `VITE_APP_URL` (seção 10.4).
 - Dependências `qrcode`, `jsqr` e `@types/qrcode`; `LeitorQr`; `EtiquetaQr`; rotas `/d/:id`, `/f/:id` e `/locais/:codigo`.
 - Ficha do dormente completa (lê do mock todos os vínculos).
-- Simulador (assistente + lista de remessas) e folha de etiquetas com CSS de impressão, inclusive da remessa "a caminho" fixa.
+- Simulador (assistente + lista de entregas) e folha de etiquetas com CSS de impressão, inclusive da entrega "a caminho" fixa.
 - Busca global e `CodigoLink` reconhecendo IDs v2.
-- Pronto quando: imprimir as etiquetas da remessa fixa, apontar a câmera do celular (pela URL da Vercel) e abrir a ficha.
+- Pronto quando: imprimir as etiquetas da entrega fixa, apontar a câmera do celular (pela URL da Vercel) e abrir a ficha.
 
-### Etapa 5 · Recebimento, NF e DOF
-- Lista de recebimentos com "A caminho", assistente de recebimento com leitura contínua dos fardos e falta de fardo, página do recebimento, tela NF e DOF com declaração.
-- Pronto quando: a remessa é recebida lendo os QR dos fardos, os dormentes passam a "aguardando inspeção" e um fardo não lido pode ser recebido depois.
+### Etapa 5 · NF e DOF, e Recebimento
+- Tela NF e DOF com o cadastro da entrega (XML ou digitada, DOF, fardos opcionais), abas de entregas e DOFs, controle de prazo e declaração no Sinaflor.
+- Lista de recebimentos com "A caminho", assistente de recebimento começando por "Escolher a entrega" (com a exceção de cadastrar NF e DOF na hora), leitura contínua dos fardos e falta de fardo, página do recebimento.
+- Pronto quando: importar o XML de uma NF e cadastrar a DOF cria a entrega "A caminho"; a entrega é recebida lendo os QR dos fardos, os dormentes passam a "aguardando inspeção" e um fardo não lido pode ser recebido depois.
 
 ### Etapa 6 · Inspeção
 - Fila (com não localizados), tela de inspeção do fardo, simulação, registro manual, conclusão com guarda, segregação e justificativa.
@@ -675,7 +691,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - `supabase/migrations/`: tabela `perfis`, tabelas dos dados, views dos campos calculados, funções das operações que mudam várias tabelas, políticas RLS por perfil e a carga da história de demonstração com os mesmos IDs do mock. Claude escreve; a Dani executa no editor SQL. As contas são criadas no painel do Supabase.
 - `@supabase/supabase-js`; implementação `services/supabase/`; Supabase Auth no serviço de autenticação (sessão guardada no aparelho); `VITE_FONTE_DADOS`, `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (também na Vercel).
 - Remover `services/real/`, `http.ts` e `endpoints.ts`; erros em `services/erros.ts`. Usuários lista e edita perfil e situação.
-- Pronto quando: computador e celular veem os mesmos dados; uma remessa gerada no computador é recebida no celular; cada perfil só lê e grava o que as políticas permitem.
+- Pronto quando: computador e celular veem os mesmos dados; uma entrega gerada no computador é recebida no celular; cada perfil só lê e grava o que as políticas permitem.
 
 ### Etapa 11 · Acabamento e demonstração
 - Revisão de responsividade (360 px), acessibilidade, estados vazios e de erro em todas as telas.
@@ -708,7 +724,7 @@ Montar uma história coerente, gerada pelas regras do mock, para que todas as te
 
 - 3 fornecedores (um com CTF válido, um com CTF vencendo em 20 dias e um com CTF vencido, bloqueado automaticamente), 4 espécies, 2 tamanhos (2,00 m e 2,80 m, medidas provisórias), 2 tratamentos, 8 locais (5 armazenagem, 1 inspeção, 1 segregação, 1 expedição).
 - 2 atas e 3 contratos vigentes, um concluído.
-- Remessas em todas as fases: **1 a caminho com IDs fixos** (contrato, fardos e dormentes documentados em `data.ts` e no `CLAUDE.md`, para imprimir as etiquetas com antecedência e para computador e celular partirem do mesmo estado), 1 recebida em parte (um fardo ainda em trânsito), 1 recebida aguardando inspeção, 1 em inspeção pela metade, várias concluídas.
+- Entregas em todas as fases: **1 a caminho com IDs fixos** (contrato, fardos e dormentes documentados em `data.ts` e no `CLAUDE.md`, para imprimir as etiquetas com antecedência e para computador e celular partirem do mesmo estado), 1 recebida em parte (um fardo ainda em trânsito), 1 recebida aguardando inspeção, 1 em inspeção pela metade, várias concluídas.
 - ~200 dormentes com situações variadas; ~5% reprovados (com uma reposição emitida); 2 dormentes não localizados num fardo concluído com justificativa; 1 fardo acima do limite de dias; 1 item abaixo do mínimo e 1 acima do máximo.
 - DOFs: 1 vencido sem declaração, 1 vencendo em 1 dia, 1 em 3 dias, os demais declarados.
 - RMEs: 1 aberta, 1 em separação, 1 pronta, 3 entregues (uma deixou fardo aberto), 1 cancelada.
@@ -717,12 +733,12 @@ Montar uma história coerente, gerada pelas regras do mock, para que todas as te
 
 ## 16. Roteiro de demonstração (o que a banca vai ver)
 
-Executado na Etapa 11, já com o Supabase, para computador e celular compartilharem os dados. Antes dele, o mesmo roteiro funciona com a remessa "a caminho" fixa no lugar da gerada no passo 3.
+Executado na Etapa 11, já com o Supabase, para computador e celular compartilharem os dados. Antes dele, o mesmo roteiro funciona com a entrega "a caminho" fixa no lugar da gerada no passo 3.
 
 1. Login como **administrador**: Painel com indicadores e alertas.
 2. Abrir um contrato e mostrar entregas por item.
-3. **Simulador do fornecedor**: gerar uma remessa e imprimir as etiquetas (já impressas e coladas em peças de madeira).
-4. Login como **almoxarife** no celular: **Receber** a remessa lendo os QR dos fardos.
+3. **Simulador do fornecedor**: gerar uma entrega (com NF e DOF) e imprimir as etiquetas (já impressas e coladas em peças de madeira). Mostrar a entrega "A caminho" em NF e DOF, com o prazo da DOF.
+4. Login como **almoxarife** no celular: **Receber**, escolher a entrega e ler os QR dos fardos.
 5. **Inspeção**: simular a inspeção do fardo, concluir e guardar lendo o QR do local.
 6. Apontar a **câmera comum do celular** para um dormente: a ficha abre com origem, inspeção, local e histórico.
 7. Login como **requisitante**: abrir uma RME. Como **almoxarife**: separar lendo os QR e entregar.
@@ -741,6 +757,7 @@ Executado na Etapa 11, já com o Supabase, para computador e celular compartilha
 | Quantos dormentes por fardo o fornecedor monta | Parâmetro, padrão 14 |
 | Tamanho final do QR na plaquinha | QR na plaquinha do contrato (a menor), a validar com a CPTM |
 | Quem abre a RME na prática | Perfil requisitante |
+| Fardos esperados da entrega | Opcionais no cadastro; sem eles, o recebimento aceita fardos do mesmo contrato emitidos e sem entrega |
 | Quem pode cancelar a RME | O requisitante que abriu e o almoxarife, antes da entrega |
 | ATENÇÃO do Inspector | Conta como reprovado (a confirmar com o time da inspeção) |
 | Categorias e limites do índice | 1, 2 e 3, com limites 80 e 50 (a confirmar com o time da inspeção) |

@@ -1,6 +1,6 @@
 # Especificação Funcional · Sistema de Rastreabilidade de Dormentes (CPTM)
 
-Versão de 05/11/2026 · Dani, revisada com as decisões de 05/11/2026 (saldo, faltas, não localizados, reposição, QR dos locais, fornecedor da ata, inspeção e login). Documento de origem: https://claude.ai/artifact/4rUyTJs9equ4ZYVKtETNVi
+Versão de 05/11/2026 · Dani, revisada com as decisões de 05/11/2026 (saldo, faltas, não localizados, reposição, QR dos locais, fornecedor da ata, inspeção e login) e de 06/11/2026 (NF e DOF antes da chegada, entrega a caminho). Documento de origem: https://claude.ai/artifact/4rUyTJs9equ4ZYVKtETNVi
 
 ## 1. Visão geral e escopo
 
@@ -62,7 +62,7 @@ Todo dormente terá um ID único, formado pelo número do contrato mais uma sequ
 | ID do dormente | Código único do dormente, gravado no QR code e escrito na plaquinha |
 | Inspeção de recebimento | Inspeção automatizada da CPTM, dormente a dormente, que mede e classifica cada peça |
 | Categoria | Resultado de qualidade dado pela inspeção de recebimento: 1, 2 ou 3 (provisório, a confirmar com o time da inspeção) |
-| Remessa | O que o fornecedor envia de uma vez, com uma NF e os seus fardos |
+| Entrega | O que o fornecedor envia de uma vez: uma NF, uma DOF e os seus fardos. É cadastrada na tela NF e DOF antes da chegada e fica "a caminho" até ser recebida |
 | Local | Endereço do armazém onde o fardo está guardado, identificado por um QR próprio |
 | Saída | Retirada de dormentes do estoque para uma obra ou trecho |
 
@@ -84,10 +84,10 @@ Plaquinha: a atual mede cerca de 5 x 7 cm. A proposta é gravar o QR na plaquinh
 
 ## 3. Jornada do dormente
 
-O dormente nasce no contrato, chega identificado pelo fornecedor e é lido pelo QR no recebimento, na inspeção, na guarda e na saída, sem nenhuma digitação de código.
+O dormente nasce no contrato, chega identificado pelo fornecedor e é lido pelo QR no recebimento, na inspeção, na guarda e na saída, sem nenhuma digitação de código. A NF e a DOF são cadastradas antes da chegada, o que cria a entrega "a caminho" que o almoxarife escolhe ao receber.
 
 ```
-Contrato → Fornecedor grava o QR → Recebimento (NF, DOF, fardos) → Inspeção peça a peça → Aprovado?
+Contrato → Fornecedor grava o QR → NF e DOF cadastradas (entrega a caminho) → Recebimento (leitura dos fardos) → Inspeção peça a peça → Aprovado?
    sim → Estoque (fardo no seu local) → Saída (baixa por ID)
    não → Segregado (a devolução ao fornecedor fica fora do protótipo)
 ```
@@ -112,7 +112,7 @@ Os fardos chegam montados. Na inspeção, o fardo é aberto, cada dormente passa
 
 | Situação | Quando acontece |
 | --- | --- |
-| Em trânsito | O fornecedor gerou o fardo, mas ele ainda não chegou, ou não foi lido no recebimento da sua remessa (falta) e pode ser recebido depois |
+| Em trânsito | O fornecedor gerou o fardo, mas ele ainda não chegou, ou não foi lido no recebimento da sua entrega (falta) e pode ser recebido depois |
 | Aguardando inspeção | Foi recebido e espera a inspeção |
 | Em inspeção | A inspeção dos seus dormentes começou e ainda não foi concluída |
 | Em estoque | Foi inspecionado, fechado e guardado num local |
@@ -132,14 +132,14 @@ O banco tem dois níveis de detalhe, o fardo e o dormente, e todo dormente apont
 | Local | Código, descrição, tipo, capacidade em dormentes, QR | Fardos guardados |
 | Usuário | Nome, e-mail, perfil, ativo | Todo registro guarda quem fez |
 | Ata | Número, fornecedor, vigência | Contratos |
-| Contrato | Número, ata, empresa inspetora, situação (o fornecedor vem da ata) | Itens, remessas, fardos, dormentes, NFs |
+| Contrato | Número, ata, empresa inspetora, situação (o fornecedor vem da ata) | Itens, entregas, fardos, dormentes, NFs |
 | Item do contrato | Espécie, tamanho, tratamento, quantidade em unidades | Contrato, dormentes |
-| Remessa | NF, fardos, situação (a caminho, recebida em parte, recebida) | Contrato, NF, fardos |
+| Entrega | NF, DOF, fardos esperados, situação (a caminho, recebida em parte, recebida) | Contrato, NF, DOF, fardos, recebimento |
 | Fardo | ID, contrato, quantidade inicial, saldo físico e disponível (calculados), local, situação | Dormentes, recebimento, movimentações |
 | Dormente | ID, item do contrato, fardo, situação, categoria, medidas | Fardo, inspeção, saída |
-| NF | Número, chave, fornecedor, data, XML | Contrato, DOF, recebimento |
+| NF | Número, chave, fornecedor, data, XML | Contrato, entrega, DOF |
 | DOF | Número, validade, volume por espécie, PDF, declarado no Sinaflor | NF |
-| Recebimento | Data, responsável, conformidade, fotos | NF, fardos recebidos |
+| Recebimento | Data, responsável, conformidade, fotos | Entrega, fardos recebidos |
 | Inspeção | Dormente, resultado (aprovado ou reprovado), categoria, medidas, inspetor, data | Dormente, fardo |
 | Movimentação | Tipo (guarda, transferência, saída), fardo, de, para, quem, quando | Fardo, local, saída |
 | Saída | Número, destino (obra ou trecho), solicitante, situação | Itens, dormentes baixados |
@@ -148,14 +148,15 @@ Mudança em relação ao sistema atual: sai o conceito de lote (NF + espécie + 
 
 ## 5. Módulos e regras de negócio
 
-São nove módulos, um para cada etapa da jornada mais os de apoio. O detalhe das telas e da interface fica no plano de desenvolvimento (`docs/PLANO-V2.md`).
+São dez módulos, um para cada etapa da jornada mais os de apoio. O detalhe das telas e da interface fica no plano de desenvolvimento (`docs/PLANO-V2.md`).
 
 | Módulo | O que faz | Regras principais |
 | --- | --- | --- |
 | Cadastros | Espécies, tamanhos, tratamentos, fornecedores, locais | Nada é apagado, só inativado; volume do tamanho sempre calculado; fornecedor com CTF vencido fica bloqueado automaticamente para novas atas e contratos, calculado pela validade; cada local tem um QR (LOC-código) |
 | Contratos | Ata, contrato e itens | O contrato herda o fornecedor da ata (não é digitado de novo); itens em unidades; se informado em m³, o sistema converte pelo volume do tamanho e arredonda para baixo; mostra quanto já foi entregue de cada item |
 | Simulador do fornecedor | Gera fardos e IDs de dormentes e imprime etiquetas | Só para demonstração, com aviso fixo na tela; o contrato é cumprido por aprovados, então pode emitir reposição dos reprovados, desde que emitidos menos reprovados não passe da quantidade do item; ID nunca repetido |
-| Recebimento | NF, DOF, conferência e leitura dos fardos | Sem DOF não há recebimento; chave de NF repetida é recusada; diferença de quantidade ou avaria exige foto; divergência de volume por espécie acima de 10% gera alerta (IN IBAMA); fardo esperado e não lido continua em trânsito, o recebimento é concluído com ocorrência de falta e o fardo pode ser recebido depois |
+| NF e DOF | Cadastro da NF (XML ou digitada) e da DOF antes da chegada, prazo e declaração no Sinaflor | Cadastrar NF e DOF cria a entrega "a caminho"; sem DOF não há entrega; chave de NF repetida é recusada; os fardos da entrega podem ser indicados no cadastro ou só na leitura do recebimento (provisório); no protótipo, o Simulador gera a entrega já com NF e DOF |
+| Recebimento | Escolha da entrega, leitura dos fardos e conferência | O almoxarife escolhe uma entrega "a caminho"; cadastrar NF e DOF na hora é exceção; sem DOF não há recebimento; diferença de quantidade ou avaria exige foto; divergência de volume por espécie acima de 10% gera alerta (IN IBAMA); fardo esperado e não lido continua em trânsito, o recebimento é concluído com ocorrência de falta e o fardo pode ser recebido depois |
 | Inspeção | Recebe o resultado de cada dormente | Vem do sistema de inspeção pelo banco compartilhado; no protótipo, simulada por botão; resultado só aprovado ou reprovado (o ATENÇÃO do sistema de inspeção conta como reprovado) e categoria 1, 2 ou 3 pelos limites 80 e 50 do índice, ambos provisórios, a confirmar com o time da inspeção; reprovados saem do fardo; ID que não pertence ao fardo vira pendência; o fardo pode ser concluído com dormentes não lidos, com justificativa obrigatória, e eles ficam não localizados |
 | Estoque | Saldo, fardos, locais e movimentações | Saldo físico do fardo = dormentes em estoque + reservados; disponível para nova saída = só em estoque; guardar e transferir é lendo o QR do fardo e o QR do local (ou escolhendo o local) |
 | Ficha do dormente | Tela aberta pelo QR | Mostra contrato, fornecedor, NF, DOF, inspeção, local e histórico; só leitura |
@@ -173,6 +174,7 @@ Cada perfil vê no menu só o que pode usar, e a leitura da ficha do dormente pe
 | Cadastros | Edita | Consulta | Consulta | Não vê |
 | Contratos | Edita | Consulta | Consulta | Não vê |
 | Simulador do fornecedor | Usa | Usa | Não vê | Não vê |
+| NF e DOF | Consulta | Cadastra e declara | Consulta | Não vê |
 | Recebimento | Consulta | Registra | Consulta | Não vê |
 | Inspeção | Consulta | Acompanha e simula | Consulta | Não vê |
 | Estoque | Consulta | Guarda e transfere | Consulta | Consulta saldo |

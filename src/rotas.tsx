@@ -41,9 +41,10 @@ export const ROTAS: Rota[] = [
   { caminho: '/', tela: emConstrucao('Painel', 9), rotulo: 'Painel', icone: 'grid', grupo: 'Início', fim: true },
   { caminho: '/contratos', tela: emConstrucao('Contratos', 3), rotulo: 'Contratos', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO },
   { caminho: '/simulador', tela: emConstrucao('Simulador do fornecedor', 4), rotulo: 'Simulador do fornecedor', icone: 'fabrica', grupo: 'Suprimento', permissoes: ['simulador:usar'], demo: true },
+  // NF e DOF primeiro: a entrega nasce no cadastro da NF e da DOF, antes da chegada.
+  { caminho: '/documentos', tela: emConstrucao('NF e DOF', 5), rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: OPERACAO },
   { caminho: '/recebimentos', tela: emConstrucao('Recebimentos', 5), rotulo: 'Recebimentos', icone: 'truck', grupo: 'Entrada', permissoes: OPERACAO },
   { caminho: '/inspecao', tela: emConstrucao('Inspeção', 6), rotulo: 'Inspeção', icone: 'inspecao', grupo: 'Entrada', permissoes: OPERACAO },
-  { caminho: '/documentos', tela: emConstrucao('NF e DOF', 5), rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: OPERACAO },
   // Todos: o requisitante verá só a visão por item (Etapa 7).
   { caminho: '/estoque', tela: emConstrucao('Estoque', 7), rotulo: 'Estoque', icone: 'box', grupo: 'Estoque' },
   { caminho: '/locais', tela: emConstrucao('Locais', 7), rotulo: 'Locais', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO },
