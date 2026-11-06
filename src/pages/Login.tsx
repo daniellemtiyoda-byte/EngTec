@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
-import { env } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
+import { PERFIS, PERFIS_LISTA } from '../dominio/permissoes';
 import { mensagemSegura } from '../services/http';
 
 export default function Login() {
@@ -50,9 +50,15 @@ export default function Login() {
       <main className="login-lado-form">
         <form className="login-form" onSubmit={enviar} noValidate>
           <h2>Entrar no sistema</h2>
-          {env.USE_MOCK && (
-            <p className="login-demo"><strong>Modo de demonstração.</strong> Qualquer usuário e senha entram como administrador, com dados fictícios. Nenhuma autenticação real é feita.</p>
-          )}
+          {/* Login simulado até a Etapa 10 (Supabase Auth): o nome do usuário escolhe o perfil. */}
+          <div className="login-demo">
+            <p>Para entrar, use como usuário o nome de um perfil e qualquer senha:</p>
+            <div className="login-perfis" role="group" aria-label="Preencher o usuário com um perfil">
+              {PERFIS_LISTA.map((p) => (
+                <button key={p} type="button" className="chip" aria-pressed={u === p} onClick={() => { setU(p); setErros((x) => ({ ...x, u: undefined })); }}>{PERFIS[p].rotulo}</button>
+              ))}
+            </div>
+          </div>
           {erro && <div className="aviso aviso-critico" role="alert">{erro}</div>}
           <div className="campo">
             <label htmlFor="usuario">Usuário</label>

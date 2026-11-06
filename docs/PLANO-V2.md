@@ -622,7 +622,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - `CLAUDE.md` reescrito para a v2.
 - Revisão das decisões (2026-11-05): plano e especificação sem contradições; sem avisos de dados simulados; botão de recolher o menu no topo.
 
-### Etapa 1 · Fundação visual, casca, perfis e vitrine
+### Etapa 1 · Fundação visual, casca, perfis e vitrine (concluída)
 - `styles/tokens.css` e ajuste de `styles.css` para os tokens.
 - Componentes: `CabecalhoPagina`, `CabecalhoObjeto`, `FatoChave`, `AbasSecao`, `AbasSituacao`, `BarraFiltros` (extraída do `ListPage`), `CartaoIndicador`, `Relacionados`, `IdCodigo`, `BarraProgresso`, `SeloDemo`, `RodapeAcoes` (rodapé fixo das telas de campo, seção 11.1); ícones novos.
 - Permissões granulares e os quatro perfis da seção 12 em `dominio/permissoes.ts`; login simulado com escolha de perfil pelo nome.

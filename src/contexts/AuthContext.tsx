@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Permissao } from '../dominio/permissoes';
-import { servicos } from '../services';
+import { autenticacao } from '../services/auth';
 import type { Usuario } from '../types/models';
 
 interface AuthCtx {
@@ -19,15 +19,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    servicos.auth.usuarioAtual().then(setUsuario).catch(() => setUsuario(null)).finally(() => setCarregando(false));
+    autenticacao.usuarioAtual().then(setUsuario).catch(() => setUsuario(null)).finally(() => setCarregando(false));
+    const cancelar = autenticacao.aoMudarSessao(setUsuario);
     const aoExpirar = () => setUsuario(null);
     window.addEventListener('sgd:nao-autenticado', aoExpirar);
-    return () => window.removeEventListener('sgd:nao-autenticado', aoExpirar);
+    return () => { cancelar(); window.removeEventListener('sgd:nao-autenticado', aoExpirar); };
   }, []);
 
-  const entrar = useCallback(async (u: string, s: string) => setUsuario(await servicos.auth.entrar({ usuario: u, senha: s })), []);
+  const entrar = useCallback(async (u: string, s: string) => setUsuario(await autenticacao.entrar({ usuario: u, senha: s })), []);
   const sair = useCallback(async () => {
-    try { await servicos.auth.sair(); } finally { setUsuario(null); }
+    try { await autenticacao.sair(); } finally { setUsuario(null); }
   }, []);
   const pode = useCallback((p: Permissao) => !!usuario?.permissoes.includes(p), [usuario]);
 

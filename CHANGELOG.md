@@ -5,6 +5,19 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-11-06: **Etapa 1 da v2: fundação visual, casca, perfis e vitrine.**
+  - **Por quê:** antes das telas de negócio, a casca precisa ter a identidade visual, o menu da jornada do dormente, os perfis e os componentes dos padrões de página (lista e objeto) que todas as etapas seguintes vão usar.
+  - **Tokens visuais** (`src/styles/tokens.css`, seção 7.2 do plano): cores por função, tipografia (IDs em mono), escala, espaços, raios, sombras e alvos de toque; `styles.css` passou a usar só os tokens.
+  - **Componentes:** `CabecalhoPagina`, `CabecalhoObjeto`, `FatoChave` e `Migalhas` (`Cabecalhos.tsx`); `AbasSecao`, `AbasSituacao` e `useAbaNoEndereco` (`Abas.tsx`, com teclado); `BarraFiltros` (extraída do `ListPage`); `CartaoIndicador` e `BarraProgresso` (`Indicadores.tsx`); `Relacionados`; `IdCodigo` (mono + copiar; `CodigoLink` usa por dentro); `SeloDemo`; `RodapeAcoes`; `EntradaCodigo` (o "Ler QR" até a câmera chegar na Etapa 4); `useTelaPequena()`; ícones `qr`, `scan`, `contrato`, `fabrica`, `impressora`, `etiqueta`, `local`, `copiar`, `seta-direita`. `ListPage` ganhou `abasSituacao` (aba no endereço e enviada como filtro), `migalhas`, `subnivel`, contagem no subtítulo e colunas com `quebrar`.
+  - **Menu v2 completo** (`GRUPOS_MENU`: Início, Suprimento, Entrada, Estoque, Saída, Cadastros), com cada item na tela "Em construção" mostrando a etapa em que entra, selo "Demo" no Simulador e permissões por item.
+  - **Permissões e perfis:** as 12 permissões granulares e os quatro perfis (administrador, almoxarife, gestor, requisitante) em `dominio/permissoes.ts`; `Usuario` passou a ter `perfil: Perfil` e `permissoes: Permissao[]`.
+  - **Autenticação separada da camada de dados** (`services/auth/`: contrato `ServicoAuth`, implementação simulada e `autenticacao`); `Servicos`, mock, real e endpoints ficaram sem `auth`. Login simulado pelo nome do perfil (com atalhos na tela de login; outro nome é recusado), sessão guardada no aparelho (`holz:sessao-demo`) e acompanhada entre abas.
+  - **Layout:** botão **Ler QR** no topo (flutuante no celular), perfil do usuário no topo e **navegação inferior de campo** no celular para quem movimenta estoque (Início, Ler QR, Estoque, RME).
+  - **Vitrine** `/vitrine` (fora do menu, só administrador, dados fixos): padrão Lista (abas de situação com contador, filtros, chips, ação da linha, cartões no celular), padrão Objeto (cabeçalho com fatos-chave, abas, relacionados, linha do tempo) e os demais componentes.
+  - Verificado no Chrome headless em 1280 px e 360 px: menu de cada perfil, "sem permissão" na vitrine para o gestor, login voltando ao endereço guardado, sem rolagem horizontal e sem erros no console.
+  - Arquivos: `src/styles/tokens.css`, `src/styles.css`, `src/components/{Cabecalhos,Abas,BarraFiltros,Indicadores,Relacionados,IdCodigo,RodapeAcoes,EntradaCodigo,Codigos,Badge,Icone,Layout,ListPage,Estados,LinhaTempo}.tsx`, `src/hooks/useTelaPequena.ts`, `src/services/auth/*`, `src/services/{contracts,endpoints}.ts`, `src/services/{mock,real}/index.ts`, `src/contexts/AuthContext.tsx`, `src/dominio/permissoes.ts`, `src/types/models.ts`, `src/rotas.tsx`, `src/pages/{EmConstrucao,Vitrine,Login}.tsx`, `CLAUDE.md`, `README.md`, `docs/PLANO-V2.md`.
+
 ### Alterado
 - 2026-11-06: **decisões da v2 aplicadas ao plano e à especificação**, sem as contradições levantadas na Etapa 0.
   - **Por quê:** antes da Etapa 1, a Dani decidiu os pontos em aberto (saldo, faltas, reprovados, QR dos locais, fornecedor da ata, inspeção, Supabase, sessão, perfis, hospedagem e testes).

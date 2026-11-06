@@ -23,6 +23,15 @@ const ICONES: Record<string, string> = {
   building: 'M4 21V8l8-5 8 5v13zM9 21v-6h6v6',
   out: 'M9 4H4v16h5M16 8l4 4-4 4M20 12H9',
   chevron: 'M15 6l-6 6 6 6',
+  qr: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2M14 18h2v2M18 18h2v2h-2zM7 7h0M17 7h0M7 17h0',
+  scan: 'M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M4 12h16',
+  contrato: 'M6 2h9l5 5v15H6zM14 2v6h6M9 13h6M9 17h4M9 9h2',
+  fabrica: 'M3 21V10l5 3V10l5 3V10l5 3V4h3v17zM7 17h2M11 17h2M15 17h2',
+  impressora: 'M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z',
+  etiqueta: 'M3 12V4h8l10 10-8 8zM7.5 8.5h0',
+  local: 'M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12zM12 11.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z',
+  copiar: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  'seta-direita': 'M5 12h14M13 6l6 6-6 6',
 };
 
 export type NomeIcone = keyof typeof ICONES;

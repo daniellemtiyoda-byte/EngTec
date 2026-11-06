@@ -15,11 +15,9 @@ export interface EndpointProvisorio {
  */
 const P = 'pendente de confirmação' as const;
 
-export const ENDPOINTS = {
-  'auth.entrar': { modulo: 'Autenticação', operacao: 'Iniciar sessão', metodo: 'POST', caminho: '/auth/login', estado: P },
-  'auth.usuarioAtual': { modulo: 'Autenticação', operacao: 'Usuário conectado', metodo: 'GET', caminho: '/auth/me', estado: P },
-  'auth.sair': { modulo: 'Autenticação', operacao: 'Encerrar sessão', metodo: 'POST', caminho: '/auth/logout', estado: P },
-} satisfies Record<string, EndpointProvisorio>;
+// Vazio até a Etapa 2. Volta a `{ ... } satisfies Record<string, EndpointProvisorio>` quando houver endpoints,
+// para a chave ser conferida pelo TypeScript.
+export const ENDPOINTS: Record<string, EndpointProvisorio> = {};
 
 export type ChaveEndpoint = keyof typeof ENDPOINTS;
 export const LISTA_ENDPOINTS: EndpointProvisorio[] = Object.values(ENDPOINTS);

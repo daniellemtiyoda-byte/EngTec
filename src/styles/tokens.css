@@ -1,0 +1,54 @@
+/*
+ * Tokens visuais do Holz Trilho v2 (seção 7.2 do docs/PLANO-V2.md), nomeados por função.
+ * Regras: cor semântica sempre acompanha texto ou ícone; o laranja (--cor-acao) aparece uma vez por tela;
+ * números alinhados à direita com tabular-nums; IDs sempre em --fonte-mono.
+ */
+:root {
+  /* Marca */
+  --cor-shell: #0f2142;
+  --cor-menu: #13294b;
+  --cor-primaria-escura: #1b3a6b;
+  --cor-primaria: #25518f;
+  --cor-primaria-clara: #e3ebf7;
+
+  /* Ação: só o botão principal da tela */
+  --cor-acao: #d96500;
+  --cor-acao-hover: #b45309;
+
+  /* Semântica */
+  --ok: #187a43; --ok-fundo: #e1f4e8;
+  --atencao: #b45309; --atencao-fundo: #fff1e0;
+  --critico: #bf2121; --critico-fundo: #fde6e6;
+  --info: #25518f; --info-fundo: #e3ebf7;
+  --neutro: #5b6673; --neutro-fundo: #eceff3;
+
+  /* Superfície */
+  --fundo: #f5f7f9;
+  --superficie: #fff;
+  --borda: #dde2e8;
+  --borda-forte: #c3cad3;
+
+  /* Texto */
+  --texto: #1c2430;
+  --texto-2: #5b6673;
+  --texto-inverso: #fff;
+
+  /* Tipografia */
+  --fonte: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --fonte-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-16: 16px; --fs-20: 20px; --fs-24: 24px;
+
+  /* Espaço (múltiplos de 4) */
+  --esp-1: 4px; --esp-2: 8px; --esp-3: 12px; --esp-4: 16px; --esp-5: 24px; --esp-6: 32px;
+
+  /* Raio e sombra */
+  --raio: 6px;
+  --raio-grande: 10px;
+  --sombra-1: 0 1px 2px rgba(15, 33, 66, .08);
+  --sombra-2: 0 8px 24px rgba(15, 33, 66, .18);
+
+  /* Densidade */
+  --linha-tabela: 40px;
+  --alvo-toque: 44px;
+  --alvo-campo: 48px;
+}

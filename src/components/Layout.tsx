@@ -1,8 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import type { Permissao } from '../dominio/permissoes';
+import { PERFIS, type Permissao } from '../dominio/permissoes';
+import { useTelaPequena } from '../hooks/useTelaPequena';
 import { GRUPOS_MENU, ROTAS, type Rota } from '../rotas';
+import { SeloDemo } from './Badge';
+import { EntradaCodigo } from './EntradaCodigo';
 import { ErroTela } from './ErroTela';
 import { Vazio } from './Estados';
 import { Icone } from './Icone';
@@ -26,6 +29,22 @@ export function RotaProtegida() {
   return <Layout />;
 }
 
+/**
+ * Navegação de campo no celular (seção 11.1 do plano): quatro itens fixos para quem trabalha no pátio
+ * (quem movimenta estoque); o menu completo continua na gaveta.
+ */
+function NavInferior({ aoLerQr }: { aoLerQr: () => void }) {
+  const item = ({ isActive }: { isActive: boolean }) => `nav-inferior-item${isActive ? ' ativo' : ''}`;
+  return (
+    <nav className="nav-inferior" aria-label="Navegação de campo">
+      <NavLink to="/" end className={item}><Icone nome="grid" /><span>Início</span></NavLink>
+      <button type="button" className="nav-inferior-item nav-inferior-qr" onClick={aoLerQr}><Icone nome="qr" /><span>Ler QR</span></button>
+      <NavLink to="/estoque" className={item}><Icone nome="box" /><span>Estoque</span></NavLink>
+      <NavLink to="/saidas" className={item}><Icone nome="pedido" /><span>RME</span></NavLink>
+    </nav>
+  );
+}
+
 function Layout() {
   const { usuario, sair, pode } = useAuth();
   const nav = useNavigate();
@@ -34,10 +53,13 @@ function Layout() {
   const loc = useLocation();
   const [recolhido, setRecolhido] = useState(false);
   const [aberto, setAberto] = useState(false);
+  const [lendo, setLendo] = useState(false);
+  const pequena = useTelaPequena();
+  const campo = pequena && pode('estoque:movimentar');
   useEffect(() => setAberto(false), [loc.pathname]);
 
   return (
-    <div className={`app ${recolhido ? 'recolhido' : ''} ${aberto ? 'menu-aberto' : ''}`}>
+    <div className={`app ${recolhido ? 'recolhido' : ''} ${aberto ? 'menu-aberto' : ''} ${campo ? 'com-nav-inferior' : ''}`}>
       <a className="pular" href="#conteudo">Ir para o conteúdo</a>
       <aside className="sidebar" aria-label="Navegação principal">
         <div className="marca">
@@ -53,7 +75,7 @@ function Layout() {
               <span className="nav-titulo">{g.titulo}</span>
               {g.itens.map((i) => (
                 <NavLink key={i.caminho} to={i.caminho} end={i.fim} className={({ isActive }) => `nav-item ${isActive ? 'ativo' : ''}`} title={i.rotulo}>
-                  <Icone nome={i.icone} /><span>{i.rotulo}</span>
+                  <Icone nome={i.icone} /><span>{i.rotulo}</span>{i.demo && <SeloDemo curto />}
                 </NavLink>
               ))}
             </div>
@@ -65,9 +87,10 @@ function Layout() {
       <div className="principal">
         <header className="topo">
           <button className="btn-icone btn-icone-claro menu-mobile" onClick={() => setAberto(true)} aria-label="Abrir menu"><Icone nome="menu" /></button>
-          {/* Busca global, botão Ler QR e sino de alertas voltam na v2 (Etapas 1, 4 e 9 do docs/PLANO-V2.md). */}
+          {/* Busca global volta na Etapa 4 (IDs v2) e o sino de alertas na Etapa 9. */}
+          <button type="button" className="btn btn-sec btn-ler-qr" onClick={() => setLendo(true)}><Icone nome="qr" tamanho={18} /><span>Ler QR</span></button>
           <div className="usuario">
-            <div><strong>{usuario?.nome}</strong><span>{usuario?.perfil}</span></div>
+            <div><strong>{usuario?.nome}</strong><span>{usuario && PERFIS[usuario.perfil].rotulo}</span></div>
             <button className="btn-icone btn-icone-claro" aria-label="Sair" title="Sair" onClick={async () => { await sair(); nav('/login'); }}><Icone nome="out" /></button>
           </div>
         </header>
@@ -75,6 +98,11 @@ function Layout() {
           <ErroTela key={loc.pathname}><Outlet /></ErroTela>
         </main>
       </div>
+      {/* No celular: navegação de campo para quem trabalha no pátio; para os demais, o Ler QR flutuante. */}
+      {campo ? <NavInferior aoLerQr={() => setLendo(true)} /> : (
+        <button type="button" className="ler-qr-flutuante" onClick={() => setLendo(true)} aria-label="Ler QR"><Icone nome="qr" tamanho={26} /></button>
+      )}
+      <EntradaCodigo aberto={lendo} aoFechar={() => setLendo(false)} />
     </div>
   );
 }

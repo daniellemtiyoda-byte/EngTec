@@ -19,7 +19,8 @@ npm run dev                  # http://localhost:5173
 npm run build                # typecheck + build em dist/
 ```
 
-No modo simulado qualquer usuário e senha preenchidos entram como administrador (nenhuma autenticação real).
+Login de demonstração: use como usuário `administrador`, `almoxarife`, `gestor` ou `requisitante` e qualquer senha (nenhuma autenticação real).
+A vitrine de componentes fica em `http://localhost:5173/#/vitrine` (só administrador).
 Para testar estados de erro/vazio: `http://localhost:5173/?simular=erro` ou `?simular=vazio`.
 
 ## Logo

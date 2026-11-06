@@ -1,11 +1,14 @@
-import { PageHeader } from '../components/Estados';
+import { CabecalhoPagina } from '../components/Cabecalhos';
 
-/** Tela provisória da reestruturação v2: as telas novas entram etapa a etapa (docs/PLANO-V2.md, seção 13). */
-export default function EmConstrucao() {
+/** Tela provisória da reestruturação v2: cada item do menu abre aqui até a sua etapa (docs/PLANO-V2.md, seção 13). */
+export default function EmConstrucao({ titulo, etapa }: { titulo: string; etapa?: number }) {
   return (
     <section className="painel">
-      <PageHeader titulo="Em construção" descricao="O Holz Trilho está sendo reestruturado para a versão 2, com rastreabilidade de cada dormente por QR code." />
-      <p>As telas voltam aos poucos, na ordem do plano: casca visual, cadastros e contratos, QR code, recebimento, inspeção, estoque, saídas e painel.</p>
+      <CabecalhoPagina titulo={titulo} subtitulo="Em construção" />
+      <p>
+        Esta tela está em construção na versão 2 do Holz Trilho, com rastreabilidade de cada dormente por QR code.
+        {etapa !== undefined && <> Ela entra na etapa {etapa} do plano de desenvolvimento.</>}
+      </p>
     </section>
   );
 }

@@ -41,16 +41,3 @@ export function ComoFunciona({ children }: { children: ReactNode }) {
     </details>
   );
 }
-
-export function PageHeader({ titulo, descricao, acoes, nivel = 1 }: { titulo: string; descricao?: string; acoes?: ReactNode; nivel?: 1 | 2 }) {
-  const H = nivel === 1 ? 'h1' : 'h2';
-  return (
-    <div className="page-header">
-      <div>
-        <H className={nivel === 1 ? 'titulo' : 'subtitulo'}>{titulo}</H>
-        {descricao && <p className="mudo">{descricao}</p>}
-      </div>
-      {acoes && <div className="acoes">{acoes}</div>}
-    </div>
-  );
-}

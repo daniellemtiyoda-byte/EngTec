@@ -1,14 +1,13 @@
-import { Link } from 'react-router-dom';
 import { rotaDoCodigo } from '../utils/busca';
+import { IdCodigo } from './IdCodigo';
 
 /**
  * Códigos clicáveis nas tabelas: cada ID abre a página do seu objeto (regra em `rotaDoCodigo`).
- * Texto que não é código conhecido aparece sem link.
+ * Código que ainda não é reconhecido aparece em mono, sem link.
  */
 export function CodigoLink({ codigo }: { codigo?: string }) {
   if (!codigo) return <>—</>;
-  const rota = rotaDoCodigo(codigo);
-  return rota ? <Link className="codigo" to={rota}>{codigo}</Link> : <>{codigo}</>;
+  return <IdCodigo id={codigo} para={rotaDoCodigo(codigo) ?? undefined} />;
 }
 
 /** Lista de códigos separados por vírgula, cada um com seu link. */

@@ -43,13 +43,5 @@ function enviarComArquivos<T>(k: ChaveEndpoint, dados: unknown, arquivos: Record
 
 export function criarServicosReais(): Servicos {
   return {
-    auth: {
-      entrar: (c) => post('auth.entrar', c),
-      usuarioAtual: async () => {
-        try { return await http(caminho('auth.usuarioAtual')); }
-        catch (e) { if (e instanceof ApiError && e.status === 401) return null; throw e; }
-      },
-      sair: () => post('auth.sair'),
-    },
   };
 }

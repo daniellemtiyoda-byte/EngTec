@@ -1,3 +1,5 @@
+import type { Perfil, Permissao } from '../dominio/permissoes';
+
 /**
  * Modelos de dados do front-end. O modelo v2 (contrato, fardo e dormente com QR) entra na Etapa 2 do docs/PLANO-V2.md.
  * Pense cada tipo como uma tabela: `id` próprio, vínculos por id e campos calculados marcados como tal.
@@ -27,8 +29,8 @@ export interface Usuario {
   id: string;
   nome: string;
   email: string;
-  perfil: string;
-  permissoes: string[];
-  ativo?: boolean;
-  ultimoAcesso?: string;
+  perfil: Perfil;
+  /** Calculadas a partir do perfil (`PERFIS` em dominio/permissoes.ts). */
+  permissoes: Permissao[];
+  ativo: boolean;
 }
