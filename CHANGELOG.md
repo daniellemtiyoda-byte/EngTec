@@ -5,6 +5,20 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-11-07: **Inventário físico por leitura de QR** (IN Ibama 21/2014, art. 41: saldo fiel ao físico).
+  - O almoxarife abre um inventário para um ou mais locais (o sistema guarda o que deveria estar em cada um, dormente a dormente), lê os QR de fardos e dormentes no celular em modo contínuo (tela de campo: câmera em cima, lista dos fardos esperados e contador embaixo, retorno na hora) e fecha, com quem e quando. O gestor vê o resultado e trata os não localizados.
+  - Resultado em grupos: conferidos; em local errado (corrigidos por transferência automática, com evento); não encontrados (passam a "não localizado" e seguem o fluxo de perda; o reservado desfaz a separação da RME, que volta a "em separação"); inesperados (baixado, perdido, retirado, não localizado, em trânsito ou de outro fardo), com justificativa obrigatória. Não existe ajuste de quantidade.
+  - A página do local mostra o último inventário; o serviço `ibama.inventarioPorLocal()` dá, por local, a data do último inventário, o percentual conferido e as diferenças (relatórios do IBAMA, Etapa 10; plano 9.21 e nova seção 9.16a).
+  - Banco: tabelas `inventarios`, `inventario_esperados`, `inventario_leituras`, `inventario_locais` e `inventario_diferencas` (em `0001_tabelas.sql`) e `0006_inventario.sql` com `abrir_inventario`, `ler_inventario`, `previa_inventario` e `fechar_inventario` (uma transação), além de `v_inventario_por_local`. Novas transições do dormente para "não localizado" (em estoque, reservado, reprovado), no mock e no gatilho do banco.
+  - Dados de demonstração: o inventário INV-2026-0001 de A-03 e A-04, fechado há 3 dias, com um fardo em local errado (corrigido) e um dormente não encontrado. Estado do mock na versão 11.
+  - "Inventário físico por leitura de QR" saiu das melhorias futuras.
+  - Testes: 103 (inventário completo, reservado não encontrado, inventário aberto sobrevive a recarregar).
+  - Arquivos: `src/types/models.ts`, `src/services/contracts.ts`, `src/services/mock/{inventario,estoque,estado,consultas,invariantes,persistencia,data,index}.ts`, `src/dominio/rotulos.ts`, `src/pages/{Inventarios,InventarioDetalhe,LocalDetalhe}.tsx`, `src/rotas.tsx`, `src/styles.css`, `supabase/migrations/`, testes, plano, especificação e `CLAUDE.md`.
+
+### Corrigido
+- 2026-11-07: **A proteção contra dado antigo apagava dados válidos.** Ela exigia em cada registro os campos que todos os registros da demonstração têm; um inventário aberto (ainda sem data de fechamento) fazia a demonstração ser recriada. Agora confere a versão, as coleções e os objetos de configuração, e deixa os registros para a montagem das telas (que pega o dado antigo de verdade). Teste novo.
+
 ### Alterado
 - 2026-11-07: **Etiquetas só no Simulador; QR dos locais só em Cadastros › Locais.**
   - **Por quê:** quem grava o QR na plaquinha é o fornecedor; o sistema não deve imprimir etiquetas de fardo e dormente fora da demonstração do fornecedor.

@@ -99,7 +99,8 @@ export function localView(e: Estado, l: LocalReg, hoje: string): Local {
   const fardos = e.fardos.filter((f) => f.localId === l.id).map((f) => fardoView(e, f, hoje)).filter((f) => f.saldo > 0 || f.situacao === 'aguardando_inspecao' || f.situacao === 'em_inspecao');
   const noFardo = fardos.reduce((s, f) => s + (f.situacao === 'aguardando_inspecao' || f.situacao === 'em_inspecao' ? dormentesDoFardo(e, f.id).length : f.saldo), 0);
   const segregados = e.dormentes.filter((d) => d.situacao === 'reprovado' && d.localId === l.id).length;
-  return { ...l, ocupacao: noFardo + segregados, fardos: fardos.length };
+  const ultimoInventarioEm = e.inventarios.filter((i) => i.situacao === 'fechado' && i.locaisIds.includes(l.id)).map((i) => i.fechadoEm!).sort().pop();
+  return { ...l, ocupacao: noFardo + segregados, fardos: fardos.length, ultimoInventarioEm };
 }
 
 export function itemContratoView(e: Estado, contratoId: Id, item: ContratoReg['itens'][number]): ItemContrato {

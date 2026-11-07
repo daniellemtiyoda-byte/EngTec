@@ -689,3 +689,9 @@ span.codigo { font-weight: 600; color: var(--texto); }
   .parcela-item { grid-template-columns: 1fr 110px; }
   .parcela-item > .btn { grid-column: 1 / -1; justify-self: start; }
 }
+
+/* Inventário: grupos do resultado (local errado, não encontrado, inesperado). */
+.inventario-grupo { margin-top: var(--esp-4); }
+.inventario-grupo h3 { display: flex; align-items: center; gap: var(--esp-2); font-size: var(--fs-md, 16px); margin-bottom: var(--esp-2); }
+.inventario-grupo li { padding: var(--esp-2) 0; border-bottom: 1px solid var(--borda); }
+.inventario-grupo li p { margin: 2px 0 0; }

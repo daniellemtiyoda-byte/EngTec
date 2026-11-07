@@ -1,5 +1,5 @@
 import type {
-  Alerta, Ata, Categoria, DestinacaoFinal, Evento, MotivoPerda, Perda, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
+  Alerta, Ata, Categoria, DestinacaoFinal, Evento, Inventario, InventarioDoLocal, MotivoPerda, Perda, ResultadoInventario, RetornoLeituraInventario, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros, RegrasAta, TipoDestino, UsoTamanho,
   Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
@@ -201,6 +201,21 @@ export interface Servicos {
     cancelar(numero: string, motivo: string): Promise<Rme>;
   };
 
+  /**
+   * Inventário físico por leitura de QR. Abrir, ler e fechar: `estoque:movimentar` (almoxarife); a leitura dos
+   * resultados é de todos. Filtro `situacao` (aberto, fechado).
+   */
+  inventarios: ServicoLista<Inventario> & {
+    obter(id: Id): Promise<Inventario>;
+    abrir(locaisIds: Id[]): Promise<Inventario>;
+    /** Lê o QR de um fardo ou dormente no local que está sendo conferido. */
+    ler(id: Id, leitura: { tipo: 'fardo' | 'dormente'; id: Id; localId: Id }): Promise<RetornoLeituraInventario>;
+    /** O resultado que o fechamento vai gravar, sem gravar. */
+    previa(id: Id): Promise<ResultadoInventario>;
+    /** Fecha: corrige o local errado (transferência), marca os não encontrados como não localizados e grava os inesperados com a justificativa (`<tipo>:<id>`). */
+    fechar(id: Id, justificativas: Record<string, string>): Promise<Inventario>;
+  };
+
   /** Prestação de contas ao IBAMA (IN Ibama 21/2014). Lançar e informar exigem `dof:declarar`. */
   ibama: {
     /** Destinação final das RMEs entregues. Filtros `lancado` ("sim"/"nao"), `especieId`, `de` e `ate` (data da entrega). */
@@ -217,6 +232,8 @@ export interface Servicos {
     perdas(q?: ListQuery): Promise<Paginado<Perda>>;
     /** Marca a perda como comunicada ao órgão (gestor ou quem declara DOF). */
     marcarPerdaComunicada(id: Id): Promise<Perda>;
+    /** Último inventário fechado de cada local ativo: data, percentual conferido e diferenças. */
+    inventarioPorLocal(): Promise<InventarioDoLocal[]>;
   };
 
   parametros: {

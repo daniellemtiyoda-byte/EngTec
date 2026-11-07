@@ -721,7 +721,7 @@ describe('painel', () => {
     como('gestor');
     expect((await s.dashboard.pendencias()).map((p) => p.id)).toEqual(expect.arrayContaining(['falta-excesso', 'parados', 'nao-localizados']));
     const ind = await s.dashboard.indicadores();
-    expect([ind.itensAbaixoMinimo, ind.itensAcimaMaximo, ind.fardosAcimaLimite, ind.naoLocalizados, ind.rmesAbertas]).toEqual([1, 1, 2, 2, 1]);
+    expect([ind.itensAbaixoMinimo, ind.itensAcimaMaximo, ind.fardosAcimaLimite, ind.naoLocalizados, ind.rmesAbertas]).toEqual([1, 1, 2, 3, 1]);
     expect([ind.parcelasAtrasadas, ind.reprovadosAguardandoRetirada, ind.laudosAVencer]).toEqual([1, 4, 1]);
     // Reposição: o item em falta mostra o saldo na ata vigente e leva ao novo contrato.
     const falta = (await s.dashboard.alertas()).find((a) => a.titulo.startsWith('Falta'))!;
@@ -744,7 +744,7 @@ describe('persistência', () => {
   });
   it('estado salvo em formato antigo (mesma versão) é descartado e a demonstração é recriada; as telas carregam', async () => {
     const casos: ((e: Record<string, any>) => void)[] = [
-      (e) => { for (const f of e.fardos) delete f.dataTratamento; },  // fardo de antes da marcação (Estoque quebrava)
+      (e) => { for (const f of e.fardos) delete f.dataTratamento; for (const d of e.dormentes) delete d.dataTratamento; },  // fardo de antes da marcação (Estoque quebrava)
       (e) => { delete e.eventos; for (const r of e.rmes) r.historico = []; },  // RME de antes da entidade Evento
       (e) => { delete e.parametros.feriados; },
       (e) => { e.rmes[0].criadoEm = 'ontem'; },  // data que não monta a tela
@@ -764,6 +764,14 @@ describe('persistência', () => {
       expect((await s.rme.listar()).total).toBe(7);
       expect(invariantes()).toEqual([]);
     }
+  });
+  it('registro novo sem um campo opcional que a demonstração sempre tem (inventário aberto) não apaga os dados', async () => {
+    const store = new Map<string, string>();
+    const a = montar('almoxarife', store);
+    const local = await localPorCodigo(a.s, 'A-01');
+    const inv = await a.s.inventarios.abrir([local.id]);
+    const b = montar('almoxarife', store);
+    expect((await b.s.inventarios.obter(inv.id)).situacao).toBe('aberto');
   });
   it('estado salvo no formato atual é mantido', async () => {
     const store = new Map<string, string>();
@@ -904,6 +912,82 @@ describe('IBAMA: perdas e não localizados no saldo do pátio', () => {
     expect(comunicada.comunicadoPor).toBe(usuarioDemo('gestor').nome);
     await falhaCom(s.ibama.marcarPerdaComunicada(p.id), 409);
     expect((await s.ibama.perdas({ filters: { comunicado: 'sim' } })).items.map((x) => x.id)).toEqual([p.id]);
+    expect(invariantes()).toEqual([]);
+  });
+});
+
+describe('inventário físico por leitura de QR', () => {
+  /** Fardos com dormentes no pátio de um local (pelo código). */
+  async function fardosDoLocal(s: ReturnType<typeof montar>['s'], codigo: string) {
+    const local = await localPorCodigo(s, codigo);
+    const lista = (await s.estoque.porFardo({ pageSize: 100, filters: { localId: local.id } })).items;
+    return { local, fardos: lista };
+  }
+
+  it('confere, corrige o local errado, marca o não encontrado e exige justificativa do inesperado', async () => {
+    const { s, como, invariantes } = montar('almoxarife');
+    const a01 = await fardosDoLocal(s, 'A-01');
+    const a02 = await fardosDoLocal(s, 'A-02');
+    expect(a01.fardos.length).toBeGreaterThan(0);
+    expect(a02.fardos.length).toBeGreaterThan(0);
+    const inv = await s.inventarios.abrir([a01.local.id, a02.local.id]);
+    expect(inv.esperados.length).toBeGreaterThan(0);
+    await falhaCom(s.inventarios.abrir([a01.local.id]), 409, 'locaisIds');
+
+    // A-01: o primeiro fardo dormente a dormente, sem um; A-02: o fardo é lido em A-01 (local errado).
+    const f1 = (await s.fardos.obter(a01.fardos[0].id)).dormentes.filter((d) => ['em_estoque', 'reservado'].includes(d.situacao));
+    const sumido = f1[f1.length - 1];
+    for (const d of f1.slice(0, -1)) expect((await s.inventarios.ler(inv.id, { tipo: 'dormente', id: d.id, localId: a01.local.id })).situacao).toBe('conferido');
+    for (const f of a01.fardos.slice(1)) await s.inventarios.ler(inv.id, { tipo: 'fardo', id: f.id, localId: a01.local.id });
+    const trocado = a02.fardos[0];
+    expect((await s.inventarios.ler(inv.id, { tipo: 'fardo', id: trocado.id, localId: a01.local.id })).situacao).toBe('local_errado');
+    for (const f of a02.fardos.slice(1)) await s.inventarios.ler(inv.id, { tipo: 'fardo', id: f.id, localId: a02.local.id });
+    // Inesperado: dormente baixado lido em A-02.
+    expect((await s.inventarios.ler(inv.id, { tipo: 'dormente', id: 'AR00224-01-000001', localId: a02.local.id })).situacao).toBe('inesperado');
+    expect((await s.inventarios.ler(inv.id, { tipo: 'dormente', id: 'AR00224-01-000001', localId: a02.local.id })).situacao).toBe('repetido');
+    await falhaCom(s.inventarios.ler(inv.id, { tipo: 'dormente', id: 'AR00224-01-999999', localId: a02.local.id }), 404);
+
+    const previa = await s.inventarios.previa(inv.id);
+    expect(previa.diferencas.map((d) => [d.grupo, d.id])).toEqual(expect.arrayContaining([
+      ['local_errado', trocado.id], ['nao_encontrado', sumido.id], ['inesperado', 'AR00224-01-000001'],
+    ]));
+    como('gestor');
+    await falhaCom(s.inventarios.fechar(inv.id, {}), 403);
+    como('almoxarife');
+    await falhaCom(s.inventarios.fechar(inv.id, {}), 422, 'dormente:AR00224-01-000001');
+    const fechado = await s.inventarios.fechar(inv.id, { 'dormente:AR00224-01-000001': 'Plaquinha solta caída no pátio; recolhida.' });
+    expect(fechado.situacao).toBe('fechado');
+    await falhaCom(s.inventarios.ler(inv.id, { tipo: 'fardo', id: trocado.id, localId: a01.local.id }), 409);
+
+    expect((await s.fardos.obter(trocado.id)).fardo.localId).toBe(a01.local.id);
+    const ficha = await s.dormentes.obter(sumido.id);
+    expect(ficha.dormente.situacao).toBe('nao_localizado');
+    expect((await s.inspecao.naoLocalizados({ pageSize: 50 })).items.map((d) => d.id)).toContain(sumido.id);
+    const movs = await s.movimentacoes.listar({ search: fechado.numero, pageSize: 20 });
+    expect(movs.items.some((m) => m.fardoId === trocado.id && m.tipo === 'transferencia')).toBe(true);
+
+    // O gestor trata o não encontrado pelo fluxo de perda; o relatório por local mostra o último inventário.
+    como('gestor');
+    await s.ibama.registrarPerda(sumido.id, { motivo: 'extravio' });
+    const porLocal = await s.ibama.inventarioPorLocal();
+    const l1 = porLocal.find((x) => x.localId === a01.local.id)!;
+    expect([l1.numero, l1.naoEncontrados, l1.percentual! < 100]).toEqual([fechado.numero, 1, true]);
+    expect((await s.locais.obterPorCodigo('A-01')).ultimoInventarioEm).toBe(fechado.fechadoEm);
+    expect(invariantes()).toEqual([]);
+  });
+
+  it('o reservado não encontrado sai da separação e a RME volta a "em separação"', async () => {
+    const { s, invariantes } = montar('almoxarife');
+    const pronta = (await s.rme.listar({ pageSize: 50 })).items.find((r) => r.situacao === 'pronta')!;
+    const linha = pronta.separacao![0];
+    const fardo = (await s.fardos.obter(linha.fardoId)).fardo;
+    const inv = await s.inventarios.abrir([fardo.localId!]);
+    const faltando = linha.dormentesIds[0];
+    for (const x of inv.esperados.filter((y) => y.dormenteId !== faltando)) await s.inventarios.ler(inv.id, { tipo: 'dormente', id: x.dormenteId, localId: x.localId });
+    await s.inventarios.fechar(inv.id, {});
+    const rme = await s.rme.obter(pronta.numero);
+    expect([rme.situacao, rme.separacao]).toEqual(['em_separacao', undefined]);
+    expect((await s.dormentes.obter(faltando)).dormente.situacao).toBe('nao_localizado');
     expect(invariantes()).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 import { dataSP } from '../../dominio/parametros';
 import type {
-  Anexo, Ata, Contrato, DestinacaoFinal, Dof, Dormente, Emissao, EmpresaInspetora, EntidadeEvento, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
+  Anexo, Ata, Contrato, DestinacaoFinal, Dof, Dormente, Emissao, EmpresaInspetora, EntidadeEvento, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, Inventario, ItemContrato, Local,
   Movimentacao, NotaFiscal, ParcelaContrato, Parametros, Perda, Recebimento, Rme, SaldoDofInformado, Tamanho, TipoEvento, Tratamento, Usuario,
 } from '../../types/models';
 import { ApiError } from '../http';
@@ -53,12 +53,14 @@ export interface Estado {
   destinacoes: DestinacaoFinal[];
   saldosDof: SaldoDofInformado[];
   perdas: Perda[];
+  /** Inventários físicos por leitura de QR. */
+  inventarios: Inventario[];
   parametros: Parametros;
   /** Próximo número de cada sequência interna (ids técnicos, números de NF e DOF). */
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 10;
+export const VERSAO_ESTADO = 11;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }

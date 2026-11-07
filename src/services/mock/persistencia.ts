@@ -15,17 +15,11 @@ export function armazenamentoPadrao(): Armazenamento | null {
 
 const objeto = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 
-/** Campos presentes em todos os registros de uma coleção de referência (os obrigatórios do formato atual). */
-function obrigatorios(lista: unknown[]): string[] {
-  const objs = lista.filter(objeto);
-  if (!objs.length) return [];
-  return Object.keys(objs[0]).filter((k) => objs.every((o) => k in o));
-}
-
 /**
- * Confere se o estado salvo tem o mesmo formato do estado novo: as mesmas coleções e, em cada registro, os campos que
- * todos os registros novos têm (inclusive os parâmetros). Um estado gravado por uma versão anterior do app com a mesma
- * `VERSAO_ESTADO` (a versão não foi subida a tempo, ou o código mudou no meio do desenvolvimento) não passa.
+ * Confere se o estado salvo tem o mesmo formato do estado novo: a mesma versão, as mesmas coleções (listas) e os
+ * campos dos objetos de configuração (parâmetros, contadores). Os registros não são conferidos campo a campo: campo
+ * opcional que todos os registros da demonstração têm (ex. a data de fechamento de um inventário) pode faltar num
+ * registro novo e válido. Registro antigo que não serve mais é pego pela conferência das visões (`conferir`).
  */
 export function mesmoFormato(salvo: unknown, referencia: Estado): boolean {
   if (!objeto(salvo) || salvo.versao !== referencia.versao) return false;
@@ -33,9 +27,7 @@ export function mesmoFormato(salvo: unknown, referencia: Estado): boolean {
   for (const [chave, ref] of Object.entries(JSON.parse(JSON.stringify(referencia)) as Record<string, unknown>)) {
     const v = salvo[chave];
     if (Array.isArray(ref)) {
-      if (!Array.isArray(v)) return false;
-      const campos = obrigatorios(ref);
-      if (!v.every((r) => objeto(r) && campos.every((c) => c in r))) return false;
+      if (!Array.isArray(v) || !v.every(objeto)) return false;
     } else if (objeto(ref)) {
       if (!objeto(v) || !Object.keys(ref).every((c) => c in v)) return false;
     } else if (typeof v !== typeof ref) return false;

@@ -19,6 +19,7 @@ import { concluirInspecao, registrarComunicacao, registrarInspecao, registrarRet
 import { alertas, indicadores, pendencias } from './painel';
 import { armazenamentoPadrao, carregar, salvar, type Armazenamento } from './persistencia';
 import { informarSaldoDof, marcarDestinacaoLancada, marcarPerdaComunicada, registrarPerda, saldoPatio } from './ibama';
+import { abrirInventario, analisarInventario, fecharInventario, inventarioPorLocal, lerNoInventario } from './inventario';
 import { emitirLaudo, previaRecebimento, receber } from './recebimento';
 import { abrirRme, acharRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
 import { emitir, xmlDaNf } from './simulador';
@@ -45,7 +46,8 @@ function conferirVisoes(e: Estado, hoje: string) {
   for (const x of e.fornecedores) fornecedorView(x, hoje);
   for (const x of e.atas) ataView(e, x, hoje);
   for (const x of e.contratos) contratoView(e, x, hoje);
-  for (const x of e.fardos) fardoView(e, x, hoje);
+  for (const x of e.fardos) fardoDetalhe(e, x.id, hoje);
+  for (const d of e.dormentes) if (!d.dataTratamento || Number.isNaN(Date.parse(d.dataTratamento))) throw new Error('dormente sem marcação');
   for (const x of e.locais) localView(e, x, hoje);
   for (const x of e.dofs) dofView(e, x, hoje);
   for (const x of e.entregas) entregaView(e, x, hoje);
@@ -299,6 +301,15 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       }),
     },
 
+    inventarios: {
+      listar: (q) => ler((e) => paginar(e.inventarios, maisRecentes('abertoEm')(q))),
+      obter: (id) => ler((e) => achar(e.inventarios, (i) => i.id === id || i.numero === id, 'Inventário')),
+      abrir: (locaisIds) => escrever(['estoque:movimentar'], (e, ctx) => abrirInventario(e, locaisIds, ctx)),
+      ler: (id, leitura) => escrever(['estoque:movimentar'], (e, ctx) => lerNoInventario(e, id, leitura, ctx)),
+      previa: (id) => ler((e) => analisarInventario(e, achar(e.inventarios, (i) => i.id === id, 'Inventário'))),
+      fechar: (id, justificativas) => escrever(['estoque:movimentar'], (e, ctx) => fecharInventario(e, id, justificativas, ctx)),
+    },
+
     ibama: {
       destinacoes: (q = {}) => ler((e) => {
         const { lancado, de, ate, ...filters } = q.filters ?? {};
@@ -315,6 +326,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
         const lista = e.perdas.filter((p) => (!comunicado || (comunicado === 'sim') === !!p.comunicadoEm) && (!de || p.quando.slice(0, 10) >= de) && (!ate || p.quando.slice(0, 10) <= ate));
         return paginar(lista, maisRecentes('quando')({ ...q, filters }));
       }),
+      inventarioPorLocal: () => ler((e) => inventarioPorLocal(e)),
       marcarPerdaComunicada: (id) => escrever(['painel:gestao', 'dof:declarar'], (e, ctx) => marcarPerdaComunicada(e, id, ctx)),
     },
 

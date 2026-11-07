@@ -11,7 +11,7 @@ import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import { ApiError } from '../services/http';
 import type { Fardo } from '../types/models';
-import { dias, numero } from '../utils/format';
+import { dataHora, dias, numero } from '../utils/format';
 
 /**
  * Página do local (seção 9.15 do plano), destino do QR do local (`LOC-<código>`, link `/#/locais/<código>`):
@@ -49,6 +49,7 @@ export default function LocalDetalhe() {
           <FatoChave rotulo="Descrição" valor={l.descricao} />
           <FatoChave rotulo="Ocupação" valor={`${numero(l.ocupacao)} de ${numero(l.capacidade)} dormentes`} />
           <FatoChave rotulo="Fardos" valor={numero(l.fardos)} />
+          <FatoChave rotulo="Último inventário" valor={l.ultimoInventarioEm ? dataHora(l.ultimoInventarioEm) : 'Nunca conferido'} para={l.ultimoInventarioEm ? '/inventarios?situacao=fechado' : undefined} />
         </>}
       />
       <ListPage<Fardo>

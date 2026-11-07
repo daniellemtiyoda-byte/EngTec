@@ -6,14 +6,15 @@ import { achar, registrar, falha, hoje, instante, novoId, type Ctx, type Estado,
  * Transições permitidas da situação do dormente. É a única porta de mudança de saldo: o saldo do fardo é sempre
  * contado a partir dos seus dormentes (em estoque + reservados), nunca gravado à parte.
  */
+// Do pátio para "não localizado": não lido na conclusão da inspeção ou não encontrado no inventário.
 const TRANSICOES: Record<SituacaoDormente, SituacaoDormente[]> = {
   emitido: ['aguardando_inspecao'],
   aguardando_inspecao: ['em_estoque', 'reprovado', 'nao_localizado'],
   nao_localizado: ['em_estoque', 'reprovado', 'perdido'],
-  em_estoque: ['reservado'],
-  reservado: ['em_estoque', 'baixado'],
+  em_estoque: ['reservado', 'nao_localizado'],
+  reservado: ['em_estoque', 'baixado', 'nao_localizado'],
   baixado: [],
-  reprovado: ['retirado'],
+  reprovado: ['retirado', 'nao_localizado'],
   retirado: [],
   perdido: [],
 };
@@ -33,7 +34,8 @@ export function movimentarDormentes(e: Estado, ids: Id[], para: SituacaoDormente
   }
   for (const d of dormentes) {
     if (para === 'reservado' || para === 'baixado') d.rmeNumero = op.rmeNumero;
-    if (para === 'em_estoque' && d.situacao === 'reservado') d.rmeNumero = undefined;
+    if ((para === 'em_estoque' || para === 'nao_localizado') && d.situacao === 'reservado') d.rmeNumero = undefined;
+    if (para === 'nao_localizado' && d.situacao === 'reprovado') d.localId = undefined;
     if (para === 'reprovado') d.localId = op.localId;
     if (para === 'retirado') d.localId = undefined;
     d.situacao = para;

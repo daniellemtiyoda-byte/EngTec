@@ -8,6 +8,7 @@ import { criarAta, criarContrato, salvarEmpresaInspetora, salvarEspecie, salvarF
 import { declararDof } from './documentos';
 import { VERSAO_ESTADO, type Ctx, type EntregaReg, type Estado } from './estado';
 import { concluirInspecao, registrarComunicacao, registrarInspecao, registrarRetirada, simularFardo } from './inspecao';
+import { abrirInventario, fecharInventario, lerNoInventario } from './inventario';
 import { informarSaldoDof, marcarDestinacaoLancada, registrarPerda, saldoPatio } from './ibama';
 import { emitirLaudo, receber } from './recebimento';
 import { abrirRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
@@ -40,7 +41,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     versao: VERSAO_ESTADO, dataBase: base,
     usuarios: PERFIS_LISTA.map(usuarioDemo),
     fornecedores: [], especies: [], tamanhos: [], tratamentos: [], empresasInspetoras: [], locais: [], atas: [], contratos: [], fardos: [], dormentes: [],
-    emissoes: [], nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [], eventos: [], destinacoes: [], saldosDof: [], perdas: [],
+    emissoes: [], nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [], eventos: [], destinacoes: [], saldosDof: [], perdas: [], inventarios: [],
     parametros: {
       limiteDiasEstoque: LIMITE_DIAS_ESTOQUE_PADRAO, alertaDofDias: [...ALERTA_DOF_DIAS_PADRAO], toleranciaVolumePct: TOLERANCIA_VOLUME_PCT,
       limitesCategoria: [...LIMITES_CATEGORIA_PADRAO], dormentesPorFardoPadrao: DORMENTES_POR_FARDO_PADRAO, niveis: [], alertaLaudoDias: [...ALERTA_LAUDO_DIAS_PADRAO],
@@ -267,6 +268,22 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     itens: saldoPatio(e).filter((s) => s.fisicoM3 > 0).map((s) => ({ especieId: s.especieId, volumeM3: s.especieId === 'es0002' ? s.fisicoM3 * 1.15 : s.fisicoM3 })),
     observacao: 'Consulta mensal do saldo no sistema DOF.',
   }, alm());
+
+  // Inventário de A-03 e A-04, fechado há 3 dias: um fardo de A-04 foi achado em A-03 (local corrigido por
+  // transferência) e um dormente de A-03 não foi encontrado (virou "não localizado"); o resto, conferido.
+  em(3, 10);
+  const inv = abrirInventario(e, [a03.id, a04.id], alm());
+  const fardosEm = (localId: Id) => e.fardos.filter((f) => f.localId === localId && e.dormentes.some((d) => d.fardoId === f.id && ['em_estoque', 'reservado'].includes(d.situacao)));
+  const [lidoAUnidade, ...outrosA03] = fardosEm(a03.id);
+  const fardosA04 = fardosEm(a04.id);
+  const trocado = fardosA04[fardosA04.length - 1];
+  const doPrimeiro = e.dormentes.filter((d) => d.fardoId === lidoAUnidade.id && ['em_estoque', 'reservado'].includes(d.situacao));
+  const sumido = doPrimeiro.find((d) => d.situacao === 'em_estoque')!;
+  for (const d of doPrimeiro.filter((x) => x !== sumido)) lerNoInventario(e, inv.id, { tipo: 'dormente', id: d.id, localId: a03.id }, alm());
+  for (const f of outrosA03) lerNoInventario(e, inv.id, { tipo: 'fardo', id: f.id, localId: a03.id }, alm());
+  for (const f of fardosA04.filter((x) => x !== trocado)) lerNoInventario(e, inv.id, { tipo: 'fardo', id: f.id, localId: a04.id }, alm());
+  lerNoInventario(e, inv.id, { tipo: 'fardo', id: trocado.id, localId: a03.id }, alm());
+  em(3, 11); fecharInventario(e, inv.id, {}, alm());
 
   // E3 (2ª parcela do AR00224-01): a entrega "a caminho" com IDs fixos e DOF que vence em 3 dias.
   gerar(1, c1.id, 2, [{ itemContratoId: ic1.id, fardos: 2 }, { itemContratoId: ic2.id, fardos: 1 }], 3);

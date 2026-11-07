@@ -38,7 +38,7 @@ Documento para orientar o Claude Code na reestruturação do front-end. Ele diz 
 | Banco | **Supabase**, numa etapa própria (Etapa 9) junto com o login: SQL em `supabase/migrations/`, executado pela Dani no editor SQL. Não há back-end próprio: `services/real/` (HTTP) sai nessa etapa |
 | Hospedagem | **Vercel**, com HTTPS (a câmera exige); a URL da Vercel é o `VITE_APP_URL` gravado nos QR |
 | Ponto de partida | Código antigo de domínio, telas e mock **foi removido** na Etapa 0; só a infraestrutura reaproveitável ficou |
-| Fora do protótipo | Etiqueta de contingência, devolução dos reprovados ao fornecedor, inventário, ajustes com aprovação, visão computacional, offline, RFID, Sinaflor automático |
+| Fora do protótipo | Etiqueta de contingência, devolução dos reprovados ao fornecedor, ajustes de quantidade (o inventário trata dormente a dormente), visão computacional, offline, RFID, Sinaflor automático |
 
 ---
 
@@ -82,6 +82,7 @@ O menu segue a **jornada do dormente** (contrato → NF e DOF → recebimento �
 | Estoque | Estoque | `/estoque` | Todos (requisitante só a visão por item) |
 | Estoque | Locais | `/locais` | Administrador, Almoxarife, Gestor |
 | Estoque | Movimentações | `/movimentacoes` | Administrador, Almoxarife, Gestor |
+| Estoque | Inventário | `/inventarios` | Administrador, Almoxarife (abre, lê e fecha), Gestor (vê o resultado) |
 | Saída | Requisições (RME) | `/saidas` | Todos |
 | Cadastros | Cadastros | `/cadastros` | Administrador (edita), Almoxarife e Gestor (consultam) |
 | Cadastros | Usuários | `/usuarios` | Administrador |
@@ -296,7 +297,7 @@ Regras **provisórias**, a confirmar com o time da inspeção (ficam em `dominio
 - **Cura:** dormentes tratados com **CCA ou CCB** só ficam disponíveis para separação **15 dias após a data de tratamento**. Antes disso aparecem "em cura" no estoque, com a data de liberação; não entram na sugestão nem na separação.
 - **Classe pelo destino da RME:** o requisitante informa o tipo de destino (linha principal de tráfego pesado, linha principal de tráfego médio, desvio ou pátio). O sistema sugere a classe mínima (**1ª para tráfego pesado; 2ª aceita nos demais**) e, se a separação usar classe inferior à sugerida, avisa e pede justificativa.
 
-**Modelo fechado (antes do Supabase).** Entidades gravadas, que viram tabelas: Usuário (perfil), Fornecedor, Espécie, Tamanho, Tratamento, Empresa inspetora, Local, Ata (com regras e itens registrados), Contrato (com itens e parcelas), Emissão do fornecedor (Simulador), Fardo (com marcação, conclusão da inspeção e reprovação), Dormente, NF (com itens), DOF (com volumes por espécie), Entrega (com boletim, relatório técnico e laudo), Recebimento (com ocorrências e canhoto), Inspeção, Movimentação, RME (com itens e separação), Evento, Destinação final, Saldo informado do DOF, Perda, Parâmetros (com níveis de estoque e feriados) e Anexo. Tudo o mais (saldo, disponível, em cura, situação do fardo e da parcela, prazos, divergência de volume, saldo da ata, garantia) é calculado: no Supabase, views e funções.
+**Modelo fechado (antes do Supabase).** Entidades gravadas, que viram tabelas: Usuário (perfil), Fornecedor, Espécie, Tamanho, Tratamento, Empresa inspetora, Local, Ata (com regras e itens registrados), Contrato (com itens e parcelas), Emissão do fornecedor (Simulador), Fardo (com marcação, conclusão da inspeção e reprovação), Dormente, NF (com itens), DOF (com volumes por espécie), Entrega (com boletim, relatório técnico e laudo), Recebimento (com ocorrências e canhoto), Inspeção, Movimentação, RME (com itens e separação), Evento, Destinação final, Saldo informado do DOF, Perda, Inventário (com o esperado, as leituras e o resultado), Parâmetros (com níveis de estoque e feriados) e Anexo. Tudo o mais (saldo, disponível, em cura, situação do fardo e da parcela, prazos, divergência de volume, saldo da ata, garantia) é calculado: no Supabase, views e funções.
 
 ### 5.6 Estoque e saída
 
@@ -319,6 +320,11 @@ interface DestinacaoFinal { id; rmeId; rmeNumero; especieId; quantidade; volumeM
 interface SaldoDofInformado { id; data; itens: { especieId; volumeM3 }[]; observacao?; quem; quando }
 // Perda (art. 42): o gestor transforma o não localizado em perdido; sai do saldo físico e fica a comunicar ao IBAMA.
 interface Perda { id; dormenteId; fardoId; contratoId; especieId; tamanhoId; volumeM3; motivo: 'extravio' | 'avaria' | 'incendio' | 'intemperie' | 'outro'; descricao?; quando; quem; comunicadoEm?; comunicadoPor? }
+// Inventário físico por leitura de QR (art. 41): o que deveria estar em cada local, as leituras e o resultado (dormente a dormente).
+interface Inventario { id; numero /* INV-2026-0001 */; locaisIds; esperados: { dormenteId; fardoId; localId }[];
+  leituras: { tipo: 'fardo' | 'dormente'; id; localId; quando; quem }[]; situacao: 'aberto' | 'fechado'; abertoEm; abertoPor; fechadoEm?; fechadoPor?;
+  resultado?: { porLocal: { localId; esperados; conferidos; percentual; diferencas }[]; esperados; conferidos; percentual;
+    diferencas: { grupo: 'local_errado' | 'nao_encontrado' | 'inesperado'; tipo: 'fardo' | 'dormente'; id; fardoId; localId?; lidoEmId?; quantidade; motivo; justificativa? }[] } }
 // Calculado: saldo físico do pátio por espécie e tamanho × último saldo informado (alerta acima de 10%, art. 41).
 interface SaldoPatioEspecie { especieId; quantidade; fisicoM3; porTamanho: { tamanhoId; quantidade; volumeM3 }[]; naoLocalizados: { quantidade; volumeM3 } /* à parte */; informadoM3?; informadoEm?; diferencaPct?; acimaTolerancia }
 ```
@@ -353,7 +359,8 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `movimentacoes` | `listar` (filtros tipo, `periodo` em dias e `localId` de ou para) |
 | `rme` | `listar`, `obter`, `abrir`, `iniciarSeparacao(numero)`, `sugerirSeparacao(numero)`, `separar`, `entregar`, `cancelar` |
 | `eventos` | `listar` (filtros `entidade`, `entidadeId` e `tipo`; do mais recente ao mais antigo) |
-| `ibama` | `destinacoes(q)` (filtros `lancado`, `especieId`, `de`, `ate`), `marcarLancado(id)`, `saldosInformados(q)`, `informarSaldo({ data, itens, observacao? })`, `saldoPatio()`, `registrarPerda(dormenteId, { motivo, descricao? })` (`painel:gestao`), `perdas(q)` (filtros `comunicado`, `especieId`, `de`, `ate`), `marcarPerdaComunicada(id)` (`painel:gestao` ou `dof:declarar`); lançar e informar exigem `dof:declarar` |
+| `inventarios` | `listar` (filtro `situacao`), `obter`, `abrir(locaisIds)`, `ler(id, { tipo, id, localId })` (retorno na hora: conferido, local errado, inesperado, repetido), `previa(id)`, `fechar(id, justificativas)`; abrir, ler e fechar exigem `estoque:movimentar` |
+| `ibama` | `destinacoes(q)` (filtros `lancado`, `especieId`, `de`, `ate`), `marcarLancado(id)`, `saldosInformados(q)`, `informarSaldo({ data, itens, observacao? })`, `saldoPatio()`, `registrarPerda(dormenteId, { motivo, descricao? })` (`painel:gestao`), `perdas(q)` (filtros `comunicado`, `especieId`, `de`, `ate`), `marcarPerdaComunicada(id)` (`painel:gestao` ou `dof:declarar`), `inventarioPorLocal()` (último inventário fechado de cada local); lançar e informar exigem `dof:declarar` |
 | `parametros` | `obter`, `atualizar`, `reiniciarDemonstracao()` (só no mock) |
 
 **Mock (até a Etapa 9).**
@@ -587,6 +594,16 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 - Colunas: Quando · Tipo · Fardo · Dormentes (quantidade) · De · Para · Quem · Referência (RME, recebimento).
 - Filtros: tipo, período (7, 30 ou 90 dias), local (de ou para); o fardo e a RME pela pesquisa. Ação principal: **Transferir fardo**.
 
+### 9.16a Inventário (`/inventarios`) e Inventário em andamento (`/inventarios/:id`) · Lista + tela de campo
+
+Inventário físico por leitura de QR (IN Ibama 21/2014, art. 41: o saldo tem de ser fiel ao físico). Não existe ajuste de quantidade: toda diferença é tratada dormente a dormente.
+- **Lista** (`operacao:consultar`): abas Abertos · Fechados; ação principal **Abrir inventário** (`estoque:movimentar`): escolhe um ou mais locais; o sistema guarda o que deveria estar em cada um (dormente a dormente: aguardando inspeção, em estoque, reservados e reprovados segregados). Um local só pode estar num inventário aberto de cada vez.
+- **Tela de campo** (seção 11.1, celular primeiro): o local que está sendo conferido (lista ou leitura do QR do local); **Ler QR** em modo contínuo (`LeitorQr` com a lista dos fardos esperados no local e o contador "x de y conferidos" embaixo da câmera); cada leitura responde na hora: conferido, local errado (será transferido no fechamento), inesperado (justificar no fechamento) ou repetido. O QR do fardo confere todos os seus dormentes; o do dormente, só ele (fardo aberto, reprovados).
+- **Revisar e fechar**: o resultado em grupos, por local (esperados, conferidos, %) e as diferenças: **conferidos**; **em local errado** (fardo lido noutro local, ou todos os seus dormentes lidos noutro local único; reprovado lido noutra segregação) → corrigidos por **transferência automática** com evento; **não encontrados** → passam a **"não localizado"** e seguem o fluxo de perda (o reservado não encontrado desfaz a separação da RME, que volta a "em separação"); **inesperados** (dormente baixado, perdido, retirado, não localizado, em trânsito ou de outro fardo lido no local; fardo sem dormentes no pátio) → **justificativa obrigatória**, gravada com o evento. Fecha com quem e quando.
+- **Fechado**: o resultado; o gestor vê e trata os não localizados (Inspeção › Não localizados: inspecionar se aparecer ou registrar a perda).
+- Permissões: o almoxarife abre, lê e fecha (`estoque:movimentar`); todos com `operacao:consultar` veem o resultado.
+- A página do local mostra o **último inventário** (data); `Local.ultimoInventarioEm` é calculado.
+
 ### 9.17 Requisições (`/saidas`) e Página da RME (`/saidas/:numero`)
 - Lista: abas Abertas · Em separação · Prontas · Entregues · Canceladas. Colunas: RME · Solicitante · Destino · Itens · Necessidade em · Situação.
 - **Nova RME** (requisitante): destino (obra ou trecho), data de necessidade, itens (espécie, tamanho, quantidade, mostrando o disponível).
@@ -618,11 +635,12 @@ Item de menu **Relatórios** (grupo Início, depois do Painel), com a seção **
 | 2. Destinação final | Volume por espécie das RMEs entregues no período, lançado ou não no DOF, com a ação **Marcar como lançado no DOF** e alerta para as pendências | baixa do saldo virtual | `ibama.destinacoes()`, `ibama.marcarLancado()` |
 | 3. DOFs a declarar | Atalho para a aba já existente em NF e DOF (`/documentos?aba=a_declarar`) | art. 51 | `dof` |
 | 4. Divergências de volume | DOF × volume medido na inspeção (nominal enquanto não há medido), por entrega e espécie, com a justificativa | art. 53 | `entrega.divergenciaVolume` |
-| 5. Inventário para vistoria | Fardos por local e espécie, com quantidade, m³, NF e DOF de origem | art. 65 | `estoque.porFardo` + documentos |
+| 5. Inventário para vistoria | Fardos por local e espécie, com quantidade, m³, NF e DOF de origem, e **quando cada local foi conferido pela última vez** (inventário) | art. 65 | `estoque.porFardo` + documentos + `ibama.inventarioPorLocal()` |
 | 6. Movimento anual | Entradas (recebimentos) e saídas (destinação final) por espécie e volume no ano | relatório anual (obrigatoriedade a confirmar com a CPTM) | movimentações + destinações |
 | 7. Perdas a comunicar ao IBAMA | Dormentes perdidos (o gestor transforma um "não localizado" em "perdido", com motivo: extravio, avaria, incêndio, intempérie ou outro, com descrição), por espécie e volume, com a ação **Marcar como comunicado ao órgão** (quem e quando) | art. 42 | `ibama.registrarPerda()`, `ibama.perdas()`, `ibama.marcarPerdaComunicada()` |
+| 8. Inventários (conferência física) | Por local: data do último inventário, percentual conferido e as diferenças encontradas (local errado, não encontrados, inesperados), com link para o resultado | art. 41 | `ibama.inventarioPorLocal()`, `inventarios` |
 
-Alertas no Painel (Etapa 10): saldo do pátio acima de 10% do informado, destinação final pendente de lançamento, perdas a comunicar e saldo do DOF sem atualização há mais de 30 dias.
+Alertas no Painel (Etapa 10): saldo do pátio acima de 10% do informado, destinação final pendente de lançamento, perdas a comunicar, saldo do DOF sem atualização há mais de 30 dias e local sem inventário há mais de 90 dias (provisório). O Saldo do pátio mostra também a data do último inventário de cada local.
 
 **Perdas.** Na aba Não localizados da Inspeção, o gestor (`painel:gestao`) tem **Registrar perda** (motivo obrigatório; "outro" exige descrição; confirmação, sem desfazer). O dormente passa a `perdido` (evento `perdido`), sai do saldo físico e entra no relatório 7; a ficha mostra o motivo e se já foi comunicado. Marcar como comunicado: gestor ou quem declara DOF.
 
@@ -716,7 +734,7 @@ Quem usa a câmera trabalha no pátio, com o celular numa mão e às vezes luva 
 | Gestor | `operacao:consultar`, `painel:gestao` |
 | Requisitante | `rme:abrir` |
 - **Modo demonstração** como parâmetro: o Simulador e os botões "Simular" somem quando desligado, sem remover código.
-- **Pontos de extensão já previstos** (não implementar agora): etiqueta de contingência no `LeitorQr` (ID não encontrado → gerar), inventário por leitura de QR, RFID como outra fonte para `lerCodigo()`.
+- **Pontos de extensão já previstos** (não implementar agora): etiqueta de contingência no `LeitorQr` (ID não encontrado → gerar), RFID como outra fonte para `lerCodigo()` (o inventário por leitura de QR já entrou, seção 9.16a).
 
 ---
 

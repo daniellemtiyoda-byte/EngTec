@@ -1,6 +1,6 @@
 import type {
   NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEmissao, SituacaoEntrega,
-  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoDestino, TipoEvento, MotivoPerda, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
+  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoDestino, TipoEvento, MotivoPerda, SituacaoInventario, GrupoDiferenca, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
 } from '../types/models';
 
 /**
@@ -146,7 +146,7 @@ export const MARCA_EVENTO: Record<TipoEvento, string> = {
   emitido: 'EMI', recebido: 'REC', inspecionado: 'INS', guardado: 'GUA', transferido: 'TRF', reservado: 'RES',
   baixado: 'SAÍ', segregado: 'SEG', nao_localizado: 'N/L', cancelado: 'CAN', ocorrencia: 'OCO', retirado: 'RET',
   criado: 'CRI', alterado: 'ALT', inativado: 'INA', reativado: 'REA', declarado: 'DEC', laudo: 'LAU', comunicado: 'COM',
-  lancado: 'DOF', informado: 'INF', perdido: 'PER',
+  lancado: 'DOF', informado: 'INF', perdido: 'PER', fechado: 'FEC',
 };
 
 /** Motivo da perda (IN Ibama 21/2014, art. 42). */
@@ -156,4 +156,16 @@ export const MOTIVO_PERDA: Rotulos<MotivoPerda> = {
   incendio: ['vermelho', 'Incêndio'],
   intemperie: ['laranja', 'Intempérie'],
   outro: ['cinza', 'Outro'],
+};
+
+export const SITUACAO_INVENTARIO: Rotulos<SituacaoInventario> = {
+  aberto: ['azul', 'Aberto'],
+  fechado: ['verde', 'Fechado'],
+};
+
+/** Grupos do resultado do inventário (o conferido é verde; as diferenças, pela gravidade). */
+export const GRUPO_DIFERENCA: Rotulos<GrupoDiferenca> = {
+  local_errado: ['laranja', 'Em local errado'],
+  nao_encontrado: ['vermelho', 'Não encontrado'],
+  inesperado: ['laranja', 'Inesperado'],
 };

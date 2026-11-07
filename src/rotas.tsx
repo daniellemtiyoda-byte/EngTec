@@ -17,6 +17,8 @@ import FichaDormente from './pages/FichaDormente';
 import FornecedorDetalhe from './pages/FornecedorDetalhe';
 import LocalDetalhe from './pages/LocalDetalhe';
 import Locais from './pages/Locais';
+import Inventarios from './pages/Inventarios';
+import InventarioDetalhe from './pages/InventarioDetalhe';
 import Movimentacoes from './pages/Movimentacoes';
 import RecebimentoDetalhe from './pages/RecebimentoDetalhe';
 import RmeDetalhe from './pages/RmeDetalhe';
@@ -88,6 +90,8 @@ export const ROTAS: Rota[] = [
   { caminho: '/fardos/:id', tela: RedirecionaFardo, rotulo: 'Fardo', icone: 'box', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/locais/:codigo', tela: LocalDetalhe, rotulo: 'Local', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/movimentacoes', tela: Movimentacoes, rotulo: 'Movimentações', icone: 'swap', grupo: 'Estoque', permissoes: OPERACAO },
+  { caminho: '/inventarios', tela: Inventarios, rotulo: 'Inventário', icone: 'clipboard', grupo: 'Estoque', permissoes: OPERACAO },
+  { caminho: '/inventarios/:id', tela: InventarioDetalhe, rotulo: 'Inventário', icone: 'clipboard', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },
   // Todos: o requisitante abre e acompanha as RMEs; o almoxarife separa e entrega.
   { caminho: '/saidas', tela: Rmes, rotulo: 'Requisições (RME)', icone: 'pedido', grupo: 'Saída' },
   { caminho: '/saidas/:numero', tela: RmeDetalhe, rotulo: 'RME', icone: 'pedido', grupo: 'Saída', foraDoMenu: true },

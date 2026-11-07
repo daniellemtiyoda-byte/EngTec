@@ -44,12 +44,12 @@ export type TipoEvento =
   | 'criado' | 'alterado' | 'inativado' | 'reativado' | 'cancelado'
   | 'emitido' | 'recebido' | 'inspecionado' | 'guardado' | 'transferido' | 'reservado' | 'baixado'
   | 'segregado' | 'nao_localizado' | 'ocorrencia' | 'declarado' | 'laudo' | 'comunicado' | 'retirado'
-  | 'lancado' | 'informado' | 'perdido';
+  | 'lancado' | 'informado' | 'perdido' | 'fechado';
 
 /** O que o evento descreve (a linha do tempo de cada objeto filtra por entidade e id). */
 export type EntidadeEvento =
   | 'fardo' | 'dormente' | 'contrato' | 'ata' | 'entrega' | 'rme' | 'fornecedor' | 'cadastro' | 'local' | 'parametros' | 'usuario'
-  | 'saldo_dof';
+  | 'saldo_dof' | 'inventario';
 
 /**
  * Evento (histórico e auditoria): toda operação que muda o estado registra um. É a fonte das linhas do tempo da ficha
@@ -130,6 +130,8 @@ export interface Local {
   ocupacao: number;
   /** Calculado: fardos com saldo no local. */
   fardos: number;
+  /** Calculado: quando o local foi conferido pela última vez (inventário fechado). */
+  ultimoInventarioEm?: string;
   ativo: boolean;
 }
 
@@ -591,6 +593,80 @@ export interface SaldoDofInformado {
   observacao?: string;
   quem: string;
   quando: string;
+}
+
+// ---------- Inventário físico por leitura de QR (IN Ibama 21/2014, art. 41) ----------
+
+/** Leitura do QR de um fardo (todos os seus dormentes) ou de um dormente, no local que está sendo conferido. */
+export interface LeituraInventario { tipo: 'fardo' | 'dormente'; id: Id; localId: Id; quando: string; quem: string }
+
+/** O que deveria estar em cada local quando o inventário foi aberto (dormente a dormente). */
+export interface EsperadoInventario { dormenteId: Id; fardoId: Id; localId: Id }
+
+export type GrupoDiferenca = 'local_errado' | 'nao_encontrado' | 'inesperado';
+
+/**
+ * Diferença encontrada, sempre dormente a dormente (não existe ajuste de quantidade). Local errado do fardo vem numa
+ * linha só (`tipo: 'fardo'`, com a quantidade); não encontrado e inesperado, por dormente (ou fardo lido sem saldo).
+ */
+export interface DiferencaInventario {
+  grupo: GrupoDiferenca;
+  tipo: 'fardo' | 'dormente';
+  id: Id;
+  fardoId: Id;
+  /** Onde deveria estar. */
+  localId?: Id;
+  /** Onde foi lido. */
+  lidoEmId?: Id;
+  quantidade: number;
+  motivo: string;
+  /** Obrigatória nos inesperados. */
+  justificativa?: string;
+}
+
+export interface ResultadoLocalInventario { localId: Id; esperados: number; conferidos: number; percentual: number; diferencas: number }
+
+export interface ResultadoInventario {
+  porLocal: ResultadoLocalInventario[];
+  esperados: number;
+  conferidos: number;
+  percentual: number;
+  diferencas: DiferencaInventario[];
+}
+
+export type SituacaoInventario = 'aberto' | 'fechado';
+
+export interface Inventario {
+  id: Id;
+  /** INV-2026-0001 */
+  numero: string;
+  locaisIds: Id[];
+  esperados: EsperadoInventario[];
+  leituras: LeituraInventario[];
+  situacao: SituacaoInventario;
+  abertoEm: string;
+  abertoPor: string;
+  fechadoEm?: string;
+  fechadoPor?: string;
+  /** Gravado no fechamento (com as justificativas dos inesperados). */
+  resultado?: ResultadoInventario;
+}
+
+/** Resposta de cada leitura, para o retorno na hora na tela de campo. */
+export interface RetornoLeituraInventario { situacao: 'conferido' | 'local_errado' | 'inesperado' | 'repetido'; mensagem: string; quantidade: number }
+
+/** Último inventário de cada local (relatórios do IBAMA e Inventário para vistoria). */
+export interface InventarioDoLocal {
+  localId: Id;
+  inventarioId?: Id;
+  numero?: string;
+  fechadoEm?: string;
+  esperados: number;
+  conferidos: number;
+  percentual?: number;
+  localErrado: number;
+  naoEncontrados: number;
+  inesperados: number;
 }
 
 /** Motivo da perda (IN Ibama 21/2014, art. 42: perdas, incêndios e intempéries são informados ao órgão). */

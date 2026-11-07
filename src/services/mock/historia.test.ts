@@ -104,12 +104,15 @@ describe('história de demonstração', () => {
     expect(e.entregas.filter((x) => x.situacao === 'recebida_parcial')).toHaveLength(1);
   });
 
-  it('tem ~5% de reprovados, uma reposição e 2 não localizados', () => {
+  it('tem ~5% de reprovados, uma reposição e 3 não localizados', () => {
     const inspecionados = e.dormentes.filter((d) => ['em_estoque', 'reservado', 'baixado', 'reprovado', 'retirado'].includes(d.situacao));
     const reprovados = e.dormentes.filter((d) => d.situacao === 'reprovado' || d.situacao === 'retirado').length;
     expect(reprovados / inspecionados.length).toBeGreaterThan(0.03);
     expect(reprovados / inspecionados.length).toBeLessThan(0.08);
-    expect(e.dormentes.filter((d) => d.situacao === 'nao_localizado')).toHaveLength(2);
+    // 2 da conclusão da inspeção e 1 do inventário de A-03 e A-04.
+    expect(e.dormentes.filter((d) => d.situacao === 'nao_localizado')).toHaveLength(3);
+    const inv = e.inventarios[0];
+    expect([inv.situacao, inv.resultado!.diferencas.map((d) => d.grupo)]).toEqual(['fechado', ['local_errado', 'nao_encontrado']]);
     expect(e.dormentes.filter((d) => d.situacao === 'perdido')).toHaveLength(1);
     expect(e.perdas.filter((p) => !p.comunicadoEm)).toHaveLength(1);
     const c2 = contratoView(e, e.contratos[0], HOJE);
