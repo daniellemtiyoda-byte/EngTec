@@ -57,19 +57,20 @@ describe('história de demonstração', () => {
     expect(e.atas.every((a) => ataView(e, a, HOJE).vigente)).toBe(true);
     const contratos = e.contratos.map((c) => contratoView(e, c, HOJE));
     expect(contratos.map((c) => `${c.numero}:${c.situacao}`)).toEqual([
-      'AR00224-01:vigente', 'AR00311-02:concluido', 'AR00224-02:vigente', 'AR00311-01:vigente', 'AR00311-03:vigente', 'AR00224-03:vigente',
+      'AR00311-02:concluido', 'AR00311-01:vigente', 'AR00224-01:vigente', 'AR00224-02:vigente', 'AR00311-03:vigente', 'AR00224-03:vigente',
     ]);
     expect(e.fornecedores.filter((f) => f.ctfValidade < HOJE)).toHaveLength(1);
     // Pessoas fictícias: nenhum gestor com nome de documento real.
     expect(e.contratos.every((c) => c.gestor.startsWith('Gestor Exemplo'))).toBe(true);
   });
 
-  it('tem o cronograma: parcelas atrasadas, entregues e o recebimento definitivo do contrato concluído', () => {
-    const [c1, c5] = e.contratos.map((c) => contratoView(e, c, HOJE));
-    expect(c1.parcelas.map((p) => p.situacao)).toEqual(['atrasada', 'atrasada']);
-    expect(c1.parcelasAtrasadas).toBe(2);
+  it('tem o cronograma: AR00224-01 no prazo, um único atraso proposital e o recebimento definitivo do contrato concluído', () => {
+    const [c5, c3, c1] = e.contratos.map((c) => contratoView(e, c, HOJE));
+    expect(c1.parcelas.map((p) => p.situacao)).toEqual(['a_entregar', 'a_entregar']);
+    expect(c3.parcelas.map((p) => p.situacao)).toEqual(['entregue_com_atraso', 'atrasada']);
+    expect(e.contratos.reduce((t, c) => t + contratoView(e, c, HOJE).parcelasAtrasadas, 0)).toBe(1);
     expect(c5.parcelas[0].situacao).toBe('entregue');
-    expect(c5.recebimentoDefinitivoEm).toBe('2026-09-02');
+    expect(c5.recebimentoDefinitivoEm).toBe('2026-07-09');
     expect(e.entregas.every((x) => c5.id !== x.contratoId || x.laudo)).toBe(true);
   });
 
@@ -109,15 +110,21 @@ describe('história de demonstração', () => {
     expect(reprovados / inspecionados.length).toBeGreaterThan(0.03);
     expect(reprovados / inspecionados.length).toBeLessThan(0.08);
     expect(e.dormentes.filter((d) => d.situacao === 'nao_localizado')).toHaveLength(2);
-    const c2 = contratoView(e, e.contratos[1], HOJE);
+    const c2 = contratoView(e, e.contratos[0], HOJE);
     expect(c2.itens[0].emitidos).toBe(30);
     expect(c2.itens[0].aprovados).toBe(28);
   });
 
-  it('tem 1 fardo acima do limite de dias, 1 item em falta e 1 em excesso', () => {
-    const parados = e.fardos.map((f) => fardoView(e, f, HOJE)).filter((f) => f.acimaLimiteDias);
-    expect(parados.map((f) => f.id)).toEqual(['AR00224-01-F001']);
-    const saldo = saldoPorItem(e);
+  it('tem fardos acima do limite de dias, em cura, 1 item em falta e 1 em excesso', () => {
+    const fardos = e.fardos.map((f) => fardoView(e, f, HOJE));
+    expect(fardos.filter((f) => f.acimaLimiteDias).map((f) => f.id)).toEqual(['AR00311-02-F002', 'AR00311-02-F003']);
+    // Em cura (CCA/CCB: 15 dias do tratamento): saldo físico, mas nada disponível, até a liberação.
+    const emCura = fardos.filter((f) => f.emCuraAte);
+    expect(emCura.map((f) => f.id)).toEqual(['AR00224-02-F001', 'AR00224-02-F002']);
+    expect(emCura.every((f) => f.disponivel === 0 && f.saldo > 0 && f.emCuraAte! > HOJE)).toBe(true);
+    expect(e.fardos.every((f) => f.usinaTratamento && f.dataTratamento)).toBe(true);
+    const saldo = saldoPorItem(e, HOJE);
+    expect(saldo.some((s) => s.emCura > 0 && !!s.liberacaoCura)).toBe(true);
     expect(saldo.filter((s) => s.situacao === 'falta')).toHaveLength(1);
     expect(saldo.filter((s) => s.situacao === 'excesso')).toHaveLength(1);
   });

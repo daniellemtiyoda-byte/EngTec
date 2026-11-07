@@ -35,7 +35,7 @@ export interface OpcoesMock {
 }
 
 /**
- * Serviços simulados (até a Etapa 10). Regras em um módulo por assunto (cadastros, simulador, documentos,
+ * Serviços simulados (até a Etapa 9). Regras em um módulo por assunto (cadastros, simulador, documentos,
  * recebimento, inspeção, estoque, rme, painel) e campos calculados em consultas.ts. Aqui só a ligação:
  * sessão e permissões (como as políticas do banco farão), escrita atômica e persistência.
  */
@@ -235,7 +235,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
         // Ordem: uso (via corrente, depois AMV), comprimento e classe. A busca olha o código do tamanho e as espécies.
         const tam = (id: Id) => e.tamanhos.find((x) => x.id === id);
         const nomes = (s: SaldoItem) => [tam(s.tamanhoId)?.codigo ?? '', ...s.especies.map((x) => e.especies.find((y) => y.id === x.especieId)?.nomePopular ?? '')];
-        const ordenado = [...saldoPorItem(e)].sort((a, b) => a.uso.localeCompare(b.uso) * -1 || (tam(a.tamanhoId)?.comprimentoCm ?? 0) - (tam(b.tamanhoId)?.comprimentoCm ?? 0) || a.classe - b.classe);
+        const ordenado = [...saldoPorItem(e, dia())].sort((a, b) => a.uso.localeCompare(b.uso) * -1 || (tam(a.tamanhoId)?.comprimentoCm ?? 0) - (tam(b.tamanhoId)?.comprimentoCm ?? 0) || a.classe - b.classe);
         return paginar(ordenado, q, nomes);
       }),
       porFardo: (q = {}) => ler((e) => {

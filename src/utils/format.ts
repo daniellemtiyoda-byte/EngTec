@@ -28,6 +28,9 @@ export function data(iso?: string): string {
   return d.toLocaleDateString('pt-BR', { timeZone: iso.length === 10 ? 'UTC' : TZ, day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+/** Mês e ano (MM/AAAA) de uma data AAAA-MM-DD, como na marcação do dormente (mês e ano de impregnação). */
+export const mesAno = (aaaammdd?: string) => (aaaammdd ? `${aaaammdd.slice(5, 7)}/${aaaammdd.slice(0, 4)}` : '—');
+
 const DIA_MS = 86_400_000;
 /** Hoje (AAAA-MM-DD) no fuso de São Paulo. */
 export const hojeSP = () => new Date().toLocaleDateString('sv-SE', { timeZone: TZ });

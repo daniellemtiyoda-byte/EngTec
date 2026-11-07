@@ -19,7 +19,7 @@ import { useCadastros } from '../hooks/useCadastros';
 import { useTelaPequena } from '../hooks/useTelaPequena';
 import { servicos } from '../services';
 import { ApiError } from '../services/http';
-import { cm, data, dataHora, dias, numero } from '../utils/format';
+import { cm, data, dataHora, dias, mesAno, numero } from '../utils/format';
 
 type AbaFardo = 'dormentes' | 'origem' | 'movimentacoes' | 'historico';
 
@@ -104,7 +104,8 @@ export default function FardoDetalhe() {
               <dt>Fornecedor</dt><dd><Link to={`/fornecedores/${contrato.fornecedorId}`}>{cad.nomeFornecedor(contrato.fornecedorId)}</Link></dd>
               <dt>Empresa inspetora</dt><dd>{entrega?.boletim ? `${cad.nomeEmpresa(entrega.boletim.empresaInspetoraId)} · Boletim ${entrega.boletim.numero}` : '—'}</dd>
               <dt>Item</dt><dd>{cad.descreverTamanho(item.tamanho.id)} · {rotuloClasse(item.classe)}</dd>
-              <dt>Madeira</dt><dd>{item.especie.nomeCientifico} ({item.especie.nomePopular}) · {item.tratamento.preservativo} / {item.tratamento.empresa}</dd>
+              <dt>Madeira</dt><dd>{item.especie.nomeCientifico} ({item.especie.nomePopular}) · {item.tratamento.preservativo}</dd>
+              <dt>Marcação</dt><dd>Usina {item.usinaTratamento} · impregnação {mesAno(item.dataTratamento)} ({data(item.dataTratamento)}){f.emCuraAte ? ` · em cura até ${data(f.emCuraAte)}` : ''}</dd>
               <dt>NF</dt><dd>{nf ? `${nf.numero} · emitida em ${data(nf.emissao)}` : '—'}</dd>
               <dt>DOF</dt><dd>{dof ? `${dof.numero} · validade ${data(dof.validade)}${dof.declarado ? ` · declarado em ${data(dof.declarado.quando)}` : ''}` : '—'}</dd>
               <dt>Recebimento</dt><dd>{recebimento ? `${dataHora(recebimento.recebidoEm)} · ${recebimento.recebidoPor}` : 'Ainda não recebido'}</dd>

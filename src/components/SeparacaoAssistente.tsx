@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CodigoLido } from '../dominio/identificacao';
+import { classeInferior, classeSugerida } from '../dominio/parametros';
+import { ordinalClasse, TIPO_DESTINO } from '../dominio/rotulos';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { ApiError, mensagemSegura } from '../services/http';
@@ -32,6 +34,8 @@ export function SeparacaoAssistente({ aberto, rme, cad, aoFechar, aoSeparar }: P
   const [lidos, setLidos] = useState<Record<string, Origem>>({});
   const [lendo, setLendo] = useState(false);
   const [justificativas, setJustificativas] = useState<Record<string, string>>({});
+  const [justClasse, setJustClasse] = useState<Record<string, string>>({});
+  const sugerida = classeSugerida(rme.tipoDestino);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string>();
   const [enviando, setEnviando] = useState(false);
@@ -43,7 +47,7 @@ export function SeparacaoAssistente({ aberto, rme, cad, aoFechar, aoSeparar }: P
 
   useEffect(() => {
     if (!aberto) return;
-    setPasso(0); setLidos({}); setJustificativas({}); setErros({}); setErroGeral(undefined);
+    setPasso(0); setLidos({}); setJustificativas({}); setJustClasse({}); setErros({}); setErroGeral(undefined);
     void carregar();
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -99,8 +103,13 @@ export function SeparacaoAssistente({ aberto, rme, cad, aoFechar, aoSeparar }: P
     const porFardo = new Map<string, string[]>();
     for (const [id, o] of Object.entries(lidos)) porFardo.set(o.fardoId, [...(porFardo.get(o.fardoId) ?? []), id]);
     const sugeridos = new Map((sugestao?.itens ?? []).flatMap((i) => i.fardos).map((f) => [f.fardoId, f.dormentesIds.length]));
-    return [...porFardo].map(([fardoId, ids]) => ({ fardoId, dormentesIds: ids.sort(), seguiu: sugeridos.get(fardoId) === ids.length, sugeridos: sugeridos.get(fardoId) ?? 0 }));
-  }, [lidos, sugestao]);
+    // Classe do fardo (a do item a que ele pertence) abaixo da sugerida para o tipo de destino: pede justificativa.
+    const itemDo = new Map(Object.values(lidos).map((o) => [o.fardoId, o.item]));
+    return [...porFardo].map(([fardoId, ids]) => {
+      const classe = sugestao?.itens[itemDo.get(fardoId) ?? 0]?.classe ?? 1;
+      return { fardoId, dormentesIds: ids.sort(), seguiu: sugeridos.get(fardoId) === ids.length, sugeridos: sugeridos.get(fardoId) ?? 0, classe, abaixo: classeInferior(classe, sugerida) };
+    });
+  }, [lidos, sugestao, sugerida]);
 
   async function avancar() {
     setErroGeral(undefined);
@@ -117,12 +126,17 @@ export function SeparacaoAssistente({ aberto, rme, cad, aoFechar, aoSeparar }: P
 
   async function confirmar() {
     const e: Record<string, string> = {};
-    linhas.forEach((l) => { if (!l.seguiu && !justificativas[l.fardoId]?.trim()) e[l.fardoId] = 'O fardo difere da sugestão: informe a justificativa.'; });
+    linhas.forEach((l) => {
+      if (!l.seguiu && !justificativas[l.fardoId]?.trim()) e[l.fardoId] = 'O fardo difere da sugestão: informe a justificativa.';
+      if (l.abaixo && !justClasse[l.fardoId]?.trim()) e[`classe-${l.fardoId}`] = `Classe abaixo da ${ordinalClasse(sugerida)} sugerida para o destino: informe a justificativa.`;
+    });
     setErros(e); setErroGeral(undefined);
     if (Object.keys(e).length) return;
     setEnviando(true);
     try {
-      const r = await servicos.rme.separar(rme.numero, linhas.map((l) => ({ fardoId: l.fardoId, dormentesIds: l.dormentesIds, justificativa: l.seguiu ? undefined : justificativas[l.fardoId] })));
+      const r = await servicos.rme.separar(rme.numero, linhas.map((l) => ({
+        fardoId: l.fardoId, dormentesIds: l.dormentesIds, justificativa: l.seguiu ? undefined : justificativas[l.fardoId], justificativaClasse: l.abaixo ? justClasse[l.fardoId] : undefined,
+      })));
       aoSeparar(r);
     } catch (err) {
       if (err instanceof ApiError && err.detalhes) {
@@ -196,7 +210,7 @@ export function SeparacaoAssistente({ aberto, rme, cad, aoFechar, aoSeparar }: P
 
         {passo === 0 && sugestao && (
           <div className="assistente-passo">
-            <p>Destino: <strong>{rme.destino}</strong>. Fardos abertos primeiro, depois os mais antigos; só dormentes disponíveis.</p>
+            <p>Destino: <strong>{rme.destino}</strong> ({TIPO_DESTINO[rme.tipoDestino][1]}, classe mínima sugerida {ordinalClasse(sugerida)}). Fardos abertos primeiro, depois os mais antigos; só dormentes disponíveis (fora da cura).</p>
             {sugestao.itens.map((it, n) => (
               <section key={n} className="separacao-item">
                 <h3 className="separacao-item-titulo">{descricao(n)} · {numero(it.quantidade)} dormentes</h3>
@@ -241,6 +255,13 @@ export function SeparacaoAssistente({ aberto, rme, cad, aoFechar, aoSeparar }: P
                     <label htmlFor={`sep-just-${l.fardoId}`}>Justificativa<span className="obrig" aria-hidden="true"> *</span></label>
                     <textarea id={`sep-just-${l.fardoId}`} rows={2} maxLength={300} value={justificativas[l.fardoId] ?? ''} onChange={(e) => setJustificativas((j) => ({ ...j, [l.fardoId]: e.target.value }))} placeholder="Ex.: fardo sugerido no fundo da pilha" />
                     {erros[l.fardoId] && <span className="erro-campo" role="alert">{erros[l.fardoId]}</span>}
+                  </div>
+                )}
+                {l.abaixo && (
+                  <div className="campo">
+                    <label htmlFor={`sep-cls-${l.fardoId}`}>Justificativa da classe ({ordinalClasse(l.classe)}, abaixo da {ordinalClasse(sugerida)} sugerida para {TIPO_DESTINO[rme.tipoDestino][1].toLowerCase()})<span className="obrig" aria-hidden="true"> *</span></label>
+                    <textarea id={`sep-cls-${l.fardoId}`} rows={2} maxLength={300} value={justClasse[l.fardoId] ?? ''} onChange={(e) => setJustClasse((j) => ({ ...j, [l.fardoId]: e.target.value }))} placeholder="Ex.: sem 1ª classe disponível; liberado pela engenharia" />
+                    {erros[`classe-${l.fardoId}`] && <span className="erro-campo" role="alert">{erros[`classe-${l.fardoId}`]}</span>}
                   </div>
                 )}
               </div>

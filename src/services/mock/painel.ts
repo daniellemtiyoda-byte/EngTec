@@ -16,7 +16,7 @@ export function saldoNasAtasVigentes(e: Estado, tamanhoId: string, dia: string) 
 const nomeItem = (e: Estado, s: SaldoItem) => `${e.tamanhos.find((x) => x.id === s.tamanhoId)?.codigo ?? s.tamanhoId} · ${ordinalClasse(s.classe)} classe`;
 
 export function indicadores(e: Estado, dia: string): Indicadores {
-  const saldo = saldoPorItem(e);
+  const saldo = saldoPorItem(e, dia);
   const fardos = e.fardos.map((f) => fardoView(e, f, dia));
   return {
     emEstoque: e.dormentes.filter((d) => d.situacao === 'em_estoque').length,
@@ -54,7 +54,7 @@ export function pendencias(e: Estado, u: Usuario, dia: string): Pendencia[] {
     add({ id: 'dof', titulo: 'DOFs a declarar no Sinaflor', quantidade: dofs.length, nivel: urgentes ? 'critico' : 'atencao', link: '/documentos?aba=dofs', acao: 'Declarar' });
   }
   if (pode('painel:gestao')) {
-    const saldo = saldoPorItem(e);
+    const saldo = saldoPorItem(e, dia);
     add({ id: 'falta-excesso', titulo: 'Itens em falta ou excesso', quantidade: saldo.filter((s) => s.situacao !== 'ok').length, nivel: 'atencao', link: '/estoque', acao: 'Ver estoque' });
     add({ id: 'parados', titulo: 'Fardos acima do limite de dias', quantidade: fardos.filter((f) => f.acimaLimiteDias).length, nivel: 'atencao', link: '/estoque?visao=fardo&acimaLimiteDias=true', acao: 'Ver fardos' });
     add({ id: 'nao-localizados', titulo: 'Dormentes não localizados', quantidade: e.dormentes.filter((d) => d.situacao === 'nao_localizado').length, nivel: 'critico', link: '/inspecao?aba=nao_localizados', acao: 'Ver dormentes' });
@@ -76,7 +76,7 @@ export function alertas(e: Estado, dia: string): Alerta[] {
     const quando = d.diasParaPrazo < 0 ? `venceu há ${-d.diasParaPrazo} dia(s)` : d.diasParaPrazo === 0 ? 'vence hoje' : `vence em ${d.diasParaPrazo} dia(s)`;
     lista.push({ id: `dof-${d.id}`, nivel: d.nivelPrazo === 'atencao' ? 'atencao' : 'critico', titulo: `DOF ${d.numero} a declarar`, descricao: `Prazo de declaração no Sinaflor ${quando}.`, link: `/documentos?aba=dofs&q=${d.numero}` });
   }
-  for (const s of saldoPorItem(e).filter((x) => x.situacao !== 'ok')) {
+  for (const s of saldoPorItem(e, dia).filter((x) => x.situacao !== 'ok')) {
     const nome = nomeItem(e, s);
     // Reposição: com o item abaixo do mínimo, o saldo nas atas vigentes e o atalho para um novo contrato.
     const atas = saldoNasAtasVigentes(e, s.tamanhoId, dia);

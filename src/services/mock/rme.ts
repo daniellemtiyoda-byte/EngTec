@@ -1,4 +1,5 @@
 import { idRme, RE_RME } from '../../dominio/identificacao';
+import { classeInferior, classeSugerida } from '../../dominio/parametros';
 import type { Classe, Dormente, Id, ItemRme, Rme, SeparacaoFardo, SugestaoSeparacao, Usuario } from '../../types/models';
 import type { DadosRme, DadosSeparacao } from '../contracts';
 import { dormentesDoFardo, fardoView } from './consultas';
@@ -17,6 +18,7 @@ export const acharRme = (e: Estado, numero: string) => achar(e.rmes, (r) => r.nu
 export function abrirRme(e: Estado, dados: DadosRme, solicitante: Usuario, ctx: Ctx): Rme {
   const campos: Record<string, string> = {};
   if (!dados.destino?.trim()) campos.destino = 'Informe a obra ou o trecho.';
+  if (!['principal_pesado', 'principal_medio', 'desvio', 'patio'].includes(dados.tipoDestino)) campos.tipoDestino = 'Escolha o tipo de destino.';
   if (!DATA.test(dados.necessidadeEm ?? '')) campos.necessidadeEm = 'Informe a data de necessidade.';
   else if (dados.necessidadeEm < hoje(ctx)) campos.necessidadeEm = 'A data de necessidade já passou.';
   if (!dados.itens?.length) campos.itens = 'Informe ao menos um item.';
@@ -36,7 +38,7 @@ export function abrirRme(e: Estado, dados: DadosRme, solicitante: Usuario, ctx: 
   const seq = e.rmes.map((r) => RE_RME.exec(r.numero)).filter((m) => m && Number(m[1]) === ano).reduce((max, m) => Math.max(max, Number(m![2])), 0) + 1;
   const rme: Rme = {
     id: novoId(e, 'rm'), numero: idRme(ano, seq), solicitanteId: solicitante.id, solicitanteNome: solicitante.nome,
-    destino: dados.destino.trim(), necessidadeEm: dados.necessidadeEm,
+    destino: dados.destino.trim(), tipoDestino: dados.tipoDestino, necessidadeEm: dados.necessidadeEm,
     itens: dados.itens.map((i) => ({ tamanhoId: i.tamanhoId, classe: i.classe, categoriaMinima: i.categoriaMinima || undefined, especieId: i.especieId || undefined, quantidade: i.quantidade })),
     situacao: 'aberta', criadoEm: instante(ctx), historico: [evento(ctx, 'emitido', `RME aberta para ${dados.destino.trim()}`)],
   };
@@ -104,6 +106,8 @@ export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[
   if (r.situacao !== 'aberta' && r.situacao !== 'em_separacao') falha(409, `A RME ${r.numero} não está aberta para separação.`);
   if (!separacao.length) falha(422, 'Informe os dormentes separados.', { separacao: 'Nada separado.' });
   const sugestao = sugerirSeparacao(e, numero, ctx);
+  const sugerida = classeSugerida(r.tipoDestino);
+  const dia = hoje(ctx);
   const sugeridoPorFardo = new Map(sugestao.itens.flatMap((i) => i.fardos).map((f) => [f.fardoId, f.dormentesIds.length]));
 
   const campos: Record<string, string> = {};
@@ -114,6 +118,11 @@ export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[
     const k = chaveItem({ tamanhoId, classe });
     const it = r.itens.find((i) => chaveItem(i) === k);
     if (!it) campos[`separacao.${n}`] = `O fardo ${fardo.id} não é do tamanho e da classe de um item desta RME.`;
+    const emCura = fardoView(e, fardo, dia).emCuraAte;
+    if (emCura) campos[`separacao.${n}`] = `O fardo ${fardo.id} está em cura até ${emCura}: ainda não pode ser separado.`;
+    // Classe inferior à sugerida para o tipo de destino: aceita com justificativa.
+    const abaixo = classeInferior(classe, sugerida);
+    if (abaixo && !s.justificativaClasse?.trim()) campos[`separacao.${n}`] = `O fardo ${fardo.id} é de ${classe}ª classe, abaixo da ${sugerida}ª sugerida para o destino: informe a justificativa.`;
     const ids = [...new Set(s.dormentesIds.map((x) => x.trim().toUpperCase()))];
     if (!ids.length) campos[`separacao.${n}`] = `Nenhum dormente do fardo ${fardo.id}.`;
     for (const id of ids) {
@@ -127,7 +136,10 @@ export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[
     totalPorItem.set(k, (totalPorItem.get(k) ?? 0) + ids.length);
     const seguiuSugestao = sugeridoPorFardo.get(fardo.id) === ids.length;
     if (!seguiuSugestao && !s.justificativa?.trim()) campos[`separacao.${n}`] = `O fardo ${fardo.id} difere da sugestão: informe a justificativa.`;
-    return { fardoId: fardo.id, dormentesIds: ids, seguiuSugestao, justificativa: seguiuSugestao ? undefined : s.justificativa?.trim() };
+    return {
+      fardoId: fardo.id, dormentesIds: ids, seguiuSugestao, justificativa: seguiuSugestao ? undefined : s.justificativa?.trim(),
+      justificativaClasse: abaixo ? s.justificativaClasse?.trim() : undefined,
+    };
   });
   r.itens.forEach((i, n) => {
     const total = totalPorItem.get(chaveItem(i)) ?? 0;

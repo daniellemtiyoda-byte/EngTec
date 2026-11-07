@@ -67,7 +67,7 @@ const OPERACAO: Permissao[] = ['operacao:consultar'];
  * Tela nova = uma linha aqui. A ordem dentro de cada grupo é a ordem do menu.
  */
 export const ROTAS: Rota[] = [
-  { caminho: '/', tela: emConstrucao('Painel', 9), rotulo: 'Painel', icone: 'grid', grupo: 'Início', fim: true },
+  { caminho: '/', tela: emConstrucao('Painel', 10), rotulo: 'Painel', icone: 'grid', grupo: 'Início', fim: true },
   { caminho: '/contratos', tela: Contratos, rotulo: 'Contratos', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO },
   { caminho: '/contratos/:numero', tela: ContratoDetalhe, rotulo: 'Contrato', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/simulador', tela: Simulador, rotulo: 'Simulador do fornecedor', icone: 'fabrica', grupo: 'Suprimento', permissoes: ['simulador:usar'], demo: true },

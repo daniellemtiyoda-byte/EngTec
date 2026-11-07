@@ -1,7 +1,7 @@
 import type { Categoria, Classe } from '../types/models';
 import {
   NIVEL_PRAZO, SITUACAO_CADASTRO, SITUACAO_MEDIDAS, SITUACAO_CONTRATO, SITUACAO_DORMENTE, SITUACAO_ENTREGA, SITUACAO_FARDO, SITUACAO_RME,
-  SITUACAO_PARCELA, SITUACAO_SALDO, TIPO_LOCAL, TIPO_MOVIMENTACAO, TIPO_OCORRENCIA, USO_TAMANHO, ordinalClasse, rotuloCategoria, type Rotulos,
+  SITUACAO_PARCELA, SITUACAO_SALDO, TIPO_DESTINO, TIPO_LOCAL, TIPO_MOVIMENTACAO, TIPO_OCORRENCIA, USO_TAMANHO, ordinalClasse, rotuloCategoria, type Rotulos,
 } from './rotulos';
 
 export interface Opcao<V extends string = string> { valor: V; rotulo: string }
@@ -31,6 +31,7 @@ export const CATEGORIAS: Categoria[] = [1, 2, 3];
 export const CATEGORIA_OPCOES: Opcao[] = CATEGORIAS.map((c) => ({ valor: String(c), rotulo: rotuloCategoria(c) }));
 
 export const USO_TAMANHO_OPCOES = opcoesDe(USO_TAMANHO);
+export const TIPO_DESTINO_OPCOES = opcoesDe(TIPO_DESTINO);
 export const SITUACAO_PARCELA_OPCOES = opcoesDe(SITUACAO_PARCELA);
 /** Classes da NBR 7511. */
 export const CLASSES: Classe[] = [1, 2];

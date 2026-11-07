@@ -1,6 +1,6 @@
 import type {
   NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEmissao, SituacaoEntrega,
-  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
+  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoDestino, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
 } from '../types/models';
 
 /**
@@ -122,6 +122,14 @@ export const rotuloClasse = (c?: number) => (c ? `Classe ${ordinalClasse(c)}` : 
 export const USO_TAMANHO: Rotulos<UsoTamanho> = {
   via_corrente: ['azul', 'Via corrente'],
   amv: ['laranja', 'AMV'],
+};
+
+/** Tipo de destino da RME (define a classe mínima sugerida). */
+export const TIPO_DESTINO: Rotulos<TipoDestino> = {
+  principal_pesado: ['vermelho', 'Linha principal, tráfego pesado'],
+  principal_medio: ['laranja', 'Linha principal, tráfego médio'],
+  desvio: ['azul', 'Desvio'],
+  patio: ['cinza', 'Pátio'],
 };
 
 export const SITUACAO_PARCELA: Rotulos<SituacaoParcela> = {

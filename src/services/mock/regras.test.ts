@@ -441,7 +441,7 @@ describe('saída por RME', () => {
     const { s, como, invariantes } = montar('requisitante');
     const c = await contrato(s, 'AR00224-01');
     const item = c.itens[0];
-    const rme = await s.rme.abrir({ destino: 'Linha 10 · Trecho Teste', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: item.tamanhoId, classe: 1, quantidade: 5 }] });
+    const rme = await s.rme.abrir({ destino: 'Linha 10 · Trecho Teste', tipoDestino: 'principal_pesado', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: item.tamanhoId, classe: 1, quantidade: 5 }] });
     expect(rme.situacao).toBe('aberta');
     como('almoxarife');
     await s.rme.iniciarSeparacao(rme.numero);
@@ -475,7 +475,7 @@ describe('saída por RME', () => {
     const { s, como, invariantes } = montar('requisitante');
     const c = await contrato(s, 'AR00224-01');
     const item = c.itens[0];
-    const rme = await s.rme.abrir({ destino: 'Linha 11 · Trecho Teste', necessidadeEm: '2026-11-25', itens: [{ tamanhoId: item.tamanhoId, classe: 1, quantidade: 3 }] });
+    const rme = await s.rme.abrir({ destino: 'Linha 11 · Trecho Teste', tipoDestino: 'principal_medio', necessidadeEm: '2026-11-25', itens: [{ tamanhoId: item.tamanhoId, classe: 1, quantidade: 3 }] });
     como('almoxarife');
     const sug = await s.rme.sugerirSeparacao(rme.numero);
     const sugerido = sug.itens[0].fardos[0].fardoId;
@@ -497,9 +497,9 @@ describe('saída por RME', () => {
     const { s, como } = montar('requisitante');
     const c = await contrato(s, 'AR00224-01');
     const t = c.itens[0].tamanhoId;
-    await falhaCom(s.rme.abrir({ destino: 'Teste', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: t, classe: 3 as 1, quantidade: 1 }] }), 422, 'itens.0');
-    const rme = await s.rme.abrir({ destino: 'Teste', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: t, classe: 1, categoriaMinima: 1, quantidade: 2 }] });
-    const porEspecie = await s.rme.abrir({ destino: 'Teste 2', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: t, classe: 1, especieId: MACARANDUBA, quantidade: 1 }] });
+    await falhaCom(s.rme.abrir({ destino: 'Teste', tipoDestino: 'desvio', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: t, classe: 3 as 1, quantidade: 1 }] }), 422, 'itens.0');
+    const rme = await s.rme.abrir({ destino: 'Teste', tipoDestino: 'desvio', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: t, classe: 1, categoriaMinima: 1, quantidade: 2 }] });
+    const porEspecie = await s.rme.abrir({ destino: 'Teste 2', tipoDestino: 'desvio', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: t, classe: 1, especieId: MACARANDUBA, quantidade: 1 }] });
     como('almoxarife');
     const sug = await s.rme.sugerirSeparacao(rme.numero);
     expect(sug.itens[0].faltam).toBe(0);
@@ -519,12 +519,46 @@ describe('saída por RME', () => {
   });
 });
 
+describe('cura e classe pelo tipo de destino', () => {
+  it('fardo em cura não entra na sugestão nem na separação até a liberação', async () => {
+    const { s, como } = montar('requisitante');
+    const c = await contrato(s, 'AR00224-02');
+    const amv = c.itens.find((i) => i.quantidade === 1500 && i.emitidos > 0)!;
+    const rme = await s.rme.abrir({ destino: 'AMV de teste', tipoDestino: 'principal_medio', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: amv.tamanhoId, classe: 1, quantidade: 2 }] });
+    como('almoxarife');
+    const sug = await s.rme.sugerirSeparacao(rme.numero);
+    expect(sug.itens[0].faltam).toBe(2);
+    const fardo = (await s.fardos.obter('AR00224-02-F001')).fardo;
+    expect(fardo.emCuraAte).toBeTruthy();
+    expect(fardo.disponivel).toBe(0);
+    const ids = (await s.fardos.obter(fardo.id)).dormentes.filter((d) => d.situacao === 'em_estoque').slice(0, 2).map((d) => d.id);
+    const erro = await falhaCom(s.rme.separar(rme.numero, [{ fardoId: fardo.id, dormentesIds: ids, justificativa: 'teste' }]), 422, 'separacao.0');
+    expect(erro.detalhes?.['separacao.0']).toContain('cura');
+    const ficha = await s.dormentes.obter(ids[0]);
+    expect([ficha.item.usinaTratamento, ficha.item.dataTratamento]).toEqual([fardo.usinaTratamento, fardo.dataTratamento]);
+  });
+  it('classe abaixo da sugerida para o destino pede justificativa na separação', async () => {
+    const { s, como, invariantes } = montar('requisitante');
+    const t = (await contrato(s, 'AR00224-01')).itens[1].tamanhoId; // 006219, que tem 2ª classe em estoque
+    await falhaCom(s.rme.abrir({ destino: 'Sem tipo', tipoDestino: 'outro' as 'patio', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: t, classe: 2, quantidade: 1 }] }), 422, 'tipoDestino');
+    const rme = await s.rme.abrir({ destino: 'Linha 10 · Via principal', tipoDestino: 'principal_pesado', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: t, classe: 2, quantidade: 1 }] });
+    como('almoxarife');
+    const f = (await s.rme.sugerirSeparacao(rme.numero)).itens[0].fardos[0];
+    const linha = { fardoId: f.fardoId, dormentesIds: f.dormentesIds };
+    const erro = await falhaCom(s.rme.separar(rme.numero, [linha]), 422, 'separacao.0');
+    expect(erro.detalhes?.['separacao.0']).toContain('1ª sugerida');
+    const pronta = await s.rme.separar(rme.numero, [{ ...linha, justificativaClasse: 'Sem 1ª classe disponível; liberado pela engenharia.' }]);
+    expect(pronta.separacao?.[0].justificativaClasse).toContain('engenharia');
+    expect(invariantes()).toEqual([]);
+  });
+});
+
 describe('expedição', () => {
   it('só recebe fardo inteiro reservado para RME pronta; separação parcial é recusada e cancelar devolve à origem', async () => {
     const { s, como, invariantes } = montar('requisitante');
     const c = await contrato(s, 'AR00224-01');
     const item = c.itens[0];
-    const pedir = (quantidade: number) => s.rme.abrir({ destino: 'Linha 7 · Pátio', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: item.tamanhoId, classe: 1, quantidade }] });
+    const pedir = (quantidade: number) => s.rme.abrir({ destino: 'Linha 7 · Pátio', tipoDestino: 'patio', necessidadeEm: '2026-11-20', itens: [{ tamanhoId: item.tamanhoId, classe: 1, quantidade }] });
     const separarSugestao = async (numero: string) => {
       await s.rme.iniciarSeparacao(numero);
       const sug = await s.rme.sugerirSeparacao(numero);
@@ -582,7 +616,7 @@ describe('estoque, cadastros e contratos', () => {
     expect((await s.estoque.porItem({ filters: { uso: 'amv' }, pageSize: 50 })).items.every((x) => x.uso === 'amv')).toBe(true);
     expect((await s.estoque.porFardo({ filters: { uso: 'via_corrente' }, pageSize: 50 })).items.every((x) => x.id !== 'AR00224-01-F004')).toBe(true);
     const acima = (await s.estoque.porFardo({ filters: { acimaLimite: 'sim' }, pageSize: 50 })).items;
-    expect(acima.map((x) => x.id)).toEqual(['AR00224-01-F001']);
+    expect(acima.map((x) => x.id)).toEqual(['AR00311-02-F002', 'AR00311-02-F003']);
     expect(mov.fardoId).toBe('AR00224-01-F003');
     const umDormente = (await s.fardos.obter('AR00224-01-F003')).dormentes.find((d) => d.situacao === 'em_estoque')!;
     expect((await s.dormentes.obter(umDormente.id)).local?.codigo).toBe('A-05');
@@ -660,7 +694,7 @@ describe('estoque, cadastros e contratos', () => {
     expect(r.reprovacao.every((x) => x.percentual === Math.round((x.reprovados / x.inspecionados) * 1000) / 10)).toBe(true);
     const t006220 = (await s.tamanhos.listar({ pageSize: 50 })).items.find((x) => x.codigo === '006220')!;
     expect((await s.contratos.listar({ filters: { tamanhoId: t006220.id } })).items.map((c) => c.numero)).toEqual(['AR00224-02']);
-    expect((await s.contratos.listar({ filters: { atrasada: 'sim' } })).items.map((c) => c.numero)).toEqual(['AR00224-01']);
+    expect((await s.contratos.listar({ filters: { atrasada: 'sim' } })).items.map((c) => c.numero)).toEqual(['AR00311-01']);
   });
   it('fornecedor com CTF vencido fica bloqueado para nova ata', async () => {
     const { s } = montar('administrador');
@@ -687,8 +721,8 @@ describe('painel', () => {
     como('gestor');
     expect((await s.dashboard.pendencias()).map((p) => p.id)).toEqual(expect.arrayContaining(['falta-excesso', 'parados', 'nao-localizados']));
     const ind = await s.dashboard.indicadores();
-    expect([ind.itensAbaixoMinimo, ind.itensAcimaMaximo, ind.fardosAcimaLimite, ind.naoLocalizados, ind.rmesAbertas]).toEqual([1, 1, 1, 2, 1]);
-    expect([ind.parcelasAtrasadas, ind.reprovadosAguardandoRetirada, ind.laudosAVencer]).toEqual([2, 4, 2]);
+    expect([ind.itensAbaixoMinimo, ind.itensAcimaMaximo, ind.fardosAcimaLimite, ind.naoLocalizados, ind.rmesAbertas]).toEqual([1, 1, 2, 2, 1]);
+    expect([ind.parcelasAtrasadas, ind.reprovadosAguardandoRetirada, ind.laudosAVencer]).toEqual([1, 4, 1]);
     // Reposição: o item em falta mostra o saldo na ata vigente e leva ao novo contrato.
     const falta = (await s.dashboard.alertas()).find((a) => a.titulo.startsWith('Falta'))!;
     expect(falta.descricao).toContain('Saldo na ata vigente');

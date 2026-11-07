@@ -1,13 +1,13 @@
 import type {
   Alerta, Ata, Categoria, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
-  Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros, RegrasAta, UsoTamanho,
+  Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros, RegrasAta, TipoDestino, UsoTamanho,
   Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
 } from '../types/models';
 
 /**
  * CONTRATO ÚNICO entre as telas e os dados (seção 6 do docs/PLANO-V2.md). Implementações: services/mock (até a
- * Etapa 10) e services/supabase (Etapa 10). A autenticação fica fora daqui, em services/auth/.
+ * Etapa 9) e services/supabase (Etapa 9). A autenticação fica fora daqui, em services/auth/.
  * Toda regra de negócio vale no serviço; as telas só exibem e enviam. Erros chegam como `ApiError`, com
  * mensagem segura para exibir e, quando for o caso, erros por campo.
  */
@@ -80,8 +80,9 @@ export type DadosInspecao =
   | { origem: 'manual'; resultado: ResultadoInspecao; categoria?: Categoria; medidas?: Medidas }
   | { origem: 'inspector' | 'simulado'; veredito: VereditoInspector; indice: number; medidas?: Medidas; relatorioUrl?: string };
 
-export interface DadosRme { destino: string; necessidadeEm: string; itens: ItemRme[] }
-export interface DadosSeparacao { fardoId: Id; dormentesIds: Id[]; justificativa?: string }
+export interface DadosRme { destino: string; tipoDestino: TipoDestino; necessidadeEm: string; itens: ItemRme[] }
+/** `justificativaClasse`: obrigatória quando o fardo é de classe inferior à sugerida para o tipo de destino. */
+export interface DadosSeparacao { fardoId: Id; dormentesIds: Id[]; justificativa?: string; justificativaClasse?: string }
 
 // ---------- Serviços ----------
 

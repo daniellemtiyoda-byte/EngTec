@@ -6,6 +6,19 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Alterado
+- 2026-11-07: **Modelo fechado antes do Supabase: marcação, cura, tipo de destino da RME, URL da Vercel e nova ordem das etapas.**
+  - **Por quê:** a próxima etapa cria o banco no Supabase, então o modelo precisa estar completo; e as regras técnicas dos dormentes de madeira (PIM-14 do DNIT e NBR 7511, até a AD1956-4 da CPTM) mudam o que pode sair do estoque.
+  - **Marcação:** fardo e dormente ganham a usina e a data de tratamento (a marcação exigida mostra usina e mês/ano de impregnação; o QR se soma a ela). A ficha do dormente e a página do fardo mostram os dois. A classe continua vindo do Boletim de cada lote.
+  - **Cura:** CCA e CCB só ficam disponíveis 15 dias após o tratamento. O fardo mostra "Em cura até", o disponível fica zerado até a liberação, o estoque por item tem a coluna "Em cura", e a sugestão e a separação ignoram e recusam o fardo em cura.
+  - **RME:** o requisitante informa o tipo de destino (linha principal de tráfego pesado ou médio, desvio, pátio); o sistema sugere a classe mínima (1ª para tráfego pesado, 2ª nos demais), avisa na Nova RME e pede justificativa na separação quando a classe é inferior.
+  - **URL:** `VITE_APP_URL=https://holz-trilho.vercel.app` no `.env.example` e na documentação; as folhas de etiquetas só avisam quando o link aponta para a máquina local.
+  - **Dados de demonstração:** AR00224-01 (e -02) assinados há 40 dias, com as parcelas no prazo; o único atraso proposital é a 2ª parcela do AR00311-01; os fardos do AR00224-02 estão em cura; RMEs com os quatro tipos de destino. IDs fixos mantidos. Estado do mock na versão 7.
+  - **Etapas:** a do Supabase (banco e login) passa a ser a 9, logo depois destes ajustes; o Painel vira a 10 e o acabamento continua a 11.
+  - Testes: 89 (cura na sugestão e na separação, marcação na ficha, tipo de destino obrigatório, justificativa da classe, um único atraso, fardos em cura e acima do limite na história). Verificado no Chrome headless: estoque com cura, fardo em cura, ficha com a marcação, contrato no prazo, Nova RME com o aviso de classe, página da RME e folha de etiquetas sem aviso com a URL da Vercel.
+  - Docs: `docs/PLANO-V2.md` (5.4 a 5.6 com as regras técnicas e o modelo fechado, seção 13 reordenada, 15 e 17), `docs/ESPECIFICACAO-FUNCIONAL.md`, `CLAUDE.md`, `.env.example`.
+  - Arquivos: `src/types/models.ts`, `src/services/contracts.ts`, `src/dominio/{parametros,rotulos,opcoes}.ts`, `src/services/mock/{consultas,rme,simulador,data,index,painel,invariantes}.ts`, testes, `src/components/{SituacaoFardo,NovaRme,SeparacaoAssistente}.tsx`, `src/pages/{Estoque,FichaDormente,FardoDetalhe,Rmes,RmeDetalhe}.tsx`, `src/utils/{qr,format}.ts`, `src/rotas.tsx` e comentários com a nova numeração das etapas.
+
+### Alterado
 - 2026-11-07: **Modelo de compra conforme os documentos reais da CPTM** (Ata AR00224 e contratos AR00224-01, -02 e -03). Escopo: exclusivamente dormentes de madeira.
   - **Por quê:** o protótipo usava um contrato simplificado (espécie, tamanho e tratamento por item, sem cronograma); os documentos reais mostram ata com regras, contrato com parcelas e prazos, item = tamanho pelo código de material, espécie e classe informadas pelo fornecedor e recebimento em duas fases.
   - **Ata e contrato:** não existe AF; cada pedido é um contrato sob a ata. A ata tem vigência de 12 meses e regras como parâmetros (padrão: pedido mínimo de 6.000, até 6 parcelas de 3.000 a 6.000, prazos de 90 a 240 dias da assinatura) e quantidades registradas por tamanho (saldo). O contrato tem data de assinatura, gestor e cronograma por parcela e tamanho; o serviço valida as regras e o saldo da ata, calcula a janela de cada parcela e marca as atrasadas. Toda entrega é vinculada a uma parcela.

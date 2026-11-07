@@ -54,13 +54,14 @@ export function emitir(e: Estado, dados: DadosEmissao, ctx: Ctx, validadeDofDias
   // Espécie, classe e tratamento de cada fardo: atribuídos de forma determinística pela sequência do fardo, entre as
   // espécies que o fornecedor fornece (como viriam do Boletim de Inspeção e da plaquinha).
   const especies = fornecedor.especiesIds.filter((id) => e.especies.some((s) => s.id === id && s.ativo));
-  const tratamentos = e.tratamentos.filter((t) => t.ativo).map((t) => t.id);
+  const tratamentos = e.tratamentos.filter((t) => t.ativo);
   if (!especies.length || !tratamentos.length) falha(409, 'Cadastre espécies (do fornecedor) e tratamentos ativos antes de emitir.');
-  const doFardo = (seq: number) => ({
-    especieId: especies[(seq - 1) % especies.length],
-    classe: (seq % 5 === 0 ? 2 : 1) as Classe,
-    tratamentoId: tratamentos[(seq - 1) % tratamentos.length],
-  });
+  // Marcação: usina (a empresa de tratamento) e data de impregnação, dois dias antes da emissão.
+  const dataTratamento = somarDias(dataSP(ctx.agora()), -2);
+  const doFardo = (seq: number) => {
+    const t = tratamentos[(seq - 1) % tratamentos.length];
+    return { especieId: especies[(seq - 1) % especies.length], classe: (seq % 5 === 0 ? 2 : 1) as Classe, tratamentoId: t.id, usinaTratamento: t.empresa, dataTratamento };
+  };
   const emissaoId = novoId(e, 'em');
   let seqFardo = proximaSequencia(e, reg.id, 'fardo');
   let seqDormente = proximaSequencia(e, reg.id, 'dormente');

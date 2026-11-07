@@ -12,7 +12,7 @@ Documento para orientar o Claude Code na reestruturação do front-end. Ele diz 
 4. Ao fim de cada etapa, atualize o `CLAUDE.md` com o que mudou (arquitetura, rotas, regras de domínio); regras que deixarem de valer saem do arquivo.
 5. **A especificação funcional v2 e este plano são a fonte de verdade** e substituem o PRD da v1, arquivado em `docs/arquivo/PRD-v1.md`. Em conflito, a especificação manda na regra de negócio e o plano na implementação.
 6. Em dúvida sobre uma regra de negócio, pergunte antes de inventar. Em dúvida sobre interface, siga os padrões da seção 8.
-7. Escopo é **só front-end**. Os dados ficam no mock (`services/mock/`) até a etapa do Supabase (Etapa 10), que cria o banco e a implementação `services/supabase/`. Não há back-end próprio.
+7. Escopo é **só front-end**. Os dados ficam no mock (`services/mock/`) até a etapa do Supabase (Etapa 9), que cria o banco e a implementação `services/supabase/`. Não há back-end próprio.
 8. É um protótipo que nunca terá dados reais: **não há banner de "modo simulado", selo de "dados simulados" nem sufixo nos toasts**. O único aviso de demonstração é o do Simulador do fornecedor (exigido pela especificação).
 
 ---
@@ -35,7 +35,7 @@ Documento para orientar o Claude Code na reestruturação do front-end. Ele diz 
 | Lote | **Deixa de existir** como conceito de tela. Agrupamento = contrato + fardo |
 | Saída | Por requisição (RME): aberta → em separação → pronta → entregue (ou cancelada) |
 | Login | Simulado (perfil escolhido pelo nome do usuário) até a etapa do Supabase; lá entra o **Supabase Auth** (e-mail e senha), com o perfil numa tabela `perfis` e a sessão guardada no aparelho (para o QR abrir a ficha sem novo login). A autenticação é um serviço separado da camada de dados desde a Etapa 1 |
-| Banco | **Supabase**, numa etapa própria (Etapa 10) junto com o login: SQL em `supabase/migrations/`, executado pela Dani no editor SQL. Não há back-end próprio: `services/real/` (HTTP) sai nessa etapa |
+| Banco | **Supabase**, numa etapa própria (Etapa 9) junto com o login: SQL em `supabase/migrations/`, executado pela Dani no editor SQL. Não há back-end próprio: `services/real/` (HTTP) sai nessa etapa |
 | Hospedagem | **Vercel**, com HTTPS (a câmera exige); a URL da Vercel é o `VITE_APP_URL` gravado nos QR |
 | Ponto de partida | Código antigo de domínio, telas e mock **foi removido** na Etapa 0; só a infraestrutura reaproveitável ficou |
 | Fora do protótipo | Etiqueta de contingência, devolução dos reprovados ao fornecedor, inventário, ajustes com aprovação, visão computacional, offline, RFID, Sinaflor automático |
@@ -48,9 +48,9 @@ A arquitetura da v1 foi aproveitada: camada de serviços com contrato único (`s
 
 | Item | Situação após a Etapa 0 | Próximo passo |
 | --- | --- | --- |
-| `services/http.ts`, `real/index.ts` | `real/` virou stub na Etapa 2 (sem back-end próprio) e `endpoints.ts` saiu | Saem na Etapa 10 (Supabase); `ApiError` e `mensagemSegura` vão para um módulo próprio de erros |
+| `services/http.ts`, `real/index.ts` | `real/` virou stub na Etapa 2 (sem back-end próprio) e `endpoints.ts` saiu | Saem na Etapa 9 (Supabase); `ApiError` e `mensagemSegura` vão para um módulo próprio de erros |
 | `services/index.ts`, `contracts.ts`, `mock/index.ts`, `mock/util.ts`, `mock/data.ts` | Só com `auth` e o usuário de demonstração | Etapa 1: autenticação vira serviço separado; Etapa 2: serviços v2, regras e história de demonstração |
-| `config/env.ts` | Mantido | Etapa 4: `VITE_APP_URL`; Etapa 10: variáveis do Supabase |
+| `config/env.ts` | Mantido | Etapa 4: `VITE_APP_URL`; Etapa 9: variáveis do Supabase |
 | `types/models.ts` | Só `Origem`, `Paginado`, `ListQuery`, `Usuario` | Etapa 2: modelo v2 (seção 5) |
 | `dominio/rotulos.ts`, `opcoes.ts`, `permissoes.ts` | Só tipos, `opcoesDe()` e `admin` | Etapa 1: permissões e perfis; Etapa 2: situações e `identificacao.ts`, `parametros.ts` |
 | `components/` genéricos: `ListPage`, `FormModal`, `FormLinha`, `Modal`, `Passos`, `Contador`, `LinhaTempo`, `Etapas`, `PainelAbas`, `Toast`, `ErroTela`, `Estados`, `Badge`, `MenuAcoes`, `Codigos`, `UploadModal`, `Logo`, `Icone`, `Layout` | Mantidos (`LinhaTempo` recebe eventos genéricos) | Etapa 1: `ListPage` com `AbasSituacao` e `BarraFiltros`, `Layout` v2 |
@@ -216,6 +216,8 @@ type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao' | 'em
 // selo secundário "Aberto" ao lado de "Em estoque".
 interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId /* = tamanho */; entregaId?: string /* definida ao entrar numa entrega */; quantidadeInicial: number;
   especieId; classe: 1 | 2; tratamentoId /* informados pelo fornecedor: Boletim de Inspeção e plaquinha */;
+  usinaTratamento; dataTratamento /* marcação exigida: usina e mês/ano de impregnação; conta a cura */;
+  reservados; emCuraAte? /* calculados: CCA ou CCB, 15 dias do tratamento */;
   reprovacao?: { dormentesIds; comunicarAte /* 5 dias úteis */; retirarAte /* 15 dias úteis */; comunicadoEm?; retiradoEm? };
   saldo: number /* calculado: saldo físico = dormentes em_estoque + reservado */;
   disponivel: number /* calculado: dormentes em_estoque (livres para nova saída) */;
@@ -224,7 +226,7 @@ interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId /* = tama
   recebidoEm?: string; idadeDias?: number /* calculado */; historico: Evento[] }
 
 type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'retirado' | 'nao_localizado';
-interface Dormente { id /* AR00224-01-000357 */; contratoId; itemContratoId; fardoId: string; especieId; classe; tratamentoId /* do próprio dormente */;
+interface Dormente { id /* AR00224-01-000357 */; contratoId; itemContratoId; fardoId: string; especieId; classe; tratamentoId; usinaTratamento; dataTratamento /* do próprio dormente */;
   situacao: SituacaoDormente; categoria?: number; medidas?: { comprimentoCm; larguraCm; alturaCm };
   inspecaoId?: string; rmeNumero?: string; historico: Evento[] }
 
@@ -283,17 +285,26 @@ Regras **provisórias**, a confirmar com o time da inspeção (ficam em `dominio
 
 **Garantia.** 5 anos a partir da entrega (recebimento do fardo), mostrada na ficha do dormente.
 
+**Regras técnicas dos dormentes de madeira** (referência: PIM-14 do DNIT e NBR 7511; a Especificação Técnica CPTM AD1956-4 prevalece quando for obtida):
+- **Marcação já exigida:** cada dormente já sai do fornecedor marcado (gravação a fogo ou chapa metálica) com a usina de tratamento e o mês e ano de impregnação. A proposta do sistema **acrescenta o código QR** a essa marcação; ela não a substitui. Fardo e dormente guardam a **usina de tratamento** e a **data de tratamento** (a marcação mostra mês e ano; o dia conta a cura), e a ficha do dormente mostra os dois.
+- **Classe** (1ª ou 2ª, NBR 7511): vem do laudo / Boletim de Inspeção de cada lote, **nunca de uma tabela fixa por espécie** (as fontes divergem).
+- **Cura:** dormentes tratados com **CCA ou CCB** só ficam disponíveis para separação **15 dias após a data de tratamento**. Antes disso aparecem "em cura" no estoque, com a data de liberação; não entram na sugestão nem na separação.
+- **Classe pelo destino da RME:** o requisitante informa o tipo de destino (linha principal de tráfego pesado, linha principal de tráfego médio, desvio ou pátio). O sistema sugere a classe mínima (**1ª para tráfego pesado; 2ª aceita nos demais**) e, se a separação usar classe inferior à sugerida, avisa e pede justificativa.
+
+**Modelo fechado (antes do Supabase).** Entidades gravadas, que viram tabelas: Usuário (perfil), Fornecedor, Espécie, Tamanho, Tratamento, Empresa inspetora, Local, Ata (com regras e itens registrados), Contrato (com itens e parcelas), Emissão do fornecedor (Simulador), Fardo (com marcação, conclusão da inspeção e reprovação), Dormente, NF (com itens), DOF (com volumes por espécie), Entrega (com boletim, relatório técnico e laudo), Recebimento (com ocorrências e canhoto), Inspeção, Movimentação, RME (com itens e separação), Parâmetros (com níveis de estoque) e Anexo. Tudo o mais (saldo, disponível, em cura, situação do fardo e da parcela, prazos, divergência de volume, saldo da ata, garantia) é calculado: no Supabase, views e funções.
+
 ### 5.6 Estoque e saída
 
 ```ts
 // Item de estoque = classe + tamanho; a espécie é detalhe.
-interface SaldoItem { id /* classe|tamanho */; classe; tamanhoId; uso; emEstoque /* disponível */; aguardandoInspecao; reservado; naoLocalizado; minimo; maximo;
+interface SaldoItem { id /* classe|tamanho */; classe; tamanhoId; uso; emEstoque /* disponível, fora da cura */; emCura; liberacaoCura?; aguardandoInspecao; reservado; naoLocalizado; minimo; maximo;
   situacao: 'falta' | 'ok' | 'excesso' /* calculado */; especies: { especieId; emEstoque }[] }
 interface Movimentacao { id; tipo: 'guarda' | 'transferencia' | 'segregacao' | 'saida'; fardoId; dormentesIds?: string[];
   deLocalId?; paraLocalId?; quando; quem; referencia?: string }
 type SituacaoRme = 'aberta' | 'em_separacao' | 'pronta' | 'entregue' | 'cancelada';
-interface Rme { id; numero /* RME-2026-0012 */; solicitanteId; destino: string /* obra ou trecho */; necessidadeEm: string;
-  itens: { tamanhoId; classe /* obrigatórios */; categoriaMinima? /* padrão: qualquer aprovado */; especieId?; quantidade }[]; separacao?: { fardoId; dormentesIds: string[]; seguiuSugestao: boolean; justificativa? }[];
+interface Rme { id; numero /* RME-2026-0012 */; solicitanteId; destino: string /* obra ou trecho */;
+  tipoDestino: 'principal_pesado' | 'principal_medio' | 'desvio' | 'patio' /* sugere a classe mínima */; necessidadeEm: string;
+  itens: { tamanhoId; classe /* obrigatórios */; categoriaMinima? /* padrão: qualquer aprovado */; especieId?; quantidade }[]; separacao?: { fardoId; dormentesIds: string[]; seguiuSugestao: boolean; justificativa?; justificativaClasse? /* classe abaixo da sugerida */ }[];
   situacao: SituacaoRme; historico: Evento[] }
 ```
 
@@ -305,9 +316,9 @@ interface Rme { id; numero /* RME-2026-0012 */; solicitanteId; destino: string /
 
 ## 6. Camada de serviços
 
-Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cada implementação (mock e, na Etapa 10, Supabase) implementa a mesma interface. Ao criar uma operação, atualizar contrato e todas as implementações juntos.
+Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cada implementação (mock e, na Etapa 9, Supabase) implementa a mesma interface. Ao criar uma operação, atualizar contrato e todas as implementações juntos.
 
-**Autenticação separada da camada de dados.** Desde a Etapa 1, a autenticação é um serviço à parte (`services/auth/`: contrato `ServicoAuth` com `entrar`, `sair`, `usuarioAtual` e `aoMudarSessao`), usado só pelo `AuthContext`. As telas usam apenas `useAuth()` e `pode()`. Até a Etapa 10 a implementação é a simulada: o nome digitado escolhe o perfil (`administrador`, `almoxarife`, `gestor`, `requisitante`; qualquer senha). Na Etapa 10 entra a implementação do Supabase Auth (e-mail e senha, perfil lido da tabela `perfis`, sessão guardada no aparelho pelo padrão do `supabase-js`), sem mexer nas telas.
+**Autenticação separada da camada de dados.** Desde a Etapa 1, a autenticação é um serviço à parte (`services/auth/`: contrato `ServicoAuth` com `entrar`, `sair`, `usuarioAtual` e `aoMudarSessao`), usado só pelo `AuthContext`. As telas usam apenas `useAuth()` e `pode()`. Até a Etapa 9 a implementação é a simulada: o nome digitado escolhe o perfil (`administrador`, `almoxarife`, `gestor`, `requisitante`; qualquer senha). Na Etapa 9 entra a implementação do Supabase Auth (e-mail e senha, perfil lido da tabela `perfis`, sessão guardada no aparelho pelo padrão do `supabase-js`), sem mexer nas telas.
 
 | Serviço | Operações principais |
 | --- | --- |
@@ -326,13 +337,13 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `rme` | `listar`, `obter`, `abrir`, `iniciarSeparacao(numero)`, `sugerirSeparacao(numero)`, `separar`, `entregar`, `cancelar` |
 | `parametros` | `obter`, `atualizar`, `reiniciarDemonstracao()` (só no mock) |
 
-**Mock (até a Etapa 10).**
+**Mock (até a Etapa 9).**
 - Guarda o estado no **`localStorage`** (com `try/catch`), para os dados sobreviverem ao recarregar a página; **Reiniciar dados de demonstração** em Configurações volta à história inicial.
 - A história inicial (`data.ts`) é **determinística**: os mesmos IDs sempre, sem `Math.random()` nem datas soltas (datas relativas a uma data-base fixa). Inclui uma **entrega "a caminho" pronta, com IDs fixos**, para computador e celular partirem do mesmo estado e as etiquetas poderem ser impressas com antecedência (seção 15).
 - Regras num módulo por assunto: `mock/simulador.ts`, `mock/recebimento.ts`, `mock/inspecao.ts`, `mock/estoque.ts` (única porta de mudança de saldo: `movimentarDormentes()`), `mock/rme.ts`. `data.ts` gera a história **chamando essas regras**, nunca montando registros à mão. As regras e os invariantes da seção 5.4 têm testes no Vitest.
 - Entregas geradas no Simulador ou cadastradas depois do início ficam só no aparelho onde foram criadas.
 
-**Supabase (Etapa 10).**
+**Supabase (Etapa 9).**
 - SQL em `supabase/migrations/` (numerado, um arquivo por mudança): tabela `perfis` ligada a `auth.users`, tabelas dos dados a partir de `models.ts` (campos calculados viram views ou funções), políticas RLS por perfil e a carga da história de demonstração com os mesmos IDs do mock. Claude escreve; a Dani executa no editor SQL do Supabase.
 - Implementação `services/supabase/` da mesma interface, escolhida por variável de ambiente (`VITE_FONTE_DADOS=mock|supabase`), e o Supabase Auth no serviço de autenticação. Regras que mudam várias tabelas juntas (receber, concluir inspeção, separar, entregar) viram funções no banco (`rpc`), para valerem no servidor.
 - Sai `services/real/` (HTTP), com `http.ts` e `endpoints.ts`; `ApiError` e `mensagemSegura()` vão para `services/erros.ts`.
@@ -435,7 +446,7 @@ Usada só em `/d/:id`. Uma coluna, cartões empilhados, texto grande, ações gr
 Para cada tela: rota, objetivo, padrão, conteúdo, ações, ligações e critérios de aceite. Todas têm estados carregando, vazio e erro (`Estados.tsx`), e respeitam permissões (`pode()`).
 
 ### 9.1 Login (`/login`)
-Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administrador`, `almoxarife`, `gestor`, `requisitante`; qualquer senha). Na Etapa 10, e-mail e senha pelo Supabase Auth, com a sessão guardada no aparelho (o QR abre a ficha sem novo login enquanto a sessão valer). Após login, voltar ao destino guardado, inclusive `/d/:id` vindo de um QR.
+Até a Etapa 9, login simulado: o nome do usuário escolhe o perfil (`administrador`, `almoxarife`, `gestor`, `requisitante`; qualquer senha). Na Etapa 9, e-mail e senha pelo Supabase Auth, com a sessão guardada no aparelho (o QR abre a ficha sem novo login enquanto a sessão valer). Após login, voltar ao destino guardado, inclusive `/d/:id` vindo de um QR.
 - Aceite: abrir `/#/d/AR00224-01-000001` sem sessão leva ao login e, após entrar, abre a ficha.
 
 ### 9.2 Painel (`/`) · padrão Painel
@@ -575,7 +586,7 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 - Fornecedor: razão social, CNPJ, cidade/UF, CTF IBAMA e validade, espécies que fornece (seleção múltipla), certificados (anexos). Linha leva à **Página do fornecedor** (`/fornecedores/:id`): contratos, entregas, taxa de reprovação, certificados.
 
 ### 9.19 Usuários (`/usuarios`) e Configurações (`/configuracoes`)
-- Usuários: lista (nome, e-mail, perfil, situação) e edita só perfil e situação. As contas são criadas no painel do Supabase (Etapa 10); até lá a lista mostra os quatro perfis de demonstração.
+- Usuários: lista (nome, e-mail, perfil, situação) e edita só perfil e situação. As contas são criadas no painel do Supabase (Etapa 9); até lá a lista mostra os quatro perfis de demonstração.
 - Configurações: parâmetros da seção 5.7, com a tabela de **níveis de estoque** (mínimo e máximo por espécie + tamanho) editável, o interruptor **Modo demonstração** e, só no mock, **Reiniciar dados de demonstração**.
 
 ### 9.20 Vitrine (`/vitrine`)
@@ -593,7 +604,7 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 | --- | --- | --- |
 | Gerar QR | `qrcode` | Pequena, sem dependências de UI; gerar com `toDataURL()` e exibir em `<img>` (proibido `dangerouslySetInnerHTML`) |
 | Ler QR | API nativa `BarcodeDetector` quando existir; senão `jsqr` lendo quadros da câmera num `<canvas>` | Funciona em Android/Chrome e nos demais navegadores |
-| Login e banco | `@supabase/supabase-js` | Cliente oficial do Supabase (Auth e dados); entra na Etapa 10 |
+| Login e banco | `@supabase/supabase-js` | Cliente oficial do Supabase (Auth e dados); entra na Etapa 9 |
 
 Dependências de desenvolvimento: `@types/qrcode` (tipos do `qrcode`, Etapa 4) e `vitest` (testes de `identificacao.ts` e das regras do mock, Etapa 2). Registrar no `CLAUDE.md` que estas são as únicas dependências de runtime além de React e react-router-dom.
 
@@ -729,15 +740,16 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Lista, nova RME, separação com sugestão e leitura, entrega, cancelamento, página da RME.
 - Pronto quando: uma RME entregue baixa os dormentes certos, o fardo fica aberto com o saldo restante e a ficha mostra o destino.
 
-### Etapa 9 · Painel e alertas
-- Indicadores por perfil, taxa de reprovação por empresa inspetora, "Para fazer agora", gráfico de estoque por item com mínimo e máximo, entregas dos contratos, alertas (DOF, falta/excesso, idade, não localizados). "Início de campo" do almoxarife no celular (seção 11.1).
-- Pronto quando: todo número leva à lista filtrada e cada perfil vê só o que lhe cabe.
-
-### Etapa 10 · Supabase: banco e login
+### Etapa 9 · Supabase: banco e login (logo depois do modelo fechado)
 - `supabase/migrations/`: tabela `perfis`, tabelas dos dados, views dos campos calculados, funções das operações que mudam várias tabelas, políticas RLS por perfil e a carga da história de demonstração com os mesmos IDs do mock. Claude escreve; a Dani executa no editor SQL. As contas são criadas no painel do Supabase.
 - `@supabase/supabase-js`; implementação `services/supabase/`; Supabase Auth no serviço de autenticação (sessão guardada no aparelho); `VITE_FONTE_DADOS`, `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (também na Vercel).
 - Remover `services/real/`, `http.ts` e `endpoints.ts`; erros em `services/erros.ts`. Usuários lista e edita perfil e situação.
 - Pronto quando: computador e celular veem os mesmos dados; uma entrega gerada no computador é recebida no celular; cada perfil só lê e grava o que as políticas permitem.
+
+### Etapa 10 · Painel e alertas
+- Indicadores por perfil, taxa de reprovação por empresa inspetora, "Para fazer agora", gráfico de estoque por item com mínimo e máximo, entregas dos contratos, alertas (DOF, falta/excesso, idade, não localizados). "Início de campo" do almoxarife no celular (seção 11.1).
+- Já preparado no serviço desde o modelo real: parcelas atrasadas, laudos perto do prazo e vencidos, reprovados aguardando retirada, pontualidade por fornecedor, via corrente × AMV e a reposição (saldo na ata vigente e "Novo contrato").
+- Pronto quando: todo número leva à lista filtrada e cada perfil vê só o que lhe cabe.
 
 ### Etapa 11 · Acabamento e demonstração
 - Revisão de responsividade (360 px), acessibilidade, estados vazios e de erro em todas as telas.
@@ -773,8 +785,8 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 Montar uma história coerente, gerada pelas regras do mock, para que todas as telas tenham conteúdo realista. Nomes de fornecedores fictícios.
 
 - 3 fornecedores (um com CTF válido, um com CTF vencendo em 20 dias e um com CTF vencido, bloqueado automaticamente), 4 espécies, os **12 tamanhos reais** da CPTM (006234 a 006231, 240 × 170 mm; 2,80 m via corrente, 3,00 a 5,40 m AMV), 2 tratamentos, empresas inspetoras IPT e UFV, 8 locais (5 armazenagem, 1 inspeção, 1 segregação, 1 expedição). Pessoas (gestores) com nomes fictícios.
-- Ata AR00224 com as regras dos documentos (contratos AR00224-01, -02 e -03; o -01 com as duas parcelas atrasadas, porque os poucos fardos da demonstração não completam 3.000 dormentes) e ata AR00311 (fictícia) com regras reduzidas, para mostrar um contrato pequeno concluído com laudos, reposição de reprovados e recebimento definitivo.
-- Espécie, classe e tratamento por fardo, atribuídos pelo Simulador; Boletim de Inspeção e Relatório Técnico em todas as entregas; laudos emitidos, a emitir no prazo e vencido; reprovados retirados, com comunicação atrasada e com retirada atrasada.
+- Ata AR00224 com as regras dos documentos (contratos AR00224-01, -02 e -03, com assinatura recente e parcelas no prazo; os poucos fardos da demonstração não completam 3.000 dormentes) e ata AR00311 (fictícia) com regras reduzidas, para mostrar um contrato pequeno concluído com laudos, reposição de reprovados e recebimento definitivo.
+- Espécie, classe e tratamento por fardo, atribuídos pelo Simulador; Boletim de Inspeção e Relatório Técnico em todas as entregas; laudos emitidos, a emitir no prazo e vencido; reprovados retirados, com comunicação atrasada e com retirada atrasada; um único atraso proposital de parcela (2ª do AR00311-01); fardos em cura (AR00224-02); RMEs com os quatro tipos de destino.
 - Entregas em todas as fases: **1 a caminho com IDs fixos** (contrato, fardos e dormentes documentados em `data.ts` e no `CLAUDE.md`, para imprimir as etiquetas com antecedência e para computador e celular partirem do mesmo estado), 1 recebida em parte (um fardo ainda em trânsito), 1 recebida aguardando inspeção, 1 em inspeção pela metade, várias concluídas.
 - ~200 dormentes com situações variadas; ~5% reprovados (com uma reposição emitida); 2 dormentes não localizados num fardo concluído com justificativa; 1 fardo acima do limite de dias; 1 item abaixo do mínimo e 1 acima do máximo.
 - DOFs: 1 vencido sem declaração, 1 vencendo em 1 dia, 1 em 3 dias, os demais declarados.
@@ -814,4 +826,5 @@ Executado na Etapa 11, já com o Supabase, para computador e celular compartilha
 | Categorias e limites do índice | 1, 2 e 3, com limites 80 e 50 (a confirmar com o time da inspeção) |
 | Nome popular de *Dialium guianense* | "Jataipeba" (a confirmar com a CPTM) |
 | Padrão da plaquinha de identificação e lista de espécies aceitas por classe | Obter a Especificação Técnica CPTM **AD1956-4**; no protótipo, o fornecedor informa espécie e classe por fardo e qualquer espécie que ele fornece é aceita |
+| Classe mínima por tipo de destino e prazo de cura | 1ª para linha principal de tráfego pesado, 2ª nos demais; cura de 15 dias para CCA e CCB (PIM-14 do DNIT e NBR 7511), até a AD1956-4 |
 | Feriados no cálculo de dias úteis (laudo, comunicação e retirada de reprovados) | Só sábados e domingos ficam de fora (a CPTM pode fornecer o calendário) |

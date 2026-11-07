@@ -229,6 +229,12 @@ export interface Fardo {
   especieId: Id;
   classe: Classe;
   tratamentoId: Id;
+  /**
+   * Marcação exigida (PIM-14 do DNIT e NBR 7511): usina de tratamento e data de impregnação (a marcação mostra mês e
+   * ano; o dia conta a cura).
+   */
+  usinaTratamento: string;
+  dataTratamento: string;
   /** Definida quando o fardo entra numa entrega (cadastro de NF e DOF ou leitura no recebimento). */
   entregaId?: Id;
   /** Emissão do fornecedor que gerou o fardo (no protótipo, o Simulador). */
@@ -244,8 +250,12 @@ export interface Fardo {
   // calculados:
   /** Saldo físico: dormentes em estoque + reservados (ainda estão no fardo). */
   saldo: number;
-  /** Disponível para nova saída: só os em estoque. */
+  /** Disponível para nova saída: os em estoque, fora da cura (CCA ou CCB: 15 dias após o tratamento). */
   disponivel: number;
+  /** Dormentes reservados para RME (ainda no fardo). */
+  reservados: number;
+  /** Em cura: os em estoque só ficam disponíveis a partir desta data (AAAA-MM-DD). */
+  emCuraAte?: string;
   situacao: SituacaoFardo;
   /** Em estoque e incompleto: algum dormente já saiu numa RME (vem primeiro na sugestão de separação). */
   aberto: boolean;
@@ -264,10 +274,12 @@ export interface Dormente {
   id: Id;
   contratoId: Id;
   itemContratoId: Id;
-  /** Do próprio dormente (o fornecedor informa por peça; no protótipo, igual ao do fardo). */
+  /** Do próprio dormente (o fornecedor informa por peça; no protótipo, igual ao do fardo), como na marcação. */
   especieId: Id;
   classe: Classe;
   tratamentoId: Id;
+  usinaTratamento: string;
+  dataTratamento: string;
   /** Fardo de origem; o reprovado continua apontando para ele. */
   fardoId: Id;
   situacao: SituacaoDormente;
@@ -472,8 +484,11 @@ export interface SaldoItem {
   classe: Classe;
   tamanhoId: Id;
   uso: UsoTamanho;
-  /** Disponível (em estoque, sem reserva). */
+  /** Disponível (em estoque, sem reserva e fora da cura). */
   emEstoque: number;
+  /** Em estoque, mas ainda em cura (CCA ou CCB), com a primeira data de liberação. */
+  emCura: number;
+  liberacaoCura?: string;
   aguardandoInspecao: number;
   reservado: number;
   naoLocalizado: number;
@@ -506,7 +521,11 @@ export type SituacaoRme = 'aberta' | 'em_separacao' | 'pronta' | 'entregue' | 'c
  * espécie opcional. Um item por tamanho + classe.
  */
 export interface ItemRme { tamanhoId: Id; classe: Classe; categoriaMinima?: Categoria; especieId?: Id; quantidade: number }
-export interface SeparacaoFardo { fardoId: Id; dormentesIds: Id[]; seguiuSugestao: boolean; justificativa?: string }
+/** `justificativaClasse`: o fardo é de classe inferior à sugerida para o tipo de destino da RME. */
+export interface SeparacaoFardo { fardoId: Id; dormentesIds: Id[]; seguiuSugestao: boolean; justificativa?: string; justificativaClasse?: string }
+
+/** Tipo de destino da RME: define a classe mínima sugerida (1ª para linha principal de tráfego pesado; 2ª aceita nos demais). */
+export type TipoDestino = 'principal_pesado' | 'principal_medio' | 'desvio' | 'patio';
 
 export interface Rme {
   id: Id;
@@ -515,6 +534,7 @@ export interface Rme {
   solicitanteNome: string;
   /** Obra ou trecho. */
   destino: string;
+  tipoDestino: TipoDestino;
   necessidadeEm: string;
   itens: ItemRme[];
   separacao?: SeparacaoFardo[];
@@ -577,7 +597,7 @@ export interface Alerta { id: Id; nivel: Exclude<NivelAlerta, 'info'>; titulo: s
 
 /** Item do contrato com os nomes, para exibir. */
 /** Descrição do fardo ou do dormente: tamanho (o item do contrato) e espécie, classe e tratamento informados pelo fornecedor. */
-export interface ItemDescrito { especie: Especie; tamanho: Tamanho; tratamento: Tratamento; classe: Classe }
+export interface ItemDescrito { especie: Especie; tamanho: Tamanho; tratamento: Tratamento; classe: Classe; usinaTratamento: string; dataTratamento: string }
 
 export interface FardoDetalhe {
   fardo: Fardo;

@@ -94,7 +94,7 @@ function Layout() {
             <label className="sr-only" htmlFor="busca-global">Pesquisa global</label>
             <input id="busca-global" type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="ID do dormente, fardo, contrato, RME ou NF…" maxLength={300} />
           </form>
-          {/* Sino de alertas: Etapa 9. */}
+          {/* Sino de alertas: Etapa 10. */}
           <button type="button" className="btn btn-sec btn-ler-qr" onClick={() => setLendo(true)}><Icone nome="qr" tamanho={18} /><span>Ler QR</span></button>
           <div className="usuario">
             <div><strong>{usuario?.nome}</strong><span>{usuario && PERFIS[usuario.perfil].rotulo}</span></div>

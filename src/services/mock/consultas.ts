@@ -1,5 +1,5 @@
 import {
-  DIAS_RECEBIMENTO_DEFINITIVO, GARANTIA_ANOS, PRAZO_LAUDO_DIAS_UTEIS, diasEntre, dataSP, diferencaVolumePct, foraDaTolerancia, janelaParcela,
+  DIAS_RECEBIMENTO_DEFINITIVO, GARANTIA_ANOS, PRAZO_LAUDO_DIAS_UTEIS, diasEntre, dataSP, diferencaVolumePct, foraDaTolerancia, janelaParcela, liberacaoDaCura,
   nivelPrazo, nivelPrazoUteis, prazoDeclaracao, situacaoParcela, situacaoSaldo, somarAnos, somarDias, somarDiasUteis, volumeM3,
 } from '../../dominio/parametros';
 import type {
@@ -29,14 +29,21 @@ export function tamanhoDoItem(e: Estado, itemContratoId: Id): Tamanho {
   return tamanhoView(achar(e.tamanhos, (x) => x.id === item.tamanhoId, 'Tamanho'));
 }
 
-/** Descrição de um fardo ou dormente: tamanho do item e espécie, classe e tratamento informados pelo fornecedor. */
-export function itemDescrito(e: Estado, x: { itemContratoId: Id; especieId: Id; tratamentoId: Id; classe: Classe }): ItemDescrito {
+type Madeira = { itemContratoId: Id; especieId: Id; tratamentoId: Id; classe: Classe; usinaTratamento: string; dataTratamento: string };
+
+/** Descrição de um fardo ou dormente: tamanho do item e espécie, classe e tratamento (usina e data) informados pelo fornecedor. */
+export function itemDescrito(e: Estado, x: Madeira): ItemDescrito {
   return {
     tamanho: tamanhoDoItem(e, x.itemContratoId),
     especie: achar(e.especies, (s) => s.id === x.especieId, 'Espécie'),
     tratamento: achar(e.tratamentos, (t) => t.id === x.tratamentoId, 'Tratamento'),
-    classe: x.classe,
+    classe: x.classe, usinaTratamento: x.usinaTratamento, dataTratamento: x.dataTratamento,
   };
+}
+
+/** Fim da cura (CCA ou CCB: 15 dias após o tratamento); sem cura, a própria data de tratamento. */
+export function liberacao(e: Estado, x: { tratamentoId: Id; dataTratamento: string }): string {
+  return liberacaoDaCura(x.dataTratamento, e.tratamentos.find((t) => t.id === x.tratamentoId)?.preservativo ?? '');
 }
 
 /** Volume de um dormente do item do contrato, pelo tamanho. */
@@ -70,14 +77,19 @@ export function situacaoFardo(e: Estado, f: FardoReg, dormentes = dormentesDoFar
 
 export function fardoView(e: Estado, f: FardoReg, hoje: string): Fardo {
   const ds = dormentesDoFardo(e, f.id);
-  const disponivel = ds.filter((d) => d.situacao === 'em_estoque').length;
-  const saldo = disponivel + ds.filter((d) => d.situacao === 'reservado').length;
+  const emEstoque = ds.filter((d) => d.situacao === 'em_estoque').length;
+  const reservados = ds.filter((d) => d.situacao === 'reservado').length;
+  const saldo = emEstoque + reservados;
+  // Cura: os em estoque só ficam disponíveis para separação depois da liberação.
+  const fimCura = liberacao(e, f);
+  const emCuraAte = emEstoque > 0 && hoje < fimCura ? fimCura : undefined;
+  const disponivel = emCuraAte ? 0 : emEstoque;
   const idadeDias = f.recebidoEm ? Math.max(0, diasEntre(dataSP(new Date(f.recebidoEm)), hoje)) : undefined;
   const situacao = situacaoFardo(e, f, ds);
   const comSaldo = situacao === 'em_estoque';
   const aberto = comSaldo && ds.some((d) => d.situacao === 'baixado');
   const progressoInspecao = f.recebidoEm && !f.conclusaoInspecao ? { inspecionados: ds.filter((d) => d.inspecaoId).length, total: ds.length } : undefined;
-  return { ...f, saldo, disponivel, situacao, aberto, idadeDias, acimaLimiteDias: comSaldo && (idadeDias ?? 0) > e.parametros.limiteDiasEstoque, progressoInspecao };
+  return { ...f, saldo, disponivel, reservados, emCuraAte, situacao, aberto, idadeDias, acimaLimiteDias: comSaldo && (idadeDias ?? 0) > e.parametros.limiteDiasEstoque, progressoInspecao };
 }
 
 export function localView(e: Estado, l: LocalReg, hoje: string): Local {
@@ -229,7 +241,7 @@ export function entregaView(e: Estado, en: EntregaReg, hoje: string): Entrega {
  * Saldo por classe + tamanho (o item de estoque): disponível, aguardando inspeção, reservado e não localizado, contra
  * o mínimo e o máximo; a espécie é detalhe (disponível por espécie).
  */
-export function saldoPorItem(e: Estado): SaldoItem[] {
+export function saldoPorItem(e: Estado, hoje: string): SaldoItem[] {
   const mapa = new Map<string, SaldoItem>();
   const linha = (classe: Classe, tamanhoId: Id) => {
     const k = `${classe}|${tamanhoId}`;
@@ -237,7 +249,7 @@ export function saldoPorItem(e: Estado): SaldoItem[] {
     if (!s) {
       const nivel = e.parametros.niveis.find((n) => n.classe === classe && n.tamanhoId === tamanhoId);
       const uso = e.tamanhos.find((t) => t.id === tamanhoId)?.uso ?? 'via_corrente';
-      s = { id: k, classe, tamanhoId, uso, emEstoque: 0, aguardandoInspecao: 0, reservado: 0, naoLocalizado: 0, minimo: nivel?.minimo ?? 0, maximo: nivel?.maximo ?? 0, situacao: 'ok', especies: [] };
+      s = { id: k, classe, tamanhoId, uso, emEstoque: 0, emCura: 0, aguardandoInspecao: 0, reservado: 0, naoLocalizado: 0, minimo: nivel?.minimo ?? 0, maximo: nivel?.maximo ?? 0, situacao: 'ok', especies: [] };
       mapa.set(k, s);
     }
     return s;
@@ -248,7 +260,11 @@ export function saldoPorItem(e: Estado): SaldoItem[] {
     const tamanhoId = tamanhoDe.get(d.itemContratoId);
     if (!tamanhoId) continue;
     const s = linha(d.classe, tamanhoId);
-    if (d.situacao === 'em_estoque') {
+    const fimCura = d.situacao === 'em_estoque' ? liberacao(e, d) : '';
+    if (d.situacao === 'em_estoque' && hoje < fimCura) {
+      s.emCura++;
+      if (!s.liberacaoCura || fimCura < s.liberacaoCura) s.liberacaoCura = fimCura;
+    } else if (d.situacao === 'em_estoque') {
       s.emEstoque++;
       const esp = s.especies.find((x) => x.especieId === d.especieId);
       if (esp) esp.emEstoque++; else s.especies.push({ especieId: d.especieId, emEstoque: 1 });

@@ -1,7 +1,7 @@
 /**
  * Permissões conhecidas pela interface (nomes provisórios, seção 12 do docs/PLANO-V2.md). Usar o tipo `Permissao`
  * em `pode()` faz o TypeScript acusar erros de digitação, que antes escondiam botões em silêncio.
- * Só UX: quem valida são as políticas do banco (Supabase, Etapa 10).
+ * Só UX: quem valida são as políticas do banco (Supabase, Etapa 9).
  */
 export const PERMISSOES = [
   'admin', // usuários, configurações e vitrine

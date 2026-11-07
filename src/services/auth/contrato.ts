@@ -2,7 +2,7 @@ import type { Usuario } from '../../types/models';
 
 /**
  * Autenticação, separada da camada de dados (`Servicos`): só o `AuthContext` usa este serviço, e as telas
- * usam `useAuth()`. Implementações: simulada (até a Etapa 10) e Supabase Auth (Etapa 10), com a mesma interface.
+ * usam `useAuth()`. Implementações: simulada (até a Etapa 9) e Supabase Auth (Etapa 9), com a mesma interface.
  */
 export interface ServicoAuth {
   /** `usuario`: no simulado, o nome do perfil; no Supabase, o e-mail. */

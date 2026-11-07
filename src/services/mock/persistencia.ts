@@ -2,7 +2,7 @@ import { VERSAO_ESTADO, type Estado } from './estado';
 
 /**
  * O estado do mock fica no localStorage deste navegador, para sobreviver ao recarregar a página.
- * Cada aparelho tem os seus dados até a Etapa 10 (Supabase). Sem armazenamento disponível (aba privada,
+ * Cada aparelho tem os seus dados até a Etapa 9 (Supabase). Sem armazenamento disponível (aba privada,
  * testes), tudo continua funcionando em memória.
  */
 const CHAVE = 'holz:demo:estado';

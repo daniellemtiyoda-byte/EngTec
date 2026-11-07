@@ -6,7 +6,7 @@ import { ListPage, type Coluna } from '../components/ListPage';
 import { NovaRme } from '../components/NovaRme';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../contexts/AuthContext';
-import { SITUACAO_RME } from '../dominio/rotulos';
+import { SITUACAO_RME, TIPO_DESTINO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
@@ -37,7 +37,7 @@ export default function Rmes() {
   const colunas: Coluna<Rme>[] = [
     { chave: 'numero', titulo: 'RME', ordenavel: true, render: (r) => <CodigoLink codigo={r.numero} /> },
     { chave: 'solicitanteNome', titulo: 'Solicitante', opcional: true, render: (r) => r.solicitanteNome },
-    { chave: 'destino', titulo: 'Destino', quebrar: true, render: (r) => r.destino },
+    { chave: 'destino', titulo: 'Destino', quebrar: true, render: (r) => <>{r.destino}<span className="detalhe-linha" style={{ display: 'block' }}>{TIPO_DESTINO[r.tipoDestino][1]}</span></> },
     { chave: 'itens', titulo: 'Itens', quebrar: true, render: (r) => r.itens.map((i) => `${cad.descreverItemRme(i)} (${numero(i.quantidade)})`).join('; ') },
     { chave: 'necessidadeEm', titulo: 'Necessidade em', ordenavel: true, render: (r) => data(r.necessidadeEm) },
     { chave: 'situacao', titulo: 'Situação', render: (r) => <BadgeDe mapa={SITUACAO_RME} valor={r.situacao} /> },

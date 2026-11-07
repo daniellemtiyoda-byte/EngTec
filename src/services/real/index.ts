@@ -2,7 +2,7 @@ import type { Servicos } from '../contracts';
 import { ApiError } from '../http';
 
 /**
- * Implementação sem o mock. Não há back-end próprio (decisão da v2): os dados vêm do mock até a Etapa 10, quando
+ * Implementação sem o mock. Não há back-end próprio (decisão da v2): os dados vêm do mock até a Etapa 9, quando
  * entra services/supabase/ e esta pasta sai. Até lá, qualquer operação avisa que é preciso usar o modo simulado.
  */
 export function criarServicosReais(): Servicos {

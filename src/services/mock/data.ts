@@ -3,7 +3,7 @@ import {
   REGRAS_ATA_PADRAO, TOLERANCIA_VOLUME_PCT,
 } from '../../dominio/parametros';
 import { PERFIS, PERFIS_LISTA, type Perfil } from '../../dominio/permissoes';
-import type { Classe, Id, Usuario } from '../../types/models';
+import type { Classe, Id, TipoDestino, Usuario } from '../../types/models';
 import { criarAta, criarContrato, salvarEmpresaInspetora, salvarEspecie, salvarFornecedor, salvarLocal, salvarTamanho, salvarTratamento } from './cadastros';
 import { declararDof } from './documentos';
 import { VERSAO_ESTADO, type Ctx, type EntregaReg, type Estado } from './estado';
@@ -100,22 +100,14 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
       { tamanhoId: t006221.id, quantidade: 2000 }, { tamanhoId: t006222.id, quantidade: 1000 }, ...outrosAmv.map((t) => ({ tamanhoId: t.id, quantidade: 600 })),
     ],
   }, adm());
-  em(150);
-  const c1 = criarContrato(e, {
-    numero: 'AR00224-01', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -150), gestor: 'Gestor Exemplo 1',
-    parcelas: cronograma([[t006234.id, 3000]], [[t006234.id, 2600], [t006219.id, 400]]),
-  }, adm());
-  const [ic1, ic2] = c1.itens; // 006234 e 006219
-
-  em(120);
   // Ata AR00311 (fictícia) com regras reduzidas: contratos pequenos, para a demonstração mostrar o ciclo completo.
   const regrasReduzidas = { ...REGRAS_ATA_PADRAO, pedidoMinimo: 28, parcelaMinima: 14, parcelaMaxima: 100 };
   const ataB = criarAta(e, {
-    numero: 'AR00311', fornecedorId: fB.id, vigenciaInicio: somarDias(base, -120), regras: regrasReduzidas,
+    numero: 'AR00311', fornecedorId: fB.id, vigenciaInicio: somarDias(base, -200), regras: regrasReduzidas,
     itens: [{ tamanhoId: t006234.id, quantidade: 500 }, { tamanhoId: t006222.id, quantidade: 100 }],
   }, adm());
-  em(110);
-  const c5 = criarContrato(e, { numero: 'AR00311-02', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -110), gestor: 'Gestor Exemplo 2', parcelas: cronograma([[t006222.id, 28]]) }, adm());
+  em(160);
+  const c5 = criarContrato(e, { numero: 'AR00311-02', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -160), gestor: 'Gestor Exemplo 2', parcelas: cronograma([[t006222.id, 28]]) }, adm());
   const [ic5] = c5.itens;
 
   e.parametros.niveis = [
@@ -155,49 +147,47 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     const s = sugerirSeparacao(e, numero, alm());
     separarRme(e, numero, s.itens.flatMap((i) => i.fardos.map((f) => ({ fardoId: f.fardoId, dormentesIds: f.dormentesIds }))), alm());
   };
-  const abrir = (diasAtras: number, destino: string, tamanhoId: Id, classe: Classe, quantidade: number) => {
+  const abrir = (diasAtras: number, destino: string, tipoDestino: TipoDestino, tamanhoId: Id, classe: Classe, quantidade: number) => {
     em(diasAtras, 9);
-    return abrirRme(e, { destino, necessidadeEm: somarDias(base, -diasAtras + 10), itens: [{ tamanhoId, classe, quantidade }] }, usuarioDemo('requisitante'), req()).numero;
+    return abrirRme(e, { destino, tipoDestino, necessidadeEm: somarDias(base, -diasAtras + 10), itens: [{ tamanhoId, classe, quantidade }] }, usuarioDemo('requisitante'), req()).numero;
   };
 
   // ---------- Entregas concluídas ----------
-  // E1 (1ª parcela do AR00224-01): o fardo mais antigo, que acaba acima do limite de dias em estoque; 1 reprovado já retirado.
-  const e1 = gerar(140, c1.id, 1, [{ itemContratoId: ic1.id, fardos: 1 }]);
-  receberEm(139, e1); inspecionarEGuardar(137, e1.fardosIds[0], a01.id); declarar(136, e1);
-  reprovados(e1.fardosIds, 135, 128); laudo(133, e1);
-
   // Contrato AR00311-02 (AMV 3,60 m): 2 reprovados, comunicados e retirados, e a reentrega (reposição) deles; termina
-  // concluído, com os laudos e o recebimento definitivo.
-  const e4 = gerar(95, c5.id, 1, [{ itemContratoId: ic5.id, fardos: 2 }]);
-  receberEm(94, e4); e4.fardosIds.forEach((f) => inspecionarEGuardar(92, f, a02.id)); declarar(93, e4);
-  reprovados(e4.fardosIds, 91, 88); laudo(90, e4);
-  const e5 = gerar(85, c5.id, 1, [{ itemContratoId: ic5.id, fardos: 1, dormentesPorFardo: 2 }], 7, true);
-  receberEm(84, e5); inspecionarEGuardar(83, e5.fardosIds[0], a02.id); declarar(83, e5); laudo(80, e5);
+  // concluído, com os laudos e o recebimento definitivo. Um fardo dele fica acima do limite de dias em estoque.
+  const e4 = gerar(150, c5.id, 1, [{ itemContratoId: ic5.id, fardos: 2 }]);
+  receberEm(149, e4); e4.fardosIds.forEach((f) => inspecionarEGuardar(147, f, a02.id)); declarar(148, e4);
+  reprovados(e4.fardosIds, 146, 143); laudo(145, e4);
+  const e5 = gerar(140, c5.id, 1, [{ itemContratoId: ic5.id, fardos: 1, dormentesPorFardo: 2 }], 7, true);
+  receberEm(139, e5); inspecionarEGuardar(138, e5.fardosIds[0], a02.id); declarar(138, e5); laudo(135, e5);
 
-  const r1 = abrir(75, 'Linha 10 · Trecho Santo André (AMV)', t006222.id, 1, 14);
-  em(74); iniciarSeparacao(e, r1, alm()); separarSugestao(r1); em(73); entregarRme(e, r1, alm());
+  em(130);
+  // AR00311-01: assinado há 130 dias. A 1ª parcela chegou com atraso e a 2ª está ATRASADA (o caso proposital do alerta).
+  const c3 = criarContrato(e, { numero: 'AR00311-01', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -130), gestor: 'Gestor Exemplo 2', parcelas: cronograma([[t006234.id, 42]], [[t006234.id, 28]]) }, adm());
+  const [ic3] = c3.itens;
 
-  // E2 (2ª parcela do AR00224-01): 006234 e 006219; reprovados comunicados e retirados; laudo emitido.
-  const e2 = gerar(60, c1.id, 2, [{ itemContratoId: ic1.id, fardos: 2 }, { itemContratoId: ic2.id, fardos: 2 }]);
-  receberEm(59, e2);
-  inspecionarEGuardar(57, e2.fardosIds[0], a03.id); inspecionarEGuardar(57, e2.fardosIds[1], a03.id);
-  inspecionarEGuardar(57, e2.fardosIds[2], a04.id); inspecionarEGuardar(57, e2.fardosIds[3], a04.id);
-  declarar(58, e2); reprovados(e2.fardosIds, 55, 45); laudo(50, e2);
-
-  const r2 = abrir(40, 'Linha 11 · Pátio Engenheiro São Paulo', t006234.id, 1, 8);
-  em(39); iniciarSeparacao(e, r2, alm()); separarSugestao(r2); em(38); entregarRme(e, r2, alm());
+  const r1 = abrir(125, 'Linha 10 · Trecho Santo André (AMV)', 'principal_pesado', t006222.id, 1, 14);
+  em(124); iniciarSeparacao(e, r1, alm()); separarSugestao(r1); em(123); entregarRme(e, r1, alm());
 
   em(40);
+  // AR00224-01 e -02 assinados há 40 dias: as parcelas estão dentro do prazo.
+  const c1 = criarContrato(e, {
+    numero: 'AR00224-01', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -40), gestor: 'Gestor Exemplo 1',
+    parcelas: cronograma([[t006234.id, 3000]], [[t006234.id, 2600], [t006219.id, 400]]),
+  }, adm());
+  const [ic1, ic2] = c1.itens; // 006234 e 006219
   const c2 = criarContrato(e, {
     numero: 'AR00224-02', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -40), gestor: 'Gestor Exemplo 1',
     parcelas: cronograma([[t006234.id, 3000]], [[t006220.id, 1500], [t006221.id, 1500]]),
   }, adm());
-  em(35);
-  const c3 = criarContrato(e, { numero: 'AR00311-01', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -35), gestor: 'Gestor Exemplo 2', parcelas: cronograma([[t006234.id, 42]], [[t006234.id, 28]]) }, adm());
-  const [ic3] = c3.itens;
 
-  // E6 (AR00311-01): um fardo concluído com 2 dormentes não lidos (não localizados); reprovados comunicados e ainda
-  // não retirados (retirada atrasada); laudo não emitido (prazo vencido).
+  // E1 (1ª parcela do AR00224-01): 1 reprovado já retirado; laudo emitido.
+  const e1 = gerar(38, c1.id, 1, [{ itemContratoId: ic1.id, fardos: 1 }]);
+  receberEm(37, e1); inspecionarEGuardar(35, e1.fardosIds[0], a01.id); declarar(34, e1);
+  reprovados(e1.fardosIds, 33, 30); laudo(31, e1);
+
+  // E6 (1ª parcela do AR00311-01, entregue com atraso): um fardo concluído com 2 dormentes não lidos (não localizados);
+  // reprovados comunicados e ainda não retirados (retirada atrasada); laudo não emitido (prazo vencido).
   const e6 = gerar(30, c3.id, 1, [{ itemContratoId: ic3.id, fardos: 3 }]);
   receberEm(29, e6);
   inspecionarEGuardar(27, e6.fardosIds[0], a05.id); inspecionarEGuardar(27, e6.fardosIds[1], a05.id);
@@ -211,16 +201,28 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   concluirInspecao(e, ultimo, { localId: a05.id, justificativa: 'Plaquinhas ilegíveis em 2 dormentes; separados para nova leitura.' }, alm());
   declarar(28, e6); reprovados(e6.fardosIds, 25);
 
-  // E9 (AR00224-02, AMV 3,20 m): recebida e inspecionada; reprovado ainda sem comunicação; laudo a emitir no prazo.
-  const ic9 = c2.itens.find((i) => i.tamanhoId === t006220.id)!;
-  const e9 = gerar(22, c2.id, 2, [{ itemContratoId: ic9.id, fardos: 2 }], 9);
-  receberEm(20, e9); e9.fardosIds.forEach((f) => inspecionarEGuardar(18, f, a02.id)); declarar(19, e9);
+  // E2 (2ª parcela do AR00224-01): 006234 e 006219; reprovados comunicados e retirados; laudo emitido.
+  const e2 = gerar(28, c1.id, 2, [{ itemContratoId: ic1.id, fardos: 2 }, { itemContratoId: ic2.id, fardos: 2 }]);
+  receberEm(27, e2);
+  inspecionarEGuardar(25, e2.fardosIds[0], a03.id); inspecionarEGuardar(25, e2.fardosIds[1], a03.id);
+  inspecionarEGuardar(25, e2.fardosIds[2], a04.id); inspecionarEGuardar(25, e2.fardosIds[3], a04.id);
+  declarar(26, e2); reprovados(e2.fardosIds, 24, 20); laudo(22, e2);
 
-  const r3 = abrir(20, 'Linha 7 · Trecho Jundiaí (AMV)', t006219.id, 1, 10);
-  em(19); iniciarSeparacao(e, r3, alm()); separarSugestao(r3); entregarRme(e, r3, alm());
+  // Saídas depois da cura dos dormentes da E2 (tratados 30 dias atrás, liberados há 15).
+  const r3 = abrir(14, 'Linha 7 · Trecho Jundiaí (AMV)', 'principal_medio', t006219.id, 1, 10);
+  em(14, 15); iniciarSeparacao(e, r3, alm()); separarSugestao(r3); entregarRme(e, r3, alm());
+
+  const r2 = abrir(13, 'Linha 11 · Pátio Engenheiro São Paulo', 'patio', t006234.id, 1, 8);
+  em(13, 15); iniciarSeparacao(e, r2, alm()); separarSugestao(r2); em(12, 8); entregarRme(e, r2, alm());
+
+  // E9 (AR00224-02, AMV 3,20 m): recebida e inspecionada, ainda EM CURA (CCA/CCB: 15 dias do tratamento); reprovado
+  // ainda sem comunicação; laudo a emitir no prazo.
+  const ic9 = c2.itens.find((i) => i.tamanhoId === t006220.id)!;
+  const e9 = gerar(12, c2.id, 2, [{ itemContratoId: ic9.id, fardos: 2 }], 9);
+  receberEm(10, e9); e9.fardosIds.forEach((f) => inspecionarEGuardar(8, f, a02.id)); declarar(9, e9);
 
   // RME cancelada depois de separada: a reserva volta para o estoque.
-  const r7 = abrir(12, 'Linha 12 · Trecho Calmon Viana', t006234.id, 1, 10);
+  const r7 = abrir(12, 'Linha 12 · Trecho Calmon Viana', 'principal_medio', t006234.id, 1, 10);
   em(12, 15); iniciarSeparacao(e, r7, alm()); separarSugestao(r7);
   em(11); cancelarRme(e, r7, 'Obra adiada pela manutenção.', req());
 
@@ -236,19 +238,20 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     const seq = sequenciaDe(d.id) ?? 0;
     registrarInspecao(e, d.id, { origem: 'simulado', veredito: 'APROVADO', indice: 60 + (seq * 13) % 41 }, alm(), e8.fardosIds[0]);
   }
-  // E7 (2ª parcela do AR00311-01): DOF que vence em 1 dia; recebida em parte (um fardo ainda em trânsito).
+  // E7 (2ª parcela do AR00311-01): DOF que vence em 1 dia; recebida em parte (um fardo ainda em trânsito), por isso a
+  // parcela fica atrasada.
   const e7 = gerar(8, c3.id, 2, [{ itemContratoId: ic3.id, fardos: 2 }], 8);
   // A divergência de volume vem só do fardo que faltou: a justificativa é preenchida pelo sistema.
   receberEm(1, e7, [e7.fardosIds[0]]);
 
   // RMEs em andamento: pronta, em separação e aberta.
-  const r4 = abrir(6, 'Linha 10 · Trecho Mauá', t006234.id, 1, 10);
+  const r4 = abrir(6, 'Linha 10 · Trecho Mauá', 'principal_pesado', t006234.id, 1, 10);
   em(5); iniciarSeparacao(e, r4, alm()); separarSugestao(r4);
   em(5);
   criarContrato(e, { numero: 'AR00224-03', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -5), gestor: 'Gestor Exemplo 3', parcelas: cronograma([[t006234.id, 6000]]) }, adm());
-  const r5 = abrir(4, 'Linha 11 · Trecho Mogi das Cruzes', t006234.id, 1, 20);
+  const r5 = abrir(4, 'Linha 11 · Trecho Mogi das Cruzes', 'principal_pesado', t006234.id, 1, 20);
   em(3); iniciarSeparacao(e, r5, alm());
-  abrir(2, 'Linha 7 · Trecho Francisco Morato (AMV)', t006219.id, 2, 6);
+  abrir(2, 'Linha 7 · Desvio de Francisco Morato (AMV)', 'desvio', t006219.id, 2, 6);
 
   // E3 (2ª parcela do AR00224-01): a entrega "a caminho" com IDs fixos e DOF que vence em 3 dias.
   gerar(1, c1.id, 2, [{ itemContratoId: ic1.id, fardos: 2 }, { itemContratoId: ic2.id, fardos: 1 }], 3);

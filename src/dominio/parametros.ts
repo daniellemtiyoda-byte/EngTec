@@ -1,9 +1,9 @@
 /**
- * Regras fixas e cálculos do domínio usados pelas telas (prévia) e pelo mock. No Supabase (Etapa 10), as mesmas
+ * Regras fixas e cálculos do domínio usados pelas telas (prévia) e pelo mock. No Supabase (Etapa 9), as mesmas
  * regras valem no banco. Valores que a CPTM ainda vai definir NÃO ficam aqui: estão em `servicos.parametros`
  * (limite de dias em estoque, antecedência dos alertas de DOF, níveis de estoque, limites das categorias).
  */
-import type { Categoria, NivelPrazo, RegrasAta, ResultadoInspecao, SituacaoParcela, SituacaoSaldo, VereditoInspector } from '../types/models';
+import type { Categoria, Classe, NivelPrazo, RegrasAta, ResultadoInspecao, SituacaoParcela, SituacaoSaldo, TipoDestino, VereditoInspector } from '../types/models';
 
 /** Divergência de volume acima disto (por espécie) gera alerta: regra da IN Ibama, não editável. */
 export const TOLERANCIA_VOLUME_PCT = 10;
@@ -38,6 +38,21 @@ export const PRAZO_COMUNICACAO_REPROVADOS_DIAS_UTEIS = 5;
 export const PRAZO_RETIRADA_REPROVADOS_DIAS_UTEIS = 15;
 /** Garantia do dormente: 5 anos a partir da entrega. */
 export const GARANTIA_ANOS = 5;
+
+/**
+ * Cura (PIM-14 do DNIT e NBR 7511; a AD1956-4 da CPTM prevalece quando obtida): dormente tratado com CCA ou CCB só
+ * fica disponível para separação 15 dias após a data de tratamento.
+ */
+export const DIAS_CURA = 15;
+export const PRESERVATIVOS_COM_CURA = ['CCA', 'CCB'];
+export const exigeCura = (preservativo: string) => PRESERVATIVOS_COM_CURA.some((p) => preservativo.trim().toUpperCase().startsWith(p));
+/** Data em que o dormente sai da cura (ou a própria data de tratamento, se o preservativo não exige cura). */
+export const liberacaoDaCura = (dataTratamento: string, preservativo: string) => (exigeCura(preservativo) ? somarDias(dataTratamento, DIAS_CURA) : dataTratamento);
+
+/** Classe mínima sugerida pelo tipo de destino da RME: 1ª para linha principal de tráfego pesado; 2ª aceita nos demais. */
+export const classeSugerida = (tipo: TipoDestino): Classe => (tipo === 'principal_pesado' ? 1 : 2);
+/** A classe é inferior à sugerida (2ª é inferior à 1ª). */
+export const classeInferior = (classe: Classe, sugerida: Classe) => classe > sugerida;
 
 const DIA_MS = 86_400_000;
 

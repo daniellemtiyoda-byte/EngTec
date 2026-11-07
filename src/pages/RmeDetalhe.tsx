@@ -13,7 +13,8 @@ import { useToast } from '../components/Toast';
 import { TransferirFardo } from '../components/TransferirFardo';
 import { useAuth } from '../contexts/AuthContext';
 import { RE_RME } from '../dominio/identificacao';
-import { SITUACAO_RME } from '../dominio/rotulos';
+import { classeSugerida } from '../dominio/parametros';
+import { ordinalClasse, SITUACAO_RME, TIPO_DESTINO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { useTelaPequena } from '../hooks/useTelaPequena';
@@ -114,6 +115,7 @@ export default function RmeDetalhe() {
         acoes={!pequena && acoes}
         fatos={<>
           <FatoChave rotulo="Destino" valor={rme.destino} />
+          <FatoChave rotulo="Tipo de destino" valor={<>{TIPO_DESTINO[rme.tipoDestino][1]} · classe mínima sugerida {ordinalClasse(classeSugerida(rme.tipoDestino))}</>} />
           <FatoChave rotulo="Necessidade em" valor={data(rme.necessidadeEm)} />
           <FatoChave rotulo="Solicitante" valor={rme.solicitanteNome} />
           <FatoChave rotulo="Dormentes" valor={`${numero(total)} em ${rme.itens.length} ${rme.itens.length === 1 ? 'item' : 'itens'}`} />
@@ -156,6 +158,7 @@ export default function RmeDetalhe() {
                     {l.seguiuSugestao ? <Badge tom="cinza">como a sugestão</Badge> : <Badge tom="laranja">difere da sugestão</Badge>}
                   </p>
                   {l.justificativa && <p className="mudo">Justificativa: {l.justificativa}</p>}
+                  {l.justificativaClasse && <p className="mudo"><Badge tom="laranja">classe abaixo da sugerida</Badge> {l.justificativaClasse}</p>}
                   <p className="lista-codigos">{l.dormentesIds.map((id) => <CodigoLink key={id} codigo={id} />)}</p>
                   {inteiro && !naExpedicao && pode('estoque:movimentar') && (
                     <button type="button" className="btn btn-acao" onClick={() => setLevar(l.fardoId)}>Levar para a expedição</button>

@@ -50,7 +50,7 @@ export default function Login() {
       <main className="login-lado-form">
         <form className="login-form" onSubmit={enviar} noValidate>
           <h2>Entrar no sistema</h2>
-          {/* Login simulado até a Etapa 10 (Supabase Auth): o nome do usuário escolhe o perfil. */}
+          {/* Login simulado até a Etapa 9 (Supabase Auth): o nome do usuário escolhe o perfil. */}
           <div className="login-demo">
             <p>Para entrar, use como usuário o nome de um perfil e qualquer senha:</p>
             <div className="login-perfis" role="group" aria-label="Preencher o usuário com um perfil">

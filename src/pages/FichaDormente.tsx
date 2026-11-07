@@ -14,7 +14,7 @@ import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { ApiError } from '../services/http';
 import type { Evento, FichaDormente as Ficha } from '../types/models';
-import { cm, data, dataHora, metros, urlSegura } from '../utils/format';
+import { cm, data, dataHora, mesAno, metros, urlSegura } from '../utils/format';
 
 /** Sigla da marca de cada evento na linha do tempo. */
 const MARCA: Record<Evento['tipo'], string> = {
@@ -88,7 +88,7 @@ export default function FichaDormente() {
         <IdCodigo id={d.id} tamanho="grande" />
         <div className="ficha-situacao"><BadgeDe mapa={SITUACAO_DORMENTE} valor={d.situacao} /></div>
         <p className="ficha-especie"><span className="nome-cientifico">{especie.nomeCientifico}</span> · {especie.nomePopular}</p>
-        <p className="ficha-resumo">{rotuloClasse(f.item.classe)} · Item {tamanho.codigo} ({metros(tamanho.comprimentoCm / 100)}, {USO_TAMANHO[tamanho.uso][1]}) · {tratamento.preservativo} / {tratamento.empresa}</p>
+        <p className="ficha-resumo">{rotuloClasse(f.item.classe)} · Item {tamanho.codigo} ({metros(tamanho.comprimentoCm / 100)}, {USO_TAMANHO[tamanho.uso][1]}) · {tratamento.preservativo} · usina {f.item.usinaTratamento} · {mesAno(f.item.dataTratamento)}</p>
       </header>
 
       {d.situacao === 'nao_localizado' && (
@@ -134,6 +134,7 @@ export default function FichaDormente() {
           {f.nf && <Par rotulo="NF">{f.nf.numero} · emitida em {data(f.nf.emissao)}</Par>}
           {f.dof && <Par rotulo="DOF">{f.dof.numero}{f.dof.declarado ? ` · declarado em ${data(f.dof.declarado.quando)}` : ' · ainda não declarado'}</Par>}
           {f.recebimento && <Par rotulo="Recebido em">{dataHora(f.recebimento.recebidoEm)} · {f.recebimento.recebidoPor}</Par>}
+          <Par rotulo="Marcação">Usina {f.item.usinaTratamento} · impregnação {mesAno(f.item.dataTratamento)}</Par>
           {f.garantiaAte && <Par rotulo="Garantia até">{data(f.garantiaAte)} (5 anos da entrega)</Par>}
         </dl>
       </Cartao>

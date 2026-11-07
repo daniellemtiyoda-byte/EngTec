@@ -44,7 +44,8 @@ export function violacoes(e: Estado, hoje: string): string[] {
     const fv = fardoView(e, f, hoje);
     const noFardo = e.dormentes.filter((d) => d.fardoId === f.id);
     v(fv.saldo === noFardo.filter((d) => d.situacao === 'em_estoque' || d.situacao === 'reservado').length, `Saldo do fardo ${f.id} diferente dos dormentes`);
-    v(fv.disponivel === noFardo.filter((d) => d.situacao === 'em_estoque').length, `Disponível do fardo ${f.id} diferente dos dormentes`);
+    v(fv.disponivel === (fv.emCuraAte ? 0 : noFardo.filter((d) => d.situacao === 'em_estoque').length), `Disponível do fardo ${f.id} diferente dos dormentes`);
+    v(noFardo.every((d) => d.dataTratamento === f.dataTratamento && d.usinaTratamento === f.usinaTratamento), `Dormente do fardo ${f.id} com marcação diferente`);
     // Na expedição, só fardo inteiro reservado para uma RME pronta (ou já baixado na entrega).
     if (fv.saldo > 0 && e.locais.find((l) => l.id === f.localId)?.tipo === 'expedicao') {
       const rmes = new Set(noFardo.filter((d) => d.situacao === 'em_estoque' || d.situacao === 'reservado').map((d) => (d.situacao === 'reservado' ? d.rmeNumero : '')));

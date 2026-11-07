@@ -15,7 +15,7 @@ import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import type { Fardo, SaldoItem } from '../types/models';
-import { dias, numero } from '../utils/format';
+import { data, dias, numero } from '../utils/format';
 
 type Visao = 'item' | 'fardo';
 const VISOES: Visao[] = ['item', 'fardo'];
@@ -53,6 +53,10 @@ export default function Estoque() {
     { chave: 'classe', titulo: 'Classe', render: (s) => `${ordinalClasse(s.classe)}` },
     { chave: 'uso', titulo: 'Uso', opcional: true, render: (s) => <BadgeDe mapa={USO_TAMANHO} valor={s.uso} /> },
     { chave: 'emEstoque', titulo: 'Em estoque', alinhar: 'right', ordenavel: true, render: (s) => <strong>{numero(s.emEstoque)}</strong> },
+    {
+      chave: 'emCura', titulo: 'Em cura', alinhar: 'right', ordenavel: true,
+      render: (s) => (s.emCura ? <span className="disponivel-fardo">{numero(s.emCura)}<span className="detalhe-linha">libera em {data(s.liberacaoCura)}</span></span> : '0'),
+    },
     { chave: 'aguardandoInspecao', titulo: 'Aguardando inspeção', alinhar: 'right', ordenavel: true, render: (s) => numero(s.aguardandoInspecao) },
     { chave: 'reservado', titulo: 'Reservado', alinhar: 'right', ordenavel: true, render: (s) => numero(s.reservado) },
     { chave: 'naoLocalizado', titulo: 'Não localizado', alinhar: 'right', opcional: true, render: (s) => numero(s.naoLocalizado) },
@@ -91,7 +95,7 @@ export default function Estoque() {
         {visaoAtual === 'item' && (
           <ListPage<SaldoItem>
             key="item" titulo="Saldo por item" subnivel colunas={colunasItem} recarregar={rec}
-            descricao="Por classe (NBR 7511) e tamanho, com a espécie como detalhe. Em estoque é o disponível para nova saída; os reservados ainda estão nos fardos."
+            descricao="Por classe (NBR 7511) e tamanho, com a espécie como detalhe. Em estoque é o disponível para nova saída; em cura (CCA ou CCB, 15 dias após o tratamento) só fica disponível na data de liberação; os reservados ainda estão nos fardos."
             filtros={[
               { chave: 'uso', rotulo: 'Uso', opcoes: USO_TAMANHO_OPCOES },
               { chave: 'tamanhoId', rotulo: 'Tamanho', opcoes: tamanhos },

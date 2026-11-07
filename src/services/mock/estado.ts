@@ -18,7 +18,7 @@ export type ParcelaReg = Pick<ParcelaContrato, 'numero' | 'itens'>;
 export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao' | 'parcelas' | 'parcelasAtrasadas' | 'recebimentoDefinitivoEm'> & {
   situacao: 'vigente' | 'cancelado'; itens: ItemContratoReg[]; parcelas: ParcelaReg[];
 };
-export type FardoReg = Omit<Fardo, 'saldo' | 'disponivel' | 'situacao' | 'aberto' | 'idadeDias' | 'acimaLimiteDias' | 'progressoInspecao'>;
+export type FardoReg = Omit<Fardo, 'saldo' | 'disponivel' | 'reservados' | 'emCuraAte' | 'situacao' | 'aberto' | 'idadeDias' | 'acimaLimiteDias' | 'progressoInspecao'>;
 export type EmissaoReg = Omit<Emissao, 'dormentes' | 'situacao'>;
 export type DofReg = Omit<Dof, 'prazoDeclaracao' | 'diasParaPrazo' | 'nivelPrazo' | 'nfNumero' | 'fornecedorId' | 'contratoId' | 'entregaId' | 'situacaoDeclaracao' | 'podeDeclarar'>;
 export type EntregaReg = Omit<Entrega, 'nfNumero' | 'fornecedorId' | 'fardosRecebidos' | 'dormentes' | 'prazoDeclaracao' | 'nivelPrazo' | 'divergenciaVolume' | 'etapa' | 'comOcorrencia' | 'recebimentosIds' | 'recebidaEm' | 'prazoLaudo' | 'nivelPrazoLaudo' | 'podeEmitirLaudo'>;
@@ -52,7 +52,7 @@ export interface Estado {
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 6;
+export const VERSAO_ESTADO = 7;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }

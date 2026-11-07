@@ -3,10 +3,10 @@ import { useAsync } from '../hooks/useAsync';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { ApiError, mensagemSegura } from '../services/http';
-import type { Categoria, Classe, Rme } from '../types/models';
-import { CATEGORIAS } from '../dominio/opcoes';
-import { USO_TAMANHO } from '../dominio/rotulos';
-import { dataSP, somarDias } from '../dominio/parametros';
+import type { Categoria, Classe, Rme, TipoDestino } from '../types/models';
+import { CATEGORIAS, TIPO_DESTINO_OPCOES } from '../dominio/opcoes';
+import { ordinalClasse, USO_TAMANHO } from '../dominio/rotulos';
+import { classeInferior, classeSugerida, dataSP, somarDias } from '../dominio/parametros';
 import { numero, paraNumero } from '../utils/format';
 import { Contador } from './Contador';
 import { Modal } from './Modal';
@@ -18,24 +18,27 @@ let seq = 1;
 interface Props { aberto: boolean; cad: Cadastros; aoFechar: () => void; aoCriar: (r: Rme) => void }
 
 /**
- * Nova RME (seção 9.17 do plano), pelo requisitante: destino (obra ou trecho), data de necessidade e itens por tamanho
+ * Nova RME (seção 9.17 do plano), pelo requisitante: destino (obra ou trecho) e o tipo de destino, que sugere a classe
+ * mínima (1ª para linha principal de tráfego pesado; 2ª aceita nos demais), data de necessidade e itens por tamanho
  * e classe (obrigatórios), com o disponível visível; categoria mínima (padrão: qualquer aprovado) e espécie opcionais.
  * Pedir mais que o disponível é permitido, com aviso: a separação só fecha quando houver estoque para a quantidade inteira.
  */
 export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
   const saldo = useAsync(() => (aberto ? servicos.estoque.porItem({ pageSize: 500 }) : Promise.resolve(undefined)), [aberto]);
   const [destino, setDestino] = useState('');
+  const [tipoDestino, setTipoDestino] = useState<TipoDestino | ''>('');
   const [necessidadeEm, setNecessidadeEm] = useState('');
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string>();
   const [enviando, setEnviando] = useState(false);
   const itens = saldo.dados?.items ?? [];
+  const sugerida = tipoDestino ? classeSugerida(tipoDestino) : undefined;
   const hoje = dataSP(new Date());
 
   useEffect(() => {
     if (!aberto) return;
-    setDestino(''); setNecessidadeEm(somarDias(hoje, 7)); setLinhas([nova()]); setErros({}); setErroGeral(undefined);
+    setDestino(''); setTipoDestino(''); setNecessidadeEm(somarDias(hoje, 7)); setLinhas([nova()]); setErros({}); setErroGeral(undefined);
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const nova = (): Linha => ({ chave: seq++, item: '', categoria: '', especieId: '', quantidade: '' });
@@ -44,6 +47,7 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
   async function enviar() {
     const e: Record<string, string> = {};
     if (!destino.trim()) e.destino = 'Informe a obra ou o trecho.';
+    if (!tipoDestino) e.tipoDestino = 'Escolha o tipo de destino.';
     if (!necessidadeEm) e.necessidadeEm = 'Informe a data de necessidade.';
     else if (necessidadeEm < hoje) e.necessidadeEm = 'A data de necessidade já passou.';
     const usados = new Set<string>();
@@ -59,7 +63,7 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
     setEnviando(true);
     try {
       const r = await servicos.rme.abrir({
-        destino: destino.trim(), necessidadeEm,
+        destino: destino.trim(), tipoDestino: tipoDestino as TipoDestino, necessidadeEm,
         itens: linhas.map((l) => {
           const [classe, tamanhoId] = l.item.split('|');
           return {
@@ -93,6 +97,15 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
           {erro('destino')}
         </div>
         <div className="campo">
+          <label htmlFor="rme-tipo">Tipo de destino<span className="obrig" aria-hidden="true"> *</span></label>
+          <select id="rme-tipo" value={tipoDestino} onChange={(e) => setTipoDestino(e.target.value as TipoDestino)}>
+            <option value="">Selecione…</option>
+            {TIPO_DESTINO_OPCOES.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
+          </select>
+          {sugerida && <span className="ajuda">Classe mínima sugerida: {ordinalClasse(sugerida)} {sugerida === 1 ? '(tráfego pesado)' : '(2ª aceita; 1ª também serve)'}.</span>}
+          {erro('tipoDestino')}
+        </div>
+        <div className="campo">
           <label htmlFor="rme-data">Necessidade em<span className="obrig" aria-hidden="true"> *</span></label>
           <input id="rme-data" type="date" min={hoje} value={necessidadeEm} onChange={(e) => setNecessidadeEm(e.target.value)} />
           {erro('necessidadeEm')}
@@ -105,14 +118,16 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
           {linhas.map((l, n) => {
             const s = itens.find((x) => x.id === l.item);
             const q = paraNumero(l.quantidade, true) || 0;
+            const abaixo = !!s && !!sugerida && classeInferior(s.classe, sugerida);
             return (
               <li key={l.chave}>
                 <div className="campo">
                   <label htmlFor={`rme-item-${l.chave}`}>Tamanho e classe</label>
                   <select id={`rme-item-${l.chave}`} value={l.item} onChange={(e) => mudar(l.chave, 'item', e.target.value)}>
                     <option value="">Selecione…</option>
-                    {itens.map((x) => <option key={x.id} value={x.id}>{cad.descreverItem(x)} · {USO_TAMANHO[x.uso][1]} · {numero(x.emEstoque)} disponíveis</option>)}
+                    {itens.map((x) => <option key={x.id} value={x.id}>{cad.descreverItem(x)} · {USO_TAMANHO[x.uso][1]} · {numero(x.emEstoque)} disponíveis{x.emCura ? ` · ${numero(x.emCura)} em cura` : ''}</option>)}
                   </select>
+                  {abaixo && <span className="texto-critico">Classe abaixo da {ordinalClasse(sugerida!)} sugerida para este destino: a separação vai pedir justificativa.</span>}
                 </div>
                 <div className="linha-campos-2">
                   <div className="campo">
