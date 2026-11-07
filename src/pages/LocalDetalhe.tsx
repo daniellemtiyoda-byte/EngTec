@@ -42,7 +42,6 @@ export default function LocalDetalhe() {
         migalhas={[{ rotulo: 'Locais', para: '/locais' }, { rotulo: `Local ${l.codigo}` }]}
         acoes={<>
           {(l.tipo === 'armazenagem' || l.tipo === 'expedicao') && <Link className="btn btn-acao" to={`/estoque?visao=fardo&localId=${l.id}`}>Ver no estoque</Link>}
-          <Link className="btn btn-sec" to={`/locais/etiquetas?local=${encodeURIComponent(l.codigo)}`}>Imprimir QR do local</Link>
         </>}
         fatos={<>
           <FatoChave rotulo="Código" valor={<span className="mono">{l.codigo}</span>} />

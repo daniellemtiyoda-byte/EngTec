@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BadgeDe } from '../components/Badge';
 import { ConfirmarInativacao, type AlvoInativacao } from '../components/ConfirmarInativacao';
 import { FormLinha } from '../components/FormLinha';
@@ -24,7 +25,10 @@ const CAMPOS_INCLUSAO: Campo[] = [
 /** O código não muda depois de criado: ele está impresso no QR do local. */
 const CAMPOS_EDICAO = CAMPOS_INCLUSAO.filter((c) => c.nome !== 'codigo');
 
-/** Aba Locais de Cadastros: endereços do armazém, cada um com o seu QR (LOC-código). O mapa fica em Estoque › Locais. */
+/**
+ * Aba Locais de Cadastros: endereços do armazém, cada um com o seu QR (LOC-código). O mapa fica em Estoque › Locais.
+ * A impressão do QR dos locais fica só aqui, para quem edita cadastros (administrador).
+ */
 export default function LocaisCadastro({ aoAlterar }: { aoAlterar: () => void }) {
   const { pode } = useAuth();
   const notificar = useToast();
@@ -33,6 +37,7 @@ export default function LocaisCadastro({ aoAlterar }: { aoAlterar: () => void })
   const [rec, setRec] = useState(0);
   const alterou = () => { setRec((x) => x + 1); aoAlterar(); };
   const edita = pode('cadastros:editar');
+  const nav = useNavigate();
 
   const colunas: Coluna<Local>[] = [
     { chave: 'codigo', titulo: 'Código', ordenavel: true, render: (l) => <span className="mono">{l.codigo}</span> },
@@ -62,9 +67,11 @@ export default function LocaisCadastro({ aoAlterar }: { aoAlterar: () => void })
         listar={(q) => servicos.locais.listar(q)}
         recarregar={rec}
         colunas={colunas}
+        acoes={edita && <button type="button" className="btn btn-sec" onClick={() => nav('/cadastros/locais/etiquetas')}>Imprimir QR dos locais</button>}
         filtros={[{ chave: 'tipo', rotulo: 'Tipo', opcoes: TIPO_LOCAL_OPCOES }]}
         acoesLinha={edita ? [
           { rotulo: 'Editar', aoClicar: setEditar },
+          { rotulo: 'Imprimir QR', visivel: (l) => l.ativo, aoClicar: (l) => nav(`/cadastros/locais/etiquetas?local=${encodeURIComponent(l.codigo)}`) },
           { rotulo: 'Inativar', visivel: (l) => l.ativo, aoClicar: (l) => setInativar({ nome: `o local ${l.codigo}`, efeito: 'Ele deixa de receber fardos. Local com dormentes não pode ser inativado.', executar: () => servicos.locais.inativar(l.id) }) },
           { rotulo: 'Reativar', visivel: (l) => !l.ativo, aoClicar: (l) => setInativar({ nome: `o local ${l.codigo}`, acao: 'reativar', efeito: 'Ele volta a receber fardos, com o mesmo código e o mesmo QR.', executar: () => servicos.locais.reativar(l.id) }) },
         ] : undefined}

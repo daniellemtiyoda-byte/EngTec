@@ -865,3 +865,45 @@ describe('IBAMA: destinação final e saldo do DOF', () => {
     expect((await s.ibama.saldosInformados()).items[0].data).toBe('2026-11-06');
   });
 });
+
+describe('IBAMA: perdas e não localizados no saldo do pátio', () => {
+  it('os não localizados ficam no saldo físico, mostrados à parte', async () => {
+    const { s } = montar('gestor');
+    const saldo = await s.ibama.saldoPatio();
+    const nl = (await s.inspecao.naoLocalizados({ pageSize: 50 })).items;
+    expect(saldo.reduce((t, x) => t + x.naoLocalizados.quantidade, 0)).toBe(nl.length);
+    const comNl = saldo.find((x) => x.naoLocalizados.quantidade > 0)!;
+    expect(comNl.naoLocalizados.volumeM3).toBeGreaterThan(0);
+    expect(comNl.fisicoM3).toBeGreaterThanOrEqual(comNl.naoLocalizados.volumeM3);
+  });
+  it('o gestor transforma o não localizado em perdido: sai do saldo e fica a comunicar ao IBAMA', async () => {
+    const { s, como, invariantes } = montar('gestor');
+    const historia = await s.ibama.perdas({ filters: { comunicado: 'nao' } });
+    expect(historia.total).toBe(1);
+    const d = (await s.inspecao.naoLocalizados({ pageSize: 50 })).items[0];
+    const antes = (await s.ibama.saldoPatio()).find((x) => x.especieId === d.especieId)!;
+
+    await falhaCom(s.ibama.registrarPerda(d.id, { motivo: 'outro' }), 422, 'descricao');
+    await falhaCom(s.ibama.registrarPerda(d.id, { motivo: 'sumiu' as never }), 422, 'motivo');
+    como('almoxarife');
+    await falhaCom(s.ibama.registrarPerda(d.id, { motivo: 'extravio' }), 403);
+    como('gestor');
+    const p = await s.ibama.registrarPerda(d.id, { motivo: 'intemperie', descricao: 'Enchente no pátio' });
+    expect([p.motivo, p.volumeM3 > 0, p.comunicadoEm]).toEqual(['intemperie', true, undefined]);
+    await falhaCom(s.ibama.registrarPerda(d.id, { motivo: 'extravio' }), 409);
+    await falhaCom(s.ibama.registrarPerda('AR00224-01-000001', { motivo: 'extravio' }), 409);
+
+    const ficha = await s.dormentes.obter(d.id);
+    expect([ficha.dormente.situacao, ficha.perda?.id, ficha.eventos[ficha.eventos.length - 1].tipo]).toEqual(['perdido', p.id, 'perdido']);
+    const depois = (await s.ibama.saldoPatio()).find((x) => x.especieId === d.especieId)!;
+    expect(depois.quantidade).toBe(antes.quantidade - 1);
+    expect(depois.naoLocalizados.quantidade).toBe(antes.naoLocalizados.quantidade - 1);
+    expect((await s.inspecao.naoLocalizados({ pageSize: 50 })).items.map((x) => x.id)).not.toContain(d.id);
+
+    const comunicada = await s.ibama.marcarPerdaComunicada(p.id);
+    expect(comunicada.comunicadoPor).toBe(usuarioDemo('gestor').nome);
+    await falhaCom(s.ibama.marcarPerdaComunicada(p.id), 409);
+    expect((await s.ibama.perdas({ filters: { comunicado: 'sim' } })).items.map((x) => x.id)).toEqual([p.id]);
+    expect(invariantes()).toEqual([]);
+  });
+});

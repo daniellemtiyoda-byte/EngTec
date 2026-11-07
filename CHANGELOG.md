@@ -5,6 +5,20 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Alterado
+- 2026-11-07: **Etiquetas só no Simulador; QR dos locais só em Cadastros › Locais.**
+  - **Por quê:** quem grava o QR na plaquinha é o fornecedor; o sistema não deve imprimir etiquetas de fardo e dormente fora da demonstração do fornecedor.
+  - Sai "Imprimir etiqueta do fardo" da página do fardo (e o modo `?fardo=` da folha do Simulador, que passa a exigir `simulador:usar`). O QR dos locais sai da tela Locais e da página do local e fica em Cadastros › Locais (ação "Imprimir QR dos locais" e "Imprimir QR" na linha), só para o administrador (`/cadastros/locais/etiquetas`, `cadastros:editar`). A etiqueta de contingência (reimpressão de etiqueta danificada) fica registrada como melhoria futura.
+  - Arquivos: `src/pages/{FardoDetalhe,Locais,LocalDetalhe,LocaisCadastro,EtiquetasLocais,EtiquetasImpressao}.tsx`, `src/rotas.tsx`.
+
+### Adicionado
+- 2026-11-07: **Perdas (IN Ibama 21/2014, art. 42) e não localizados à parte no saldo do pátio.**
+  - O gestor transforma um dormente "não localizado" em **perdido** (Inspeção › Não localizados › Registrar perda), com motivo obrigatório (extravio, avaria, incêndio, intempérie, outro com descrição) e evento. O perdido sai do saldo físico e entra nas perdas a comunicar ao IBAMA (por espécie e volume), com a marcação "comunicado ao órgão" (quem e quando). A ficha do dormente mostra o motivo e a comunicação.
+  - O saldo do pátio mantém os não localizados no físico e mostra essa parte separada, para explicar diferenças em vistoria.
+  - Dados de demonstração: o fardo AR00311-01-F003 teve 3 não lidos; um virou perda por extravio, ainda não comunicada (os 2 não localizados continuam). Estado do mock na versão 10.
+  - Testes: 100. Plano (seção 9.21 com o relatório 7, modelo e serviços), especificação e `CLAUDE.md` atualizados.
+  - Arquivos: `src/types/models.ts`, `src/services/contracts.ts`, `src/services/mock/{ibama,estoque,estado,consultas,invariantes,data,index}.ts`, `src/dominio/{rotulos,opcoes}.ts`, `src/pages/{Inspecao,FichaDormente}.tsx`, testes.
+
 ### Corrigido
 - 2026-11-07: **Estoque e RME mostravam "Não foi possível carregar os dados" no ambiente local.**
   - **Causa:** o navegador guardava o estado do mock gravado por uma versão anterior do código com a mesma `VERSAO_ESTADO` (fardos sem a data de tratamento, RMEs sem campos novos); ao montar as telas, a data vazia gerava "Invalid time value".

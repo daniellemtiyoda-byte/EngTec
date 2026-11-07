@@ -226,7 +226,7 @@ interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId /* = tama
   conclusaoInspecao?: { quando; quem; justificativa? /* obrigatória com não localizados */; naoLocalizados: string[] };
   recebidoEm?: string; idadeDias?: number /* calculado */ }
 
-type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'retirado' | 'nao_localizado';
+type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'retirado' | 'nao_localizado' | 'perdido';
 interface Dormente { id /* AR00224-01-000357 */; contratoId; itemContratoId; fardoId: string; especieId; classe; tratamentoId; usinaTratamento; dataTratamento /* do próprio dormente */;
   situacao: SituacaoDormente; categoria?: number; medidas?: { comprimentoCm; larguraCm; alturaCm };
   inspecaoId?: string; rmeNumero?: string }
@@ -296,7 +296,7 @@ Regras **provisórias**, a confirmar com o time da inspeção (ficam em `dominio
 - **Cura:** dormentes tratados com **CCA ou CCB** só ficam disponíveis para separação **15 dias após a data de tratamento**. Antes disso aparecem "em cura" no estoque, com a data de liberação; não entram na sugestão nem na separação.
 - **Classe pelo destino da RME:** o requisitante informa o tipo de destino (linha principal de tráfego pesado, linha principal de tráfego médio, desvio ou pátio). O sistema sugere a classe mínima (**1ª para tráfego pesado; 2ª aceita nos demais**) e, se a separação usar classe inferior à sugerida, avisa e pede justificativa.
 
-**Modelo fechado (antes do Supabase).** Entidades gravadas, que viram tabelas: Usuário (perfil), Fornecedor, Espécie, Tamanho, Tratamento, Empresa inspetora, Local, Ata (com regras e itens registrados), Contrato (com itens e parcelas), Emissão do fornecedor (Simulador), Fardo (com marcação, conclusão da inspeção e reprovação), Dormente, NF (com itens), DOF (com volumes por espécie), Entrega (com boletim, relatório técnico e laudo), Recebimento (com ocorrências e canhoto), Inspeção, Movimentação, RME (com itens e separação), Evento, Destinação final, Saldo informado do DOF, Parâmetros (com níveis de estoque e feriados) e Anexo. Tudo o mais (saldo, disponível, em cura, situação do fardo e da parcela, prazos, divergência de volume, saldo da ata, garantia) é calculado: no Supabase, views e funções.
+**Modelo fechado (antes do Supabase).** Entidades gravadas, que viram tabelas: Usuário (perfil), Fornecedor, Espécie, Tamanho, Tratamento, Empresa inspetora, Local, Ata (com regras e itens registrados), Contrato (com itens e parcelas), Emissão do fornecedor (Simulador), Fardo (com marcação, conclusão da inspeção e reprovação), Dormente, NF (com itens), DOF (com volumes por espécie), Entrega (com boletim, relatório técnico e laudo), Recebimento (com ocorrências e canhoto), Inspeção, Movimentação, RME (com itens e separação), Evento, Destinação final, Saldo informado do DOF, Perda, Parâmetros (com níveis de estoque e feriados) e Anexo. Tudo o mais (saldo, disponível, em cura, situação do fardo e da parcela, prazos, divergência de volume, saldo da ata, garantia) é calculado: no Supabase, views e funções.
 
 ### 5.6 Estoque e saída
 
@@ -317,8 +317,10 @@ interface Rme { id; numero /* RME-2026-0012 */; solicitanteId; destino: string /
 interface DestinacaoFinal { id; rmeId; rmeNumero; especieId; quantidade; volumeM3 /* medido; sem medidas, o do tamanho */; entregueEm; lancadoEm?; lancadoPor? }
 // Registro periódico do saldo que aparece no sistema DOF, por espécie.
 interface SaldoDofInformado { id; data; itens: { especieId; volumeM3 }[]; observacao?; quem; quando }
+// Perda (art. 42): o gestor transforma o não localizado em perdido; sai do saldo físico e fica a comunicar ao IBAMA.
+interface Perda { id; dormenteId; fardoId; contratoId; especieId; tamanhoId; volumeM3; motivo: 'extravio' | 'avaria' | 'incendio' | 'intemperie' | 'outro'; descricao?; quando; quem; comunicadoEm?; comunicadoPor? }
 // Calculado: saldo físico do pátio por espécie e tamanho × último saldo informado (alerta acima de 10%, art. 41).
-interface SaldoPatioEspecie { especieId; quantidade; fisicoM3; porTamanho: { tamanhoId; quantidade; volumeM3 }[]; informadoM3?; informadoEm?; diferencaPct?; acimaTolerancia }
+interface SaldoPatioEspecie { especieId; quantidade; fisicoM3; porTamanho: { tamanhoId; quantidade; volumeM3 }[]; naoLocalizados: { quantidade; volumeM3 } /* à parte */; informadoM3?; informadoEm?; diferencaPct?; acimaTolerancia }
 ```
 
 O **nível de estoque** (`SaldoItem.situacao`) compara o mínimo e o máximo com o **disponível somado ao que está em cura**: item abaixo do mínimo só por causa da cura não é falta e não gera alerta de reposição. A tela mostra a parte em cura separada, com a data de liberação.
@@ -351,7 +353,7 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `movimentacoes` | `listar` (filtros tipo, `periodo` em dias e `localId` de ou para) |
 | `rme` | `listar`, `obter`, `abrir`, `iniciarSeparacao(numero)`, `sugerirSeparacao(numero)`, `separar`, `entregar`, `cancelar` |
 | `eventos` | `listar` (filtros `entidade`, `entidadeId` e `tipo`; do mais recente ao mais antigo) |
-| `ibama` | `destinacoes(q)` (filtros `lancado`, `especieId`, `de`, `ate`), `marcarLancado(id)`, `saldosInformados(q)`, `informarSaldo({ data, itens, observacao? })`, `saldoPatio()`; as ações exigem `dof:declarar` |
+| `ibama` | `destinacoes(q)` (filtros `lancado`, `especieId`, `de`, `ate`), `marcarLancado(id)`, `saldosInformados(q)`, `informarSaldo({ data, itens, observacao? })`, `saldoPatio()`, `registrarPerda(dormenteId, { motivo, descricao? })` (`painel:gestao`), `perdas(q)` (filtros `comunicado`, `especieId`, `de`, `ate`), `marcarPerdaComunicada(id)` (`painel:gestao` ou `dof:declarar`); lançar e informar exigem `dof:declarar` |
 | `parametros` | `obter`, `atualizar`, `reiniciarDemonstracao()` (só no mock) |
 
 **Mock (até a Etapa 9).**
@@ -499,7 +501,7 @@ Até a Etapa 9, login simulado: o nome do usuário escolhe o perfil (`administra
 - Aceite: nenhuma sequência se repete entre entregas do mesmo contrato; emitidos menos reprovados nunca passa do contratado.
 
 ### 9.6 Folha de etiquetas (`/simulador/etiquetas/:emissao`)
-- Sem Layout. Grade de `EtiquetaQr` para impressão em A4: primeiro a etiqueta do fardo, depois as dos dormentes daquele fardo.
+- Sem Layout, só com `simulador:usar`. Grade de `EtiquetaQr` para impressão em A4: primeiro a etiqueta do fardo, depois as dos dormentes daquele fardo. **Etiquetas:** fardo e dormente só são impressos pelo Simulador do fornecedor (o fornecedor é quem grava o QR na plaquinha); o QR dos locais só em Cadastros › Locais, para o administrador. A reimpressão de etiqueta danificada (contingência) é melhoria futura.
 - Etiqueta do dormente (proporção da plaquinha do contrato): QR à esquerda, à direita o ID em mono e grande, contrato, espécie e comprimento. Etiqueta do fardo: maior, com "FARDO", ID, item e quantidade.
 - Usar o texto "CPTM" no cabeçalho, não o arquivo do logo (só usar logo se a CPTM fornecer).
 - CSS `@media print`: margens, quebra de página sem cortar etiqueta, botão Imprimir escondido.
@@ -558,7 +560,7 @@ Primeiro item do grupo Entrada: é onde a entrega nasce, antes da chegada do mat
 ### 9.12 Página do fardo (`/f/:id`) · padrão Objeto
 - Fatos-chave: Saldo/inicial (físico: em estoque + reservados) · Disponível · Local · Idade · Contrato · Item · Recebido em.
 - Abas: **Dormentes** (ID, situação, categoria, comprimento medido) · **Origem** (contrato, fornecedor, NF, DOF, recebimento, inspeção) · **Movimentações** · **Histórico**.
-- Ações por situação: aguardando inspeção → **Inspecionar**; em estoque → **Transferir**, **Imprimir etiqueta do fardo**. No celular, as ações ficam no rodapé fixo e as tabelas das abas viram cartões.
+- Ações por situação: aguardando inspeção → **Inspecionar**; em estoque → **Transferir**. Sem impressão de etiqueta (só o Simulador imprime as de fardo e dormente). No celular, as ações ficam no rodapé fixo e as tabelas das abas viram cartões.
 
 ### 9.13 Ficha do dormente (`/d/:id`) · padrão Ficha rápida
 - Topo: ID grande em mono, badge de situação, espécie (nome científico + popular), classe, tamanho, tratamento.
@@ -578,8 +580,8 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 - Visão **Lista**: Código · Tipo · Descrição · Fardos · Ocupação · Situação.
 - Clique no local → **Página do local** (padrão Objeto): fatos-chave (tipo, capacidade, ocupação, fardos), lista dos fardos no local (link para cada fardo e para o Estoque por fardo filtrado pelo local) e **Imprimir QR do local**. É o destino do QR do local.
 - QR do local: ID `LOC-<código>` (ex. `LOC-A03`), link `<APP_URL>/#/locais/A03`; validação por `RE_LOCAL` em `identificacao.ts`.
-- Ação: **Imprimir QR dos locais** (etiqueta de endereço, para guarda por leitura; `/locais/etiquetas`, sem o Layout, `?local=` imprime um só) e **Gerenciar locais** (leva a Cadastros › Locais; só para quem tem `cadastros:editar`).
-- Ocupação em texto e cor: "Quase cheio" a partir de 85% e "Lotado" a 100%. Página do local: **Ver no estoque** (visão por fardo filtrada pelo local) e **Imprimir QR do local**.
+- Ação: **Gerenciar locais** (leva a Cadastros › Locais; só para quem edita cadastros). O QR dos locais é impresso só em **Cadastros › Locais** (administrador): **Imprimir QR dos locais** e, na linha, **Imprimir QR** de um local (`/cadastros/locais/etiquetas`, sem o Layout, `?local=` imprime um só).
+- Ocupação em texto e cor: "Quase cheio" a partir de 85% e "Lotado" a 100%. Página do local: **Ver no estoque** (visão por fardo filtrada pelo local).
 
 ### 9.16 Movimentações (`/movimentacoes`) · padrão Lista
 - Colunas: Quando · Tipo · Fardo · Dormentes (quantidade) · De · Para · Quem · Referência (RME, recebimento).
@@ -612,14 +614,17 @@ Item de menu **Relatórios** (grupo Início, depois do Painel), com a seção **
 
 | Relatório | O que mostra | Norma | Serviço |
 | --- | --- | --- | --- |
-| 1. Saldo do pátio | Volume em m³ por espécie (nome científico) e tamanho dos dormentes no pátio (aguardando inspeção, em estoque, reservados, reprovados ainda não retirados e não localizados), comparado com o último saldo informado do DOF, com a diferença e alerta acima de 10%; ação **Informar saldo do DOF** | art. 41 | `ibama.saldoPatio()`, `ibama.informarSaldo()`, `ibama.saldosInformados()` |
+| 1. Saldo do pátio | Volume em m³ por espécie (nome científico) e tamanho dos dormentes no pátio (aguardando inspeção, em estoque, reservados, reprovados ainda não retirados e não localizados; **os não localizados aparecem à parte**, para explicar diferenças em vistoria; o perdido sai do saldo), comparado com o último saldo informado do DOF, com a diferença e alerta acima de 10%; ação **Informar saldo do DOF** | art. 41 | `ibama.saldoPatio()`, `ibama.informarSaldo()`, `ibama.saldosInformados()` |
 | 2. Destinação final | Volume por espécie das RMEs entregues no período, lançado ou não no DOF, com a ação **Marcar como lançado no DOF** e alerta para as pendências | baixa do saldo virtual | `ibama.destinacoes()`, `ibama.marcarLancado()` |
 | 3. DOFs a declarar | Atalho para a aba já existente em NF e DOF (`/documentos?aba=a_declarar`) | art. 51 | `dof` |
 | 4. Divergências de volume | DOF × volume medido na inspeção (nominal enquanto não há medido), por entrega e espécie, com a justificativa | art. 53 | `entrega.divergenciaVolume` |
 | 5. Inventário para vistoria | Fardos por local e espécie, com quantidade, m³, NF e DOF de origem | art. 65 | `estoque.porFardo` + documentos |
 | 6. Movimento anual | Entradas (recebimentos) e saídas (destinação final) por espécie e volume no ano | relatório anual (obrigatoriedade a confirmar com a CPTM) | movimentações + destinações |
+| 7. Perdas a comunicar ao IBAMA | Dormentes perdidos (o gestor transforma um "não localizado" em "perdido", com motivo: extravio, avaria, incêndio, intempérie ou outro, com descrição), por espécie e volume, com a ação **Marcar como comunicado ao órgão** (quem e quando) | art. 42 | `ibama.registrarPerda()`, `ibama.perdas()`, `ibama.marcarPerdaComunicada()` |
 
-Alertas no Painel (Etapa 10): saldo do pátio acima de 10% do informado, destinação final pendente de lançamento e saldo do DOF sem atualização há mais de 30 dias.
+Alertas no Painel (Etapa 10): saldo do pátio acima de 10% do informado, destinação final pendente de lançamento, perdas a comunicar e saldo do DOF sem atualização há mais de 30 dias.
+
+**Perdas.** Na aba Não localizados da Inspeção, o gestor (`painel:gestao`) tem **Registrar perda** (motivo obrigatório; "outro" exige descrição; confirmação, sem desfazer). O dormente passa a `perdido` (evento `perdido`), sai do saldo físico e entra no relatório 7; a ficha mostra o motivo e se já foi comunicado. Marcar como comunicado: gestor ou quem declara DOF.
 
 ### 9.20 Vitrine (`/vitrine`)
 - Interna: fora do menu, só administrador (`admin`). Dados fixos no próprio arquivo, sem serviço.
@@ -810,6 +815,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 ---
 
 ### Melhorias futuras registradas
+- **Etiqueta de contingência**: reimprimir a etiqueta de um dormente ou fardo com QR danificado ou ilegível (hoje só o Simulador imprime etiquetas de fardo e dormente).
 - **RME por jogo de dormentes de AMV**: pedir o conjunto completo de um travessão de determinada geometria (os tamanhos de 3,00 a 5,40 m nas quantidades do jogo), em vez de tamanho por tamanho.
 - **Movimentação física parcial**: levar para a expedição só os dormentes separados de um fardo (sem o fardo inteiro), com rastreio do local de cada dormente. Hoje a separação parcial fica no local do fardo até a entrega.
 

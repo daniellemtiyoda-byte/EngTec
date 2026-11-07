@@ -1,8 +1,9 @@
 import { diferencaVolumePct, foraDaTolerancia } from '../../dominio/parametros';
-import type { DadosSaldoDof } from '../contracts';
-import type { DestinacaoFinal, Id, SaldoDofInformado, SaldoPatioEspecie } from '../../types/models';
+import type { DadosPerda, DadosSaldoDof } from '../contracts';
+import type { DestinacaoFinal, Id, MotivoPerda, Perda, SaldoDofInformado, SaldoPatioEspecie } from '../../types/models';
 import { tamanhoDoItem, volumeMedido } from './consultas';
 import { achar, falha, instante, novoId, registrar, type Ctx, type Estado } from './estado';
+import { movimentarDormentes } from './estoque';
 
 /**
  * Prestação de contas ao IBAMA (IN Ibama 21/2014). O sistema não substitui o sistema DOF: guarda o que a CPTM precisa
@@ -11,7 +12,10 @@ import { achar, falha, instante, novoId, registrar, type Ctx, type Estado } from
 
 const arredondar = (v: number) => Math.round(v * 1000) / 1000;
 
-/** Dormentes que estão fisicamente no pátio (entraram no saldo do DOF e ainda não saíram). */
+/**
+ * Dormentes que estão no saldo físico do pátio (entraram no saldo do DOF e ainda não saíram). Os não localizados
+ * continuam nele, mostrados à parte; o perdido sai (vai para as perdas a comunicar).
+ */
 const NO_PATIO = new Set(['aguardando_inspecao', 'em_estoque', 'reservado', 'reprovado', 'nao_localizado']);
 
 /** Na entrega da RME, uma destinação final por espécie, com o volume (medido ou, sem medidas, o do tamanho). */
@@ -67,8 +71,9 @@ export function saldoPatio(e: Estado): SaldoPatioEspecie[] {
   const mapa = new Map<Id, SaldoPatioEspecie>();
   for (const d of e.dormentes.filter((x) => NO_PATIO.has(x.situacao))) {
     const tamanho = tamanhoDoItem(e, d.itemContratoId);
-    const s = mapa.get(d.especieId) ?? { especieId: d.especieId, quantidade: 0, fisicoM3: 0, porTamanho: [], acimaTolerancia: false };
+    const s = mapa.get(d.especieId) ?? { especieId: d.especieId, quantidade: 0, fisicoM3: 0, porTamanho: [], naoLocalizados: { quantidade: 0, volumeM3: 0 }, acimaTolerancia: false };
     const vol = volumeMedido(e, d);
+    if (d.situacao === 'nao_localizado') { s.naoLocalizados.quantidade++; s.naoLocalizados.volumeM3 += vol; }
     s.quantidade++;
     s.fisicoM3 += vol;
     const t = s.porTamanho.find((x) => x.tamanhoId === tamanho.id);
@@ -76,16 +81,47 @@ export function saldoPatio(e: Estado): SaldoPatioEspecie[] {
     mapa.set(d.especieId, s);
   }
   const ultimo = [...e.saldosDof].sort((a, b) => b.data.localeCompare(a.data) || b.quando.localeCompare(a.quando))[0];
-  for (const i of ultimo?.itens ?? []) if (!mapa.has(i.especieId)) mapa.set(i.especieId, { especieId: i.especieId, quantidade: 0, fisicoM3: 0, porTamanho: [], acimaTolerancia: false });
+  for (const i of ultimo?.itens ?? []) if (!mapa.has(i.especieId)) mapa.set(i.especieId, { especieId: i.especieId, quantidade: 0, fisicoM3: 0, porTamanho: [], naoLocalizados: { quantidade: 0, volumeM3: 0 }, acimaTolerancia: false });
   return [...mapa.values()].map((s) => {
     const informado = ultimo?.itens.find((i) => i.especieId === s.especieId);
     const fisicoM3 = arredondar(s.fisicoM3);
     const pct = informado ? diferencaVolumePct(informado.volumeM3, fisicoM3) : undefined;
     return {
       ...s, fisicoM3, porTamanho: s.porTamanho.map((t) => ({ ...t, volumeM3: arredondar(t.volumeM3) })),
+      naoLocalizados: { ...s.naoLocalizados, volumeM3: arredondar(s.naoLocalizados.volumeM3) },
       informadoM3: informado?.volumeM3, informadoEm: informado ? ultimo.data : undefined,
       diferencaPct: pct === undefined ? undefined : Number.isFinite(pct) ? Math.round(pct * 10) / 10 : pct,
       acimaTolerancia: pct !== undefined && foraDaTolerancia(pct),
     };
   });
+}
+
+const MOTIVOS: MotivoPerda[] = ['extravio', 'avaria', 'incendio', 'intemperie', 'outro'];
+const ROTULO_MOTIVO: Record<MotivoPerda, string> = { extravio: 'extravio', avaria: 'avaria', incendio: 'incêndio', intemperie: 'intempérie', outro: 'outro' };
+
+/** Perdas (art. 42): só o dormente não localizado vira perdido; sai do saldo físico e fica a comunicar ao IBAMA. */
+export function registrarPerda(e: Estado, dormenteId: Id, dados: DadosPerda, ctx: Ctx): Perda {
+  const d = achar(e.dormentes, (x) => x.id === dormenteId, `Dormente ${dormenteId}`);
+  if (d.situacao !== 'nao_localizado') falha(409, `Só um dormente não localizado pode ser registrado como perdido (o ${d.id} está "${d.situacao}").`);
+  const descricao = dados.descricao?.trim();
+  if (!MOTIVOS.includes(dados.motivo)) falha(422, 'Informe o motivo da perda.', { motivo: 'Motivo obrigatório.' });
+  if (dados.motivo === 'outro' && !descricao) falha(422, 'Descreva o motivo da perda.', { descricao: 'Obrigatória quando o motivo é "outro".' });
+  const tamanho = tamanhoDoItem(e, d.itemContratoId);
+  movimentarDormentes(e, [d.id], 'perdido', { evento: { tipo: 'perdido', descricao: `Perda registrada (${ROTULO_MOTIVO[dados.motivo]})${descricao ? `: ${descricao}` : ''}`, referencia: d.fardoId } }, ctx);
+  const p: Perda = {
+    id: novoId(e, 'pd'), dormenteId: d.id, fardoId: d.fardoId, contratoId: d.contratoId, especieId: d.especieId, tamanhoId: tamanho.id,
+    volumeM3: arredondar(tamanho.volumeM3), motivo: dados.motivo, descricao: descricao || undefined, quando: instante(ctx), quem: ctx.quem,
+  };
+  e.perdas.push(p);
+  return p;
+}
+
+/** Marca a perda como comunicada ao órgão (uma vez só). */
+export function marcarPerdaComunicada(e: Estado, id: Id, ctx: Ctx): Perda {
+  const p = achar(e.perdas, (x) => x.id === id, 'Perda');
+  if (p.comunicadoEm) falha(409, `Esta perda já foi comunicada ao IBAMA em ${p.comunicadoEm.slice(0, 10)}.`);
+  p.comunicadoEm = instante(ctx);
+  p.comunicadoPor = ctx.quem;
+  registrar(e, ctx, 'dormente', p.dormenteId, 'comunicado', 'Perda comunicada ao IBAMA', p.fardoId);
+  return p;
 }

@@ -9,12 +9,13 @@ import { achar, registrar, falha, hoje, instante, novoId, type Ctx, type Estado,
 const TRANSICOES: Record<SituacaoDormente, SituacaoDormente[]> = {
   emitido: ['aguardando_inspecao'],
   aguardando_inspecao: ['em_estoque', 'reprovado', 'nao_localizado'],
-  nao_localizado: ['em_estoque', 'reprovado'],
+  nao_localizado: ['em_estoque', 'reprovado', 'perdido'],
   em_estoque: ['reservado'],
   reservado: ['em_estoque', 'baixado'],
   baixado: [],
   reprovado: ['retirado'],
   retirado: [],
+  perdido: [],
 };
 
 interface Opcoes {

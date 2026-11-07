@@ -71,7 +71,7 @@ export const ROTAS: Rota[] = [
   { caminho: '/contratos', tela: Contratos, rotulo: 'Contratos', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO },
   { caminho: '/contratos/:numero', tela: ContratoDetalhe, rotulo: 'Contrato', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/simulador', tela: Simulador, rotulo: 'Simulador do fornecedor', icone: 'fabrica', grupo: 'Suprimento', permissoes: ['simulador:usar'], demo: true },
-  { caminho: '/simulador/etiquetas/:emissao', tela: EtiquetasImpressao, rotulo: 'Etiquetas', icone: 'impressora', grupo: 'Suprimento', permissoes: ['simulador:usar', 'operacao:consultar'], foraDoMenu: true, semLayout: true },
+  { caminho: '/simulador/etiquetas/:emissao', tela: EtiquetasImpressao, rotulo: 'Etiquetas', icone: 'impressora', grupo: 'Suprimento', permissoes: ['simulador:usar'], foraDoMenu: true, semLayout: true },
   // NF e DOF primeiro: a entrega nasce no cadastro da NF e da DOF, antes da chegada.
   { caminho: '/documentos', tela: Documentos, rotulo: 'NF e DOF', icone: 'file', grupo: 'Entrada', permissoes: OPERACAO },
   { caminho: '/recebimentos', tela: Recebimentos, rotulo: 'Recebimentos', icone: 'truck', grupo: 'Entrada', permissoes: OPERACAO },
@@ -81,7 +81,7 @@ export const ROTAS: Rota[] = [
   // Todos: o requisitante (sem operacao:consultar) vê só a visão por item.
   { caminho: '/estoque', tela: Estoque, rotulo: 'Estoque', icone: 'box', grupo: 'Estoque' },
   { caminho: '/locais', tela: Locais, rotulo: 'Locais', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO },
-  { caminho: '/locais/etiquetas', tela: EtiquetasLocais, rotulo: 'QR dos locais', icone: 'impressora', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true, semLayout: true },
+  { caminho: '/cadastros/locais/etiquetas', tela: EtiquetasLocais, rotulo: 'QR dos locais', icone: 'impressora', grupo: 'Cadastros', permissoes: ['cadastros:editar'], foraDoMenu: true, semLayout: true },
   // Destinos dos QR: dormente (todos os usuários logados), fardo e local.
   { caminho: '/d/:id', tela: FichaDormente, rotulo: 'Dormente', icone: 'qr', grupo: 'Estoque', foraDoMenu: true },
   { caminho: '/f/:id', tela: FardoDetalhe, rotulo: 'Fardo', icone: 'box', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },

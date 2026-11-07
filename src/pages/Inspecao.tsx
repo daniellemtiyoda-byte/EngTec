@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AbasSecao, useAbaNoEndereco, type Aba } from '../components/Abas';
 import { Badge, BadgeDe } from '../components/Badge';
+import { FormModal, type Campo } from '../components/FormModal';
 import { ConfirmModal } from '../components/Modal';
 import { useToast } from '../components/Toast';
 import { CabecalhoPagina } from '../components/Cabecalhos';
@@ -9,15 +10,22 @@ import { CodigoLink } from '../components/Codigos';
 import { BarraProgresso } from '../components/Indicadores';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { useAuth } from '../contexts/AuthContext';
+import { MOTIVO_PERDA_OPCOES } from '../dominio/opcoes';
 import { SITUACAO_FARDO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import type { Dormente, Fardo } from '../types/models';
+import type { Dormente, Fardo, MotivoPerda } from '../types/models';
 import { mensagemSegura } from '../services/http';
 import { data, dataHora, dias, hojeSP, numero } from '../utils/format';
 
 type AbaInspecao = 'fila' | 'nao_localizados' | 'reprovados';
+
+/** Perda (IN Ibama 21/2014, art. 42): motivo obrigatório; "outro" pede a descrição. */
+const CAMPOS_PERDA: Campo[] = [
+  { nome: 'motivo', rotulo: 'Motivo', tipo: 'select', obrigatorio: true, opcoes: MOTIVO_PERDA_OPCOES },
+  { nome: 'descricao', rotulo: 'Descrição', tipo: 'textarea', maxLength: 300, ajuda: 'Onde foi procurado e o que se sabe. Obrigatória quando o motivo é "Outro".' },
+];
 const ABAS: AbaInspecao[] = ['fila', 'nao_localizados', 'reprovados'];
 
 const contar = () => Promise.all([servicos.inspecao.fila({ pageSize: 1 }), servicos.inspecao.naoLocalizados({ pageSize: 1 }), servicos.inspecao.reprovados({ pageSize: 1 })]).then((r) => r.map((x) => x.total));
@@ -50,6 +58,8 @@ export default function Inspecao() {
   const [acao, setAcao] = useState<{ tipo: 'comunicar' | 'retirar'; fardo: Fardo } | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [rec, setRec] = useState(0);
+  const [perda, setPerda] = useState<Dormente | null>(null);
+  const gestao = pode('painel:gestao');
 
   async function confirmar() {
     if (!acao) return;
@@ -114,9 +124,12 @@ export default function Inspecao() {
         {aba === 'nao_localizados' && (
           <ListPage<Dormente>
             key="nao_localizados" titulo="Dormentes não localizados" subnivel colunas={colunasNaoLocalizados}
-            descricao="Não lidos na conclusão da inspeção do fardo. Quando forem encontrados, inspecione: seguem para o estoque ou para a segregação na hora."
-            listar={(q) => servicos.inspecao.naoLocalizados(q)}
-            acoesLinha={operar ? [{ rotulo: 'Inspecionar', principal: true, aoClicar: (d) => nav(`/inspecao/${d.fardoId}?dormente=${d.id}`) }] : undefined}
+            descricao="Não lidos na conclusão da inspeção do fardo. Quando forem encontrados, inspecione: seguem para o estoque ou para a segregação na hora. Se não aparecerem, o gestor registra a perda (IBAMA)."
+            listar={(q) => servicos.inspecao.naoLocalizados(q)} recarregar={rec}
+            acoesLinha={operar || gestao ? [
+              ...(operar ? [{ rotulo: 'Inspecionar', principal: true, aoClicar: (d: Dormente) => nav(`/inspecao/${d.fardoId}?dormente=${d.id}`) }] : []),
+              ...(gestao ? [{ rotulo: 'Registrar perda', aoClicar: setPerda }] : []),
+            ] : undefined}
           />
         )}
         {aba === 'reprovados' && (
@@ -131,6 +144,17 @@ export default function Inspecao() {
           />
         )}
       </AbasSecao>
+      <FormModal
+        titulo={perda ? `Registrar perda do dormente ${perda.id}` : 'Registrar perda'} aberto={!!perda} aoFechar={() => setPerda(null)}
+        campos={CAMPOS_PERDA} rotuloEnviar="Registrar perda"
+        validar={(v): Record<string, string> => (v.motivo === 'outro' && !v.descricao?.trim() ? { descricao: 'Obrigatória quando o motivo é "Outro".' } : {})}
+        confirmacao={() => 'O dormente passa a "perdido": sai do saldo físico e entra nas perdas a comunicar ao IBAMA. Não dá para desfazer.'}
+        aoEnviar={async (v) => {
+          await servicos.ibama.registrarPerda(perda!.id, { motivo: v.motivo as MotivoPerda, descricao: v.descricao });
+          notificar('sucesso', `Perda do dormente ${perda!.id} registrada. Ela fica a comunicar ao IBAMA.`);
+          setRec((x) => x + 1); totais.recarregar();
+        }}
+      />
       <ConfirmModal
         titulo={acao?.tipo === 'retirar' ? 'Registrar a retirada' : 'Registrar a comunicação'} aberto={!!acao} carregando={enviando}
         rotuloConfirmar={acao?.tipo === 'retirar' ? 'Registrar retirada' : 'Registrar comunicação'}

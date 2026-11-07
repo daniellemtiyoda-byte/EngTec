@@ -1,5 +1,5 @@
 import type {
-  Alerta, Ata, Categoria, DestinacaoFinal, Evento, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
+  Alerta, Ata, Categoria, DestinacaoFinal, Evento, MotivoPerda, Perda, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros, RegrasAta, TipoDestino, UsoTamanho,
   Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
@@ -209,8 +209,14 @@ export interface Servicos {
     /** Saldos informados do DOF, do mais recente ao mais antigo. */
     saldosInformados(q?: ListQuery): Promise<Paginado<SaldoDofInformado>>;
     informarSaldo(dados: DadosSaldoDof): Promise<SaldoDofInformado>;
-    /** Saldo do pátio em m³ por espécie e tamanho × último saldo informado. */
+    /** Saldo do pátio em m³ por espécie e tamanho × último saldo informado (com os não localizados à parte). */
     saldoPatio(): Promise<SaldoPatioEspecie[]>;
+    /** Gestor: dormente não localizado vira perdido (motivo obrigatório; "outro" exige descrição). */
+    registrarPerda(dormenteId: Id, dados: DadosPerda): Promise<Perda>;
+    /** Perdas a comunicar ao IBAMA. Filtros `comunicado` ("sim"/"nao"), `especieId`, `de` e `ate` (data da perda). */
+    perdas(q?: ListQuery): Promise<Paginado<Perda>>;
+    /** Marca a perda como comunicada ao órgão (gestor ou quem declara DOF). */
+    marcarPerdaComunicada(id: Id): Promise<Perda>;
   };
 
   parametros: {
@@ -225,4 +231,9 @@ export interface DadosSaldoDof {
   data: string;
   itens: { especieId: Id; volumeM3: number }[];
   observacao?: string;
+}
+
+export interface DadosPerda {
+  motivo: MotivoPerda;
+  descricao?: string;
 }

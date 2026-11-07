@@ -28,7 +28,7 @@ function nivelOcupacao(l: Local): { tom: 'vermelho' | 'laranja'; rotulo: string 
 
 /**
  * Locais (seção 9.15 do plano): mapa em cartões por tipo (ocupação em dormentes e fardos) ou lista. Cada local abre a
- * sua página, que é o destino do QR do local. Imprimir QR dos locais gera as etiquetas de endereço para a guarda
+ * sua página, que é o destino do QR do local. O QR dos locais é impresso em Cadastros › Locais (administrador), para a guarda
  * por leitura; Gerenciar locais leva ao cadastro (só para quem edita cadastros).
  */
 export default function Locais() {
@@ -53,10 +53,7 @@ export default function Locais() {
       <CabecalhoPagina
         titulo="Locais"
         subtitulo="Onde os fardos estão: ocupação em dormentes e fardos. Cada local tem um QR para a guarda e a transferência por leitura."
-        acoes={<>
-          <Link className="btn btn-pri" to="/locais/etiquetas">Imprimir QR dos locais</Link>
-          {pode('cadastros:editar') && <Link className="btn btn-sec" to="/cadastros?aba=locais">Gerenciar locais</Link>}
-        </>}
+        acoes={pode('cadastros:editar') && <Link className="btn btn-sec" to="/cadastros?aba=locais">Gerenciar locais</Link>}
       />
       <AbasSecao abas={abas} ativa={visao} aoEscolher={setVisao} rotulo="Visão dos locais">
         {visao === 'mapa' && (

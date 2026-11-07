@@ -44,7 +44,7 @@ export type TipoEvento =
   | 'criado' | 'alterado' | 'inativado' | 'reativado' | 'cancelado'
   | 'emitido' | 'recebido' | 'inspecionado' | 'guardado' | 'transferido' | 'reservado' | 'baixado'
   | 'segregado' | 'nao_localizado' | 'ocorrencia' | 'declarado' | 'laudo' | 'comunicado' | 'retirado'
-  | 'lancado' | 'informado';
+  | 'lancado' | 'informado' | 'perdido';
 
 /** O que o evento descreve (a linha do tempo de cada objeto filtra por entidade e id). */
 export type EntidadeEvento =
@@ -287,7 +287,7 @@ export interface Fardo {
   progressoInspecao?: { inspecionados: number; total: number };
 }
 
-export type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'retirado' | 'nao_localizado';
+export type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'retirado' | 'nao_localizado' | 'perdido';
 export type Categoria = 1 | 2 | 3;
 export interface Medidas { comprimentoCm: number; larguraCm: number; alturaCm: number }
 
@@ -593,12 +593,38 @@ export interface SaldoDofInformado {
   quando: string;
 }
 
+/** Motivo da perda (IN Ibama 21/2014, art. 42: perdas, incêndios e intempéries são informados ao órgão). */
+export type MotivoPerda = 'extravio' | 'avaria' | 'incendio' | 'intemperie' | 'outro';
+
+/**
+ * Perda: o gestor transforma um dormente "não localizado" em "perdido", com motivo. O dormente sai do saldo físico e
+ * entra no relatório "Perdas a comunicar ao IBAMA" até ser marcado como comunicado ao órgão.
+ */
+export interface Perda {
+  id: Id;
+  dormenteId: Id;
+  fardoId: Id;
+  contratoId: Id;
+  especieId: Id;
+  tamanhoId: Id;
+  /** Volume do tamanho (o dormente perdido não foi medido). */
+  volumeM3: number;
+  motivo: MotivoPerda;
+  descricao?: string;
+  quando: string;
+  quem: string;
+  comunicadoEm?: string;
+  comunicadoPor?: string;
+}
+
 /** Calculado: saldo físico do pátio por espécie (e tamanho), comparado com o último saldo informado do DOF (art. 41). */
 export interface SaldoPatioEspecie {
   especieId: Id;
   quantidade: number;
   fisicoM3: number;
   porTamanho: { tamanhoId: Id; quantidade: number; volumeM3: number }[];
+  /** Parte do físico que está "não localizada" (continua no saldo; mostrada à parte para explicar diferenças em vistoria). */
+  naoLocalizados: { quantidade: number; volumeM3: number };
   informadoM3?: number;
   informadoEm?: string;
   diferencaPct?: number;
@@ -701,6 +727,8 @@ export interface FichaDormente {
   garantiaAte?: string;
   /** Linha do tempo do dormente (eventos), do mais antigo ao mais novo. */
   eventos: Evento[];
+  /** Perda registrada (dormente perdido). */
+  perda?: Perda;
 }
 
 /** Tela de inspeção de um fardo: cada dormente com a inspeção que vale. */

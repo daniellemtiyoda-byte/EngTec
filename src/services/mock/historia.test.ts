@@ -110,6 +110,8 @@ describe('história de demonstração', () => {
     expect(reprovados / inspecionados.length).toBeGreaterThan(0.03);
     expect(reprovados / inspecionados.length).toBeLessThan(0.08);
     expect(e.dormentes.filter((d) => d.situacao === 'nao_localizado')).toHaveLength(2);
+    expect(e.dormentes.filter((d) => d.situacao === 'perdido')).toHaveLength(1);
+    expect(e.perdas.filter((p) => !p.comunicadoEm)).toHaveLength(1);
     const c2 = contratoView(e, e.contratos[0], HOJE);
     expect(c2.itens[0].emitidos).toBe(30);
     expect(c2.itens[0].aprovados).toBe(28);

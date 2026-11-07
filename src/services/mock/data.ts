@@ -8,7 +8,7 @@ import { criarAta, criarContrato, salvarEmpresaInspetora, salvarEspecie, salvarF
 import { declararDof } from './documentos';
 import { VERSAO_ESTADO, type Ctx, type EntregaReg, type Estado } from './estado';
 import { concluirInspecao, registrarComunicacao, registrarInspecao, registrarRetirada, simularFardo } from './inspecao';
-import { informarSaldoDof, marcarDestinacaoLancada, saldoPatio } from './ibama';
+import { informarSaldoDof, marcarDestinacaoLancada, registrarPerda, saldoPatio } from './ibama';
 import { emitirLaudo, receber } from './recebimento';
 import { abrirRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
 import { emitir } from './simulador';
@@ -40,7 +40,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     versao: VERSAO_ESTADO, dataBase: base,
     usuarios: PERFIS_LISTA.map(usuarioDemo),
     fornecedores: [], especies: [], tamanhos: [], tratamentos: [], empresasInspetoras: [], locais: [], atas: [], contratos: [], fardos: [], dormentes: [],
-    emissoes: [], nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [], eventos: [], destinacoes: [], saldosDof: [],
+    emissoes: [], nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [], eventos: [], destinacoes: [], saldosDof: [], perdas: [],
     parametros: {
       limiteDiasEstoque: LIMITE_DIAS_ESTOQUE_PADRAO, alertaDofDias: [...ALERTA_DOF_DIAS_PADRAO], toleranciaVolumePct: TOLERANCIA_VOLUME_PCT,
       limitesCategoria: [...LIMITES_CATEGORIA_PADRAO], dormentesPorFardoPadrao: DORMENTES_POR_FARDO_PADRAO, niveis: [], alertaLaudoDias: [...ALERTA_LAUDO_DIAS_PADRAO],
@@ -197,13 +197,15 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   inspecionarEGuardar(27, e6.fardosIds[0], a05.id); inspecionarEGuardar(27, e6.fardosIds[1], a05.id);
   em(27, 15);
   const ultimo = e6.fardosIds[2];
-  const naoLidos = e.dormentes.filter((d) => d.fardoId === ultimo).slice(-2).map((d) => d.id);
+  const naoLidos = e.dormentes.filter((d) => d.fardoId === ultimo).slice(-3).map((d) => d.id);
   for (const d of e.dormentes.filter((x) => x.fardoId === ultimo && !naoLidos.includes(x.id))) {
     const seq = sequenciaDe(d.id) ?? 0;
     registrarInspecao(e, d.id, { origem: 'simulado', veredito: 'APROVADO', indice: 55 + (seq * 37) % 46 }, alm(), ultimo);
   }
-  concluirInspecao(e, ultimo, { localId: a05.id, justificativa: 'Plaquinhas ilegíveis em 2 dormentes; separados para nova leitura.' }, alm());
+  concluirInspecao(e, ultimo, { localId: a05.id, justificativa: 'Plaquinhas ilegíveis em 3 dormentes; separados para nova leitura.' }, alm());
   declarar(28, e6); reprovados(e6.fardosIds, 25);
+  // Um dos não lidos não apareceu: o gestor registra a perda (extravio), ainda não comunicada ao IBAMA.
+  em(18, 11); registrarPerda(e, naoLidos[0], { motivo: 'extravio', descricao: 'Não encontrado na busca no pátio A-05 e na segregação.' }, como('gestor'));
 
   // E2 (2ª parcela do AR00224-01): 006234 e 006219; reprovados comunicados e retirados; laudo emitido.
   const e2 = gerar(28, c1.id, 2, [{ itemContratoId: ic1.id, fardos: 2 }, { itemContratoId: ic2.id, fardos: 2 }]);

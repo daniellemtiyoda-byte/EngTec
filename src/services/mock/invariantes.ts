@@ -32,10 +32,11 @@ export function violacoes(e: Estado, hoje: string): string[] {
     if (d.situacao === 'retirado') v(!d.localId && !!f.reprovacao?.retiradoEm && f.reprovacao.dormentesIds.includes(d.id), `Retirado ${d.id} sem retirada registrada no fardo`);
     if (d.situacao === 'reprovado') v(!!f.reprovacao?.dormentesIds.includes(d.id), `Reprovado ${d.id} sem reprovação registrada no fardo`);
     v((d.situacao === 'emitido') === !f.recebidoEm, `Dormente ${d.id} (${d.situacao}) incoerente com o recebimento do fardo ${f.id}`);
-    if (['em_estoque', 'reservado', 'baixado', 'reprovado', 'nao_localizado'].includes(d.situacao)) v(!!f.conclusaoInspecao, `Dormente ${d.id} (${d.situacao}) num fardo sem inspeção concluída`);
+    if (['em_estoque', 'reservado', 'baixado', 'reprovado', 'nao_localizado', 'perdido'].includes(d.situacao)) v(!!f.conclusaoInspecao, `Dormente ${d.id} (${d.situacao}) num fardo sem inspeção concluída`);
     if (d.situacao === 'aguardando_inspecao') v(!f.conclusaoInspecao, `Dormente ${d.id} aguardando inspeção num fardo concluído`);
     if (d.situacao === 'reprovado') v(e.locais.find((l) => l.id === d.localId)?.tipo === 'segregacao', `Reprovado ${d.id} fora da segregação`);
     if (d.situacao === 'nao_localizado') v(!!f.conclusaoInspecao?.naoLocalizados.includes(d.id) && !!f.conclusaoInspecao.justificativa, `Não localizado ${d.id} sem registro na conclusão do fardo`);
+    if (d.situacao === 'perdido') v(e.perdas.some((p) => p.dormenteId === d.id) && !!f.conclusaoInspecao?.naoLocalizados.includes(d.id), `Perdido ${d.id} sem perda registrada`);
     if (d.situacao === 'reservado') v(e.rmes.find((r) => r.numero === d.rmeNumero)?.situacao === 'pronta', `Reservado ${d.id} sem RME pronta`);
     if (d.situacao === 'baixado') v(e.rmes.find((r) => r.numero === d.rmeNumero)?.situacao === 'entregue', `Baixado ${d.id} sem RME entregue`);
   }

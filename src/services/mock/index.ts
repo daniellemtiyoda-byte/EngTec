@@ -18,7 +18,7 @@ import { transferirFardo } from './estoque';
 import { concluirInspecao, registrarComunicacao, registrarInspecao, registrarRetirada, simularFardo } from './inspecao';
 import { alertas, indicadores, pendencias } from './painel';
 import { armazenamentoPadrao, carregar, salvar, type Armazenamento } from './persistencia';
-import { informarSaldoDof, marcarDestinacaoLancada, saldoPatio } from './ibama';
+import { informarSaldoDof, marcarDestinacaoLancada, marcarPerdaComunicada, registrarPerda, saldoPatio } from './ibama';
 import { emitirLaudo, previaRecebimento, receber } from './recebimento';
 import { abrirRme, acharRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
 import { emitir, xmlDaNf } from './simulador';
@@ -309,6 +309,13 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       saldosInformados: (q = {}) => ler((e) => paginar(e.saldosDof, q.sortBy || q.sort ? q : { ...q, sort: [{ campo: 'data', dir: 'desc' }, { campo: 'quando', dir: 'desc' }] })),
       informarSaldo: (d) => escrever(['dof:declarar'], (e, ctx) => informarSaldoDof(e, d, ctx)),
       saldoPatio: () => ler((e) => saldoPatio(e)),
+      registrarPerda: (id, d) => escrever(['painel:gestao'], (e, ctx) => registrarPerda(e, id, d, ctx)),
+      perdas: (q = {}) => ler((e) => {
+        const { comunicado, de, ate, ...filters } = q.filters ?? {};
+        const lista = e.perdas.filter((p) => (!comunicado || (comunicado === 'sim') === !!p.comunicadoEm) && (!de || p.quando.slice(0, 10) >= de) && (!ate || p.quando.slice(0, 10) <= ate));
+        return paginar(lista, maisRecentes('quando')({ ...q, filters }));
+      }),
+      marcarPerdaComunicada: (id) => escrever(['painel:gestao', 'dof:declarar'], (e, ctx) => marcarPerdaComunicada(e, id, ctx)),
     },
 
     parametros: {

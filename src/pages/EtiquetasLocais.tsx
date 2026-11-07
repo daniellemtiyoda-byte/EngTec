@@ -31,7 +31,7 @@ export default function EtiquetasLocais() {
           <p className="mudo">{so ? `Só o local ${so}` : `${numero(lista.length)} locais ativos`}</p>
         </div>
         <div className="acoes">
-          <Link className="btn btn-sec" to={so ? `/locais/${so}` : '/locais'}>Voltar</Link>
+          <Link className="btn btn-sec" to="/cadastros?aba=locais">Voltar</Link>
           <button type="button" className="btn btn-pri" onClick={() => window.print()} disabled={!lista.length}>Imprimir</button>
         </div>
       </div>

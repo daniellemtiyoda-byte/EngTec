@@ -1,6 +1,6 @@
 import type {
   NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEmissao, SituacaoEntrega,
-  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoDestino, TipoEvento, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
+  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoDestino, TipoEvento, MotivoPerda, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
 } from '../types/models';
 
 /**
@@ -21,6 +21,7 @@ export const SITUACAO_DORMENTE: Rotulos<SituacaoDormente> = {
   reprovado: ['vermelho', 'Reprovado'],
   retirado: ['cinza', 'Retirado pelo fornecedor'],
   nao_localizado: ['vermelho', 'Não localizado'],
+  perdido: ['cinza', 'Perdido'],
 };
 
 export const SITUACAO_FARDO: Rotulos<SituacaoFardo> = {
@@ -145,5 +146,14 @@ export const MARCA_EVENTO: Record<TipoEvento, string> = {
   emitido: 'EMI', recebido: 'REC', inspecionado: 'INS', guardado: 'GUA', transferido: 'TRF', reservado: 'RES',
   baixado: 'SAÍ', segregado: 'SEG', nao_localizado: 'N/L', cancelado: 'CAN', ocorrencia: 'OCO', retirado: 'RET',
   criado: 'CRI', alterado: 'ALT', inativado: 'INA', reativado: 'REA', declarado: 'DEC', laudo: 'LAU', comunicado: 'COM',
-  lancado: 'DOF', informado: 'INF',
+  lancado: 'DOF', informado: 'INF', perdido: 'PER',
+};
+
+/** Motivo da perda (IN Ibama 21/2014, art. 42). */
+export const MOTIVO_PERDA: Rotulos<MotivoPerda> = {
+  extravio: ['cinza', 'Extravio'],
+  avaria: ['laranja', 'Avaria'],
+  incendio: ['vermelho', 'Incêndio'],
+  intemperie: ['laranja', 'Intempérie'],
+  outro: ['cinza', 'Outro'],
 };

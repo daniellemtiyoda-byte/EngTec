@@ -1,7 +1,7 @@
 import { dataSP } from '../../dominio/parametros';
 import type {
   Anexo, Ata, Contrato, DestinacaoFinal, Dof, Dormente, Emissao, EmpresaInspetora, EntidadeEvento, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
-  Movimentacao, NotaFiscal, ParcelaContrato, Parametros, Recebimento, Rme, SaldoDofInformado, Tamanho, TipoEvento, Tratamento, Usuario,
+  Movimentacao, NotaFiscal, ParcelaContrato, Parametros, Perda, Recebimento, Rme, SaldoDofInformado, Tamanho, TipoEvento, Tratamento, Usuario,
 } from '../../types/models';
 import { ApiError } from '../http';
 
@@ -52,12 +52,13 @@ export interface Estado {
   /** IBAMA: destinação final das RMEs entregues e saldos informados do DOF. */
   destinacoes: DestinacaoFinal[];
   saldosDof: SaldoDofInformado[];
+  perdas: Perda[];
   parametros: Parametros;
   /** Próximo número de cada sequência interna (ids técnicos, números de NF e DOF). */
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 9;
+export const VERSAO_ESTADO = 10;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }

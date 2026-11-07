@@ -13,7 +13,7 @@ import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { ApiError } from '../services/http';
-import { MARCA_EVENTO } from '../dominio/rotulos';
+import { MARCA_EVENTO, MOTIVO_PERDA } from '../dominio/rotulos';
 import type { FichaDormente as Ficha } from '../types/models';
 import { cm, data, dataHora, mesAno, metros, urlSegura } from '../utils/format';
 
@@ -86,6 +86,13 @@ export default function FichaDormente() {
         <p className="ficha-resumo">{rotuloClasse(f.item.classe)} · Item {tamanho.codigo} ({metros(tamanho.comprimentoCm / 100)}, {USO_TAMANHO[tamanho.uso][1]}) · {tratamento.preservativo} · usina {f.item.usinaTratamento} · {mesAno(f.item.dataTratamento)}</p>
       </header>
 
+      {d.situacao === 'perdido' && f.perda && (
+        <Aviso tom="critico">
+          Perdido ({MOTIVO_PERDA[f.perda.motivo][1].toLowerCase()}){f.perda.descricao ? `: ${f.perda.descricao}` : ''}. Registrado em {data(f.perda.quando)} por {f.perda.quem};{' '}
+          {f.perda.comunicadoEm ? `comunicado ao IBAMA em ${data(f.perda.comunicadoEm)}.` : 'ainda não comunicado ao IBAMA.'}
+        </Aviso>
+      )}
+
       {d.situacao === 'nao_localizado' && (
         <Aviso tom="critico">Não lido na inspeção do fardo: {f.fardo.conclusaoInspecao?.justificativa ?? 'sem justificativa registrada'}. Se ele foi encontrado, inspecione agora.</Aviso>
       )}
@@ -97,7 +104,7 @@ export default function FichaDormente() {
             <Par rotulo="Local">
               {operacao ? <Link to={`/locais/${f.local.codigo}`}>{f.local.codigo}</Link> : f.local.codigo} · <BadgeDe mapa={TIPO_LOCAL} valor={f.local.tipo} />
             </Par>
-          ) : <Par rotulo="Local">{d.situacao === 'emitido' ? 'Em trânsito (ainda não chegou)' : d.situacao === 'baixado' ? 'Saiu do estoque' : '—'}</Par>}
+          ) : <Par rotulo="Local">{d.situacao === 'emitido' ? 'Em trânsito (ainda não chegou)' : d.situacao === 'baixado' ? 'Saiu do estoque' : d.situacao === 'perdido' ? 'Perdido (fora do saldo)' : '—'}</Par>}
           {f.localDesde && <Par rotulo="Desde">{dataHora(f.localDesde)}</Par>}
           {f.rme && (
             <Par rotulo={d.situacao === 'baixado' ? 'Saída' : 'Reservado para'}>

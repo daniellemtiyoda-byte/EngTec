@@ -25,7 +25,7 @@ type AbaFardo = 'dormentes' | 'origem' | 'movimentacoes' | 'historico';
 
 /**
  * Página do fardo (seção 9.12 do plano), destino do QR do fardo: saldo físico e disponível, local, idade, os
- * dormentes, a origem e o histórico. Ações por situação: Inspecionar, Transferir (leitura do QR do local) e a etiqueta.
+ * dormentes, a origem e o histórico. Ações por situação: Inspecionar e Transferir (leitura do QR do local). Etiquetas só no Simulador do fornecedor.
  */
 export default function FardoDetalhe() {
   const { id: bruto = '' } = useParams();
@@ -58,7 +58,6 @@ export default function FardoDetalhe() {
   const acoes = (inspecionar || podeTransferir || f.emissaoId) ? <>
     {inspecionar && <Link className="btn btn-acao" to={`/inspecao/${f.id}`}>Inspecionar</Link>}
     {podeTransferir && <button type="button" className="btn btn-acao" onClick={() => setTransferir(true)}>Transferir</button>}
-    {f.emissaoId && <Link className="btn btn-sec" to={`/simulador/etiquetas/${f.emissaoId}?fardo=${f.id}`}>{pequena ? 'Etiqueta' : 'Imprimir etiqueta do fardo'}</Link>}
   </> : null;
 
   return (

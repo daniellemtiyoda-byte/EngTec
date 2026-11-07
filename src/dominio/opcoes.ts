@@ -1,6 +1,6 @@
 import type { Categoria, Classe } from '../types/models';
 import {
-  NIVEL_PRAZO, SITUACAO_CADASTRO, SITUACAO_MEDIDAS, SITUACAO_CONTRATO, SITUACAO_DORMENTE, SITUACAO_ENTREGA, SITUACAO_FARDO, SITUACAO_RME,
+  MOTIVO_PERDA, NIVEL_PRAZO, SITUACAO_CADASTRO, SITUACAO_MEDIDAS, SITUACAO_CONTRATO, SITUACAO_DORMENTE, SITUACAO_ENTREGA, SITUACAO_FARDO, SITUACAO_RME,
   SITUACAO_PARCELA, SITUACAO_SALDO, TIPO_DESTINO, TIPO_LOCAL, TIPO_MOVIMENTACAO, TIPO_OCORRENCIA, USO_TAMANHO, ordinalClasse, rotuloCategoria, type Rotulos,
 } from './rotulos';
 
@@ -37,3 +37,4 @@ export const SITUACAO_PARCELA_OPCOES = opcoesDe(SITUACAO_PARCELA);
 export const CLASSES: Classe[] = [1, 2];
 export const CLASSE_OPCOES: Opcao[] = CLASSES.map((c) => ({ valor: String(c), rotulo: `${ordinalClasse(c)} classe` }));
 export const SIM_NAO_OPCOES: Opcao<'true' | 'false'>[] = [{ valor: 'true', rotulo: 'Sim' }, { valor: 'false', rotulo: 'Não' }];
+export const MOTIVO_PERDA_OPCOES = opcoesDe(MOTIVO_PERDA);

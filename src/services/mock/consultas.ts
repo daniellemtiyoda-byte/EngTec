@@ -327,6 +327,7 @@ export function fichaDormente(e: Estado, id: Id, hoje: string): FichaDormente {
     empresaInspetora: entrega?.boletim ? e.empresasInspetoras.find((x) => x.id === entrega.boletim!.empresaInspetoraId) : undefined,
     garantiaAte: det.fardo.recebidoEm ? somarAnos(dataDe(det.fardo.recebidoEm), GARANTIA_ANOS) : undefined,
     eventos,
+    perda: e.perdas.find((p) => p.dormenteId === d.id),
   };
 }
 
