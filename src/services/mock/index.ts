@@ -1,6 +1,6 @@
 import { dataSP } from '../../dominio/parametros';
 import { PERFIS, type Permissao } from '../../dominio/permissoes';
-import type { ListQuery, Parametros, Usuario } from '../../types/models';
+import type { ListQuery, Parametros, SaldoItem, Usuario } from '../../types/models';
 import { autenticacao } from '../auth';
 import type { Servicos } from '../contracts';
 import { ApiError } from '../http';
@@ -225,12 +225,30 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
     },
 
     estoque: {
-      porItem: () => ler((e) => saldoPorItem(e)),
-      porFardo: (q) => ler((e) => paginar(fardosView(e).filter((f) => f.situacao === 'em_estoque' || f.situacao === 'aberto'), maisAntigos(q))),
+      porItem: (q = {}) => ler((e) => {
+        const nomes = (s: SaldoItem) => [e.especies.find((x) => x.id === s.especieId)?.nomePopular ?? '', e.tamanhos.find((x) => x.id === s.tamanhoId)?.codigo ?? ''];
+        const ordenado = [...saldoPorItem(e)].sort((a, b) => nomes(a).join(' ').localeCompare(nomes(b).join(' '), 'pt-BR'));
+        return paginar(ordenado, q, nomes);
+      }),
+      porFardo: (q = {}) => ler((e) => {
+        const { especieId, tamanhoId, acimaLimite, ...filters } = q.filters ?? {};
+        const itemDe = new Map(e.contratos.flatMap((c) => c.itens).map((i) => [i.id, i]));
+        const lista = fardosView(e).filter((f) => {
+          if (f.situacao !== 'em_estoque' && f.situacao !== 'aberto') return false;
+          const item = itemDe.get(f.itemContratoId);
+          return (!especieId || item?.especieId === especieId) && (!tamanhoId || item?.tamanhoId === tamanhoId) && (acimaLimite !== 'sim' || f.acimaLimiteDias);
+        });
+        return paginar(lista, maisAntigos({ ...q, filters }));
+      }),
     },
 
     movimentacoes: {
-      listar: (q) => ler((e) => paginar(e.movimentacoes, maisRecentes('quando')(q))),
+      listar: (q = {}) => ler((e) => {
+        const { periodo, localId, ...filters } = q.filters ?? {};
+        const desde = periodo ? agora().getTime() - Number(periodo) * 86_400_000 : 0;
+        const lista = e.movimentacoes.filter((m) => (!desde || Date.parse(m.quando) >= desde) && (!localId || m.deLocalId === localId || m.paraLocalId === localId));
+        return paginar(lista, maisRecentes('quando')({ ...q, filters }));
+      }),
     },
 
     rme: {

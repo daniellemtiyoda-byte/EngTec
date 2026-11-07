@@ -117,7 +117,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
         if (o.tipo === 'falta' && !aceitosLidos.includes(o.fardoId)) e[`ocorrencias.${n}`] = 'Na falta, escolha o fardo lido em que faltam dormentes (fardo não lido o sistema já registra).';
         else if (o.tipo === 'falta' && !(paraNumero(o.quantidade, true) >= 1)) e[`ocorrencias.${n}`] = 'Informe quantos dormentes faltam no fardo.';
         else if (!o.descricao.trim()) e[`ocorrencias.${n}`] = 'Descreva a ocorrência.';
-        else if (!o.fotos.length) e[`ocorrencias.${n}`] = 'Tire ao menos uma foto.';
+        else if (o.tipo !== 'falta' && !o.fotos.length) e[`ocorrencias.${n}`] = 'Tire ao menos uma foto.';
         else { const inv = o.fotos.map((f) => arquivoInvalido(f, EXTENSOES_FOTO)).find(Boolean); if (inv) e[`ocorrencias.${n}`] = inv; }
       });
     }
@@ -294,7 +294,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
                       <textarea id={`oc-desc-${o.chave}`} rows={2} maxLength={500} value={o.descricao} onChange={(e) => mudarOcorrencia(o.chave, 'descricao', e.target.value)} />
                     </div>
                     <div className="campo">
-                      <label htmlFor={`oc-foto-${o.chave}`}>Fotos<span className="obrig" aria-hidden="true"> *</span></label>
+                      <label htmlFor={`oc-foto-${o.chave}`}>Fotos{o.tipo === 'falta' ? ' (opcional)' : <span className="obrig" aria-hidden="true"> *</span>}</label>
                       <input id={`oc-foto-${o.chave}`} type="file" accept="image/*" capture="environment" multiple onChange={(e) => mudarOcorrencia(o.chave, 'fotos', [...o.fotos, ...Array.from(e.target.files ?? [])])} />
                       {o.fotos.length > 0 && <span className="ajuda">{o.fotos.length} foto(s): {o.fotos.map((f) => f.name).join(', ')}</span>}
                     </div>

@@ -9,11 +9,15 @@ import InspecaoFardo from './pages/InspecaoFardo';
 import Documentos from './pages/Documentos';
 import Contratos from './pages/Contratos';
 import EmConstrucao from './pages/EmConstrucao';
+import Estoque from './pages/Estoque';
 import EtiquetasImpressao from './pages/EtiquetasImpressao';
+import EtiquetasLocais from './pages/EtiquetasLocais';
 import FardoDetalhe from './pages/FardoDetalhe';
 import FichaDormente from './pages/FichaDormente';
 import FornecedorDetalhe from './pages/FornecedorDetalhe';
 import LocalDetalhe from './pages/LocalDetalhe';
+import Locais from './pages/Locais';
+import Movimentacoes from './pages/Movimentacoes';
 import RecebimentoDetalhe from './pages/RecebimentoDetalhe';
 import Recebimentos from './pages/Recebimentos';
 import Simulador from './pages/Simulador';
@@ -72,15 +76,16 @@ export const ROTAS: Rota[] = [
   { caminho: '/recebimentos/:id', tela: RecebimentoDetalhe, rotulo: 'Recebimento', icone: 'truck', grupo: 'Entrada', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/inspecao', tela: Inspecao, rotulo: 'Inspeção', icone: 'inspecao', grupo: 'Entrada', permissoes: OPERACAO },
   { caminho: '/inspecao/:fardo', tela: InspecaoFardo, rotulo: 'Inspeção do fardo', icone: 'inspecao', grupo: 'Entrada', permissoes: OPERACAO, foraDoMenu: true },
-  // Todos: o requisitante verá só a visão por item (Etapa 7).
-  { caminho: '/estoque', tela: emConstrucao('Estoque', 7), rotulo: 'Estoque', icone: 'box', grupo: 'Estoque' },
-  { caminho: '/locais', tela: emConstrucao('Locais', 7), rotulo: 'Locais', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO },
+  // Todos: o requisitante (sem operacao:consultar) vê só a visão por item.
+  { caminho: '/estoque', tela: Estoque, rotulo: 'Estoque', icone: 'box', grupo: 'Estoque' },
+  { caminho: '/locais', tela: Locais, rotulo: 'Locais', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO },
+  { caminho: '/locais/etiquetas', tela: EtiquetasLocais, rotulo: 'QR dos locais', icone: 'impressora', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true, semLayout: true },
   // Destinos dos QR: dormente (todos os usuários logados), fardo e local.
   { caminho: '/d/:id', tela: FichaDormente, rotulo: 'Dormente', icone: 'qr', grupo: 'Estoque', foraDoMenu: true },
   { caminho: '/f/:id', tela: FardoDetalhe, rotulo: 'Fardo', icone: 'box', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/fardos/:id', tela: RedirecionaFardo, rotulo: 'Fardo', icone: 'box', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/locais/:codigo', tela: LocalDetalhe, rotulo: 'Local', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },
-  { caminho: '/movimentacoes', tela: emConstrucao('Movimentações', 7), rotulo: 'Movimentações', icone: 'swap', grupo: 'Estoque', permissoes: OPERACAO },
+  { caminho: '/movimentacoes', tela: Movimentacoes, rotulo: 'Movimentações', icone: 'swap', grupo: 'Estoque', permissoes: OPERACAO },
   { caminho: '/saidas', tela: emConstrucao('Requisições (RME)', 8), rotulo: 'Requisições (RME)', icone: 'pedido', grupo: 'Saída' },
   { caminho: '/cadastros', tela: Cadastros, rotulo: 'Cadastros', icone: 'building', grupo: 'Cadastros', permissoes: OPERACAO },
   { caminho: '/fornecedores/:id', tela: FornecedorDetalhe, rotulo: 'Fornecedor', icone: 'fabrica', grupo: 'Cadastros', permissoes: OPERACAO, foraDoMenu: true },

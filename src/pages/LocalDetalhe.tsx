@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { BadgeDe } from '../components/Badge';
 import { CabecalhoObjeto, FatoChave } from '../components/Cabecalhos';
 import { Carregando, Erro, Vazio } from '../components/Estados';
@@ -14,7 +14,7 @@ import { dias, numero } from '../utils/format';
 
 /**
  * Página do local (seção 9.15 do plano), destino do QR do local (`LOC-<código>`, link `/#/locais/<código>`):
- * tipo, capacidade, ocupação e os fardos que estão nele. O mapa e a impressão dos QR dos locais entram na Etapa 7.
+ * tipo, capacidade, ocupação e os fardos que estão nele; imprimir o QR do local e ver os fardos no Estoque.
  */
 export default function LocalDetalhe() {
   const { codigo: bruto = '' } = useParams();
@@ -37,7 +37,11 @@ export default function LocalDetalhe() {
     <section className="painel">
       <CabecalhoObjeto
         tipo="Local" id={idLocal(l.codigo)} situacao={<BadgeDe mapa={SITUACAO_CADASTRO} valor={l.ativo ? 'ativo' : 'inativo'} />}
-        migalhas={[{ rotulo: 'Cadastros', para: '/cadastros?aba=locais' }, { rotulo: `Local ${l.codigo}` }]}
+        migalhas={[{ rotulo: 'Locais', para: '/locais' }, { rotulo: `Local ${l.codigo}` }]}
+        acoes={<>
+          {(l.tipo === 'armazenagem' || l.tipo === 'expedicao') && <Link className="btn btn-acao" to={`/estoque?visao=fardo&localId=${l.id}`}>Ver no estoque</Link>}
+          <Link className="btn btn-sec" to={`/locais/etiquetas?local=${encodeURIComponent(l.codigo)}`}>Imprimir QR do local</Link>
+        </>}
         fatos={<>
           <FatoChave rotulo="Código" valor={<span className="mono">{l.codigo}</span>} />
           <FatoChave rotulo="Tipo" valor={<BadgeDe mapa={TIPO_LOCAL} valor={l.tipo} />} />

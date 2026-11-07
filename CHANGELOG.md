@@ -6,6 +6,23 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Adicionado
+- 2026-11-07: **Etapa 7 da v2: Estoque, página do fardo, Locais e Movimentações.**
+  - **Por quê:** depois da inspeção o fardo vive no estoque: é preciso ver o saldo por item e por fardo, saber onde cada fardo está e movê-lo lendo o QR, com cada movimentação registrada.
+  - **Estoque** (`/estoque`): visões Por item (disponível, aguardando inspeção, reservado, não localizado, mínimo, máximo e falta/excesso; "Ver fardos") e Por fardo (abas Todos, Em estoque, Abertos; filtros espécie, tamanho, local e acima do limite de dias). O requisitante vê só a visão por item.
+  - **Transferir fardo** (tela de campo): ler o QR do fardo e, em seguida, o do local (o leitor do local abre sozinho), ou escolher o destino na lista; confirmação em tela cheia no celular. Em Estoque, Movimentações e na página do fardo.
+  - **Locais** (`/locais`): mapa em cartões por tipo com a ocupação ("Quase cheio", "Lotado") e lista; **Imprimir QR dos locais** (`/locais/etiquetas`) e **Gerenciar locais** (só para quem edita cadastros). Página do local com "Ver no estoque" e "Imprimir QR do local".
+  - **Movimentações** (`/movimentacoes`): filtros por tipo, período e local; pesquisa pelo fardo ou pela RME.
+  - Página do fardo com **Transferir**, "Recebido em" e, no celular, ações no rodapé fixo e as tabelas em cartões.
+  - Serviço: `estoque.porItem(q)` paginado e filtrado no serviço (`SaldoItem.id`), filtros `especieId`, `tamanhoId` e `acimaLimite` em `estoque.porFardo`, `periodo` e `localId` em `movimentacoes.listar`.
+  - Arquivos: `src/pages/{Estoque,Locais,EtiquetasLocais,Movimentacoes,LocalDetalhe,FardoDetalhe}.tsx`, `src/components/TransferirFardo.tsx`, `src/utils/qr.ts`, `src/rotas.tsx`, `src/services/contracts.ts`, `src/services/mock/{index,consultas}.ts`, `src/types/models.ts`, `src/styles.css`.
+
+### Alterado
+- 2026-11-07: **Falta sem foto obrigatória.** Na ocorrência de falta, a foto passa a ser opcional (não se fotografa o que não chegou); continua obrigatória na avaria e na sobra. Arquivos: `src/services/mock/recebimento.ts`, `src/components/RecebimentoAssistente.tsx`.
+- 2026-11-07: **Volume medido com estimados.** Quando o medido inclui dormentes lançados à mão sem medidas (contados pelo volume do tamanho), a tabela de volumes mostra "inclui N estimados" (`DivergenciaVolume.estimados`). Arquivos: `src/services/mock/consultas.ts`, `src/components/TabelaVolumes.tsx`.
+  - Testes: 79 (falta sem foto aceita e avaria sem foto recusada, estimados no volume medido, filtros do estoque por item e por fardo e das movimentações). Verificado no Chrome headless em 360 e 1280 px: estoque nas duas visões e com o requisitante, "Ver fardos", mapa e lista de locais (com e sem "Gerenciar locais"), QR dos locais, movimentações, transferência lendo o fardo e o local (com a recusa de local de inspeção) e a página do fardo no celular.
+  - Docs: `docs/PLANO-V2.md` (seção 6, 5.5, 9.7, 9.11, 9.12, 9.15, 9.16), `docs/ESPECIFICACAO-FUNCIONAL.md` (seção 5), `CLAUDE.md`.
+
+### Adicionado
 - 2026-11-06: **Etapa 6 da v2: Inspeção.**
   - **Por quê:** fechar a entrada: o fardo recebido só vira estoque depois da inspeção peça a peça, e o volume medido nela é o que vale na comparação com a DOF.
   - **Inspeção** (`/inspecao`): abas Fila (fardos aguardando e em inspeção, com o progresso) e Não localizados (com a justificativa da conclusão).

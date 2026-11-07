@@ -9,7 +9,7 @@ import { movimentarDormentes } from './estoque';
  * Recebimento de uma entrega "a caminho" (seção 9.7 do plano). Fardo esperado e lido entra; fardo do mesmo contrato,
  * emitido e sem entrega, também entra (a entrega pode não ter indicado os fardos, regra provisória); qualquer outro
  * vira ocorrência "fardo desconhecido". Esperado e não lido gera ocorrência de falta, continua em trânsito e pode
- * ser recebido depois. Ocorrência declarada exige descrição e foto. Divergência de volume por espécie acima da
+ * ser recebido depois. Ocorrência declarada exige descrição e foto (na falta, a foto é opcional: não se fotografa o que não chegou). Divergência de volume por espécie acima da
  * tolerância não bloqueia, mas exige justificativa; quando ela vem só dos fardos que faltaram (contando-os, a DOF
  * fecha), o sistema preenche a justificativa com a lista deles e a pessoa pode complementar. A divergência é sempre
  * a acumulada da entrega: ao receber depois os fardos que faltaram, ela é recalculada. Falta declarada num fardo lido
@@ -88,12 +88,12 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
       if (!Number.isInteger(o.quantidade) || (o.quantidade ?? 0) < 1 || (o.quantidade ?? 0) > total) { campos[`ocorrencias.${n}`] = `Informe quantos dormentes faltam no fardo (de 1 a ${total}).`; return; }
     }
     if (!o.descricao?.trim()) campos[`ocorrencias.${n}`] = 'Descreva a ocorrência.';
-    else if (!o.fotos?.length) campos[`ocorrencias.${n}`] = 'A ocorrência exige ao menos uma foto.';
+    else if (o.tipo !== 'falta' && !o.fotos?.length) campos[`ocorrencias.${n}`] = 'A ocorrência exige ao menos uma foto.';
   });
   for (const [fardoId, q] of faltaPorFardo) {
     if (q > dormentesDoFardo(e, fardoId).length) campos.ocorrencias = `A falta declarada no fardo ${fardoId} passa da quantidade de dormentes dele.`;
   }
-  if (Object.keys(campos).length) falha(422, 'Complete as ocorrências: descrição e foto são obrigatórias; na falta, o fardo e a quantidade.', campos);
+  if (Object.keys(campos).length) falha(422, 'Complete as ocorrências: descrição sempre; foto na avaria e na sobra; na falta, o fardo e a quantidade.', campos);
 
   // Justificativa: automática quando a divergência vem só dos fardos que faltaram (a pessoa pode complementar).
   const lidosAgora = new Set(aceitos.map((f) => f.id));

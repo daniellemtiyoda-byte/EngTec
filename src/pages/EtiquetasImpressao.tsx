@@ -1,17 +1,10 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Aviso, Carregando, Erro } from '../components/Estados';
 import { EtiquetaQr } from '../components/EtiquetaQr';
-import { env } from '../config/env';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import { metros, numero } from '../utils/format';
-
-/** Base do link nos QR e se ela serve para etiqueta de uso real (https e fora da máquina local). */
-function baseDosQr() {
-  const base = env.APP_URL || `${window.location.origin}${window.location.pathname}`.replace(/\/$/, '');
-  const real = /^https:\/\//.test(base) && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(base);
-  return { base, real, configurada: !!env.APP_URL };
-}
+import { baseDosQr } from '../utils/qr';
 
 /**
  * Folha de etiquetas de uma emissão do fornecedor (seção 9.6 do plano), sem o Layout: primeiro a etiqueta do fardo, depois as dos

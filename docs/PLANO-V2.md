@@ -255,7 +255,7 @@ interface Inspecao { id; dormenteId; fardoId; resultado: 'aprovado' | 'reprovado
 
 **Entrega e fardos esperados.** No cadastro de NF e DOF, o usuário pode indicar quais fardos vêm na entrega (fardos já emitidos do contrato, em trânsito e sem entrega). Se não indicar, a entrega começa sem fardos esperados e, no recebimento, todo fardo lido que seja do mesmo contrato, emitido e sem entrega passa a fazer parte dela; fardo de outro contrato, de outra entrega ou com ID inexistente vira ocorrência "fardo desconhecido". A entrega fica `recebida_parcial` enquanto houver fardo esperado dela ainda em trânsito (falta no recebimento). Regra **provisória** (o fornecedor real ainda não informa os fardos da NF ao sistema). Fardos e dormentes sempre existem antes da leitura: são emitidos pelo fornecedor (no protótipo, pelo Simulador).
 
-**Volume nominal e medido.** O volume da DOF é digitado do documento, nunca copiado da NF. A comparação por espécie usa o **volume nominal** (dormentes recebidos × volume do tamanho, descontada a falta de dormentes declarada no recebimento) até a inspeção; quando todos os fardos recebidos da espécie têm a inspeção concluída, passa a usar o **volume medido** (soma das medidas reais dos aprovados e reprovados; dormente sem medidas conta pelo volume do tamanho). A divergência oficial é a do medido; antes dela, a tela marca a diferença como provisória.
+**Volume nominal e medido.** O volume da DOF é digitado do documento, nunca copiado da NF. A comparação por espécie usa o **volume nominal** (dormentes recebidos × volume do tamanho, descontada a falta de dormentes declarada no recebimento) até a inspeção; quando todos os fardos recebidos da espécie têm a inspeção concluída, passa a usar o **volume medido** (soma das medidas reais dos aprovados e reprovados; dormente lançado à mão sem medidas conta pelo volume do tamanho e a tela mostra quantos, ex. "inclui 3 estimados"). A divergência oficial é a do medido; antes dela, a tela marca a diferença como provisória.
 
 **Falta de dormentes.** Ocorrência de falta declarada num fardo lido informa a quantidade de dormentes que faltam; ela sai do recebido do item e do volume nominal, e entra na justificativa automática quando explica a divergência. Na conclusão da inspeção, os não lidos que cabem nessa falta já têm justificativa (a do sistema, se a pessoa não escrever outra).
 
@@ -298,8 +298,8 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `inspecao` | `fila()`, `naoLocalizados()`, `obterFardo(id)`, `registrar(dormenteId, resultado)` (aceita dormente `nao_localizado` encontrado depois), `simularFardo(id)`, `concluir(fardoId, localId, justificativa?)` (justificativa do sistema quando os não lidos cabem na falta declarada) |
 | `fardos` | `listar`, `obter(id)`, `transferir(id, localId)` |
 | `dormentes` | `listar`, `obter(id)` (devolve a ficha completa já montada, seção 9.13) |
-| `estoque` | `porItem()`, `porFardo(q)` |
-| `movimentacoes` | `listar` |
+| `estoque` | `porItem(q)` (paginado; filtros espécie, tamanho e situação; busca pelos nomes), `porFardo(q)` (filtros espécie, tamanho, local, situação e `acimaLimite`) |
+| `movimentacoes` | `listar` (filtros tipo, `periodo` em dias e `localId` de ou para) |
 | `rme` | `listar`, `obter`, `abrir`, `iniciarSeparacao(numero)`, `sugerirSeparacao(numero)`, `separar`, `entregar`, `cancelar` |
 | `parametros` | `obter`, `atualizar`, `reiniciarDemonstracao()` (só no mock) |
 
@@ -458,7 +458,7 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 - **Assistente de recebimento** (`RecebimentoAssistente`):
   1. **Escolher a entrega**: lista das entregas "A caminho" (NF, fornecedor, contrato, fardos esperados, prazo da DOF), com busca pela NF. Exceção: **Cadastrar NF e DOF agora**, para material que chegou sem cadastro prévio; abre os mesmos passos do cadastro de NF e DOF (9.9) e volta com a entrega criada (origem `recebimento`).
   2. **Leitura dos fardos**: lista dos fardos esperados com caixa de checagem; botão **Ler QR** em modo contínuo marca cada fardo lido; fardo lido do mesmo contrato, emitido e sem entrega entra na entrega; fardo de outro contrato, de outra entrega ou desconhecido vira ocorrência "fardo desconhecido"; também dá para marcar à mão. Fardo esperado e não lido gera ocorrência de **falta** automática, continua `em_transito` e pode ser recebido depois (a entrega fica `recebida_parcial` e continua em "A caminho" com os fardos que faltam).
-  3. **Conferência**: conforme ou com ocorrência (avaria, falta, sobra); ocorrência exige descrição e foto. Falta declarada exige o fardo lido e a **quantidade de dormentes faltando**, que sai do recebido e do volume nominal.
+  3. **Conferência**: conforme ou com ocorrência (avaria, falta, sobra); ocorrência exige descrição, e foto na avaria e na sobra (na falta a foto é opcional: não se fotografa o que não chegou). Falta declarada exige o fardo lido e a **quantidade de dormentes faltando**, que sai do recebido e do volume nominal.
   4. **Local de espera**: local do tipo inspeção (sugerido o com mais espaço).
   5. **Revisar e confirmar** (prévia do serviço, `recebimentos.previa`): resumo, divergência de volume por espécie com DOF, volume nominal e volume medido (este só depois da inspeção; até lá a diferença é marcada como provisória; acima de 10% mostra aviso crítico e pede justificativa, não bloqueia). Se a divergência vem só do que faltou (fardos não lidos e dormentes faltando; contando-os, a DOF fecha), o campo já vem preenchido com a lista deles (`justificativaPorFalta` em `dominio/parametros.ts`) e a pessoa pode complementar. A divergência é sempre a acumulada da entrega: quando os fardos que faltaram são recebidos, ela é recalculada (`entrega.divergenciaVolume`).
 - Resultado: fardos e dormentes lidos passam a `aguardando_inspecao`; os não lidos continuam `em_transito`; abre a página do recebimento.
@@ -498,11 +498,13 @@ Primeiro item do grupo Entrada: é onde a entrega nasce, antes da chegada do mat
 - Por fardo: Fardo (link) · Item · Contrato · Local · Saldo (físico) · Disponível · Idade (dias, com alerta acima do limite) · Situação. Ordenação padrão: mais antigos primeiro.
 - Filtros: espécie, tamanho, local, situação, contrato, "acima do limite de dias".
 - Ação principal: **Transferir fardo** (ler QR do fardo → ler QR ou escolher local).
+- Por item: "Ver fardos" na linha abre a visão por fardo filtrada pelo item. Por fardo: abas de situação Todos · Em estoque · Abertos; filtros espécie, tamanho, local e idade; o contrato pela pesquisa (o ID do fardo começa por ele). O requisitante vê só a visão por item.
+- **Transferir fardo** (`TransferirFardo`, tela de campo): ler o QR do fardo; com fardo em estoque ou aberto, o leitor do QR do local abre sozinho; escolher o local na lista ou digitar o ID ficam como alternativa; confirmação em tela cheia no celular ("A-03 → A-05"). Também na página do fardo e em Movimentações.
 
 ### 9.12 Página do fardo (`/f/:id`) · padrão Objeto
 - Fatos-chave: Saldo/inicial (físico: em estoque + reservados) · Disponível · Local · Idade · Contrato · Item · Recebido em.
 - Abas: **Dormentes** (ID, situação, categoria, comprimento medido) · **Origem** (contrato, fornecedor, NF, DOF, recebimento, inspeção) · **Movimentações** · **Histórico**.
-- Ações por situação: aguardando inspeção → **Inspecionar**; em estoque/aberto → **Transferir**, **Imprimir etiqueta do fardo**.
+- Ações por situação: aguardando inspeção → **Inspecionar**; em estoque/aberto → **Transferir**, **Imprimir etiqueta do fardo**. No celular, as ações ficam no rodapé fixo e as tabelas das abas viram cartões.
 
 ### 9.13 Ficha do dormente (`/d/:id`) · padrão Ficha rápida
 - Topo: ID grande em mono, badge de situação, espécie (nome científico + popular), classe, tamanho, tratamento.
@@ -522,11 +524,12 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 - Visão **Lista**: Código · Tipo · Descrição · Fardos · Ocupação · Situação.
 - Clique no local → **Página do local** (padrão Objeto): fatos-chave (tipo, capacidade, ocupação, fardos), lista dos fardos no local (link para cada fardo e para o Estoque por fardo filtrado pelo local) e **Imprimir QR do local**. É o destino do QR do local.
 - QR do local: ID `LOC-<código>` (ex. `LOC-A03`), link `<APP_URL>/#/locais/A03`; validação por `RE_LOCAL` em `identificacao.ts`.
-- Ação: **Imprimir QR dos locais** (etiqueta de endereço, para guarda por leitura).
+- Ação: **Imprimir QR dos locais** (etiqueta de endereço, para guarda por leitura; `/locais/etiquetas`, sem o Layout, `?local=` imprime um só) e **Gerenciar locais** (leva a Cadastros › Locais; só para quem tem `cadastros:editar`).
+- Ocupação em texto e cor: "Quase cheio" a partir de 85% e "Lotado" a 100%. Página do local: **Ver no estoque** (visão por fardo filtrada pelo local) e **Imprimir QR do local**.
 
 ### 9.16 Movimentações (`/movimentacoes`) · padrão Lista
 - Colunas: Quando · Tipo · Fardo · Dormentes (quantidade) · De · Para · Quem · Referência (RME, recebimento).
-- Filtros: tipo, período, local, fardo. Ação principal: **Transferir fardo**.
+- Filtros: tipo, período (7, 30 ou 90 dias), local (de ou para); o fardo e a RME pela pesquisa. Ação principal: **Transferir fardo**.
 
 ### 9.17 Requisições (`/saidas`) e Página da RME (`/saidas/:numero`)
 - Lista: abas Abertas · Em separação · Prontas · Entregues · Canceladas. Colunas: RME · Solicitante · Destino · Itens · Necessidade em · Situação.
@@ -689,7 +692,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Fila (com não localizados), tela de inspeção do fardo, simulação, registro manual, conclusão com guarda, segregação e justificativa.
 - Pronto quando: fardo inspecionado fica em estoque no local escolhido, reprovados segregados, não lidos ficam não localizados, ficha do dormente mostra a inspeção.
 
-### Etapa 7 · Estoque, fardo, locais e movimentações
+### Etapa 7 · Estoque, fardo, locais e movimentações (concluída)
 - Estoque (por item e por fardo), página do fardo, Locais (mapa, lista e página do local, QR dos locais), Movimentações, transferência por leitura.
 - Pronto quando: transferir um fardo lendo o QR do fardo e do local atualiza estoque, local, movimentações e a ficha dos dormentes.
 

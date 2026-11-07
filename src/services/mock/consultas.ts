@@ -118,6 +118,7 @@ export function divergenciaVolume(e: Estado, dof: DofReg, fardos: FardoReg[], fa
   const nominal = new Map<Id, number>();
   const medido = new Map<Id, number>();
   const tudoInspecionado = new Map<Id, boolean>();
+  const estimados = new Map<Id, number>();
   for (const f of fardos) {
     const d = itemDescrito(e, f.itemContratoId);
     const especieId = d.especie.id;
@@ -126,6 +127,7 @@ export function divergenciaVolume(e: Estado, dof: DofReg, fardos: FardoReg[], fa
     tudoInspecionado.set(especieId, (tudoInspecionado.get(especieId) ?? true) && !!f.conclusaoInspecao);
     const inspecionados = dormentesDoFardo(e, f.id).filter((x) => ['em_estoque', 'reservado', 'baixado', 'reprovado'].includes(x.situacao));
     medido.set(especieId, (medido.get(especieId) ?? 0) + inspecionados.reduce((t, x) => t + volumeMedido(e, x), 0));
+    estimados.set(especieId, (estimados.get(especieId) ?? 0) + inspecionados.filter((x) => !x.medidas).length);
   }
   const especies = new Set([...dof.volumes.map((v) => v.especieId), ...nominal.keys()]);
   return [...especies].map((especieId) => {
@@ -136,6 +138,7 @@ export function divergenciaVolume(e: Estado, dof: DofReg, fardos: FardoReg[], fa
     const percentual = diferencaVolumePct(documentalM3, medidoM3 ?? nominalM3);
     return {
       especieId, documentalM3, nominalM3, medidoM3, base,
+      estimados: medidoM3 !== undefined && estimados.get(especieId) ? estimados.get(especieId) : undefined,
       percentual: Number.isFinite(percentual) ? Math.round(percentual * 10) / 10 : percentual, acimaTolerancia: foraDaTolerancia(percentual),
     };
   });
@@ -169,7 +172,7 @@ export function saldoPorItem(e: Estado): SaldoItem[] {
     let s = mapa.get(k);
     if (!s) {
       const nivel = e.parametros.niveis.find((n) => n.especieId === especieId && n.tamanhoId === tamanhoId);
-      s = { especieId, tamanhoId, emEstoque: 0, aguardandoInspecao: 0, reservado: 0, naoLocalizado: 0, minimo: nivel?.minimo ?? 0, maximo: nivel?.maximo ?? 0, situacao: 'ok' };
+      s = { id: k, especieId, tamanhoId, emEstoque: 0, aguardandoInspecao: 0, reservado: 0, naoLocalizado: 0, minimo: nivel?.minimo ?? 0, maximo: nivel?.maximo ?? 0, situacao: 'ok' };
       mapa.set(k, s);
     }
     return s;

@@ -336,7 +336,8 @@ describe('falta de dormentes e volume nominal × medido', () => {
     const foto = new File(['x'], 'falta.jpg', { type: 'image/jpeg' });
     const c = await contrato(s, 'AR00224-01');
     const recebidoAntes = c.itens[0].recebidos;
-    // Falta sem quantidade ou maior que o fardo é recusada.
+    // Avaria sem foto é recusada; falta sem quantidade ou maior que o fardo também.
+    await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: [f6, f7, f8], ocorrencias: [{ tipo: 'avaria', descricao: 'Amarração rompida', fardoId: f6, fotos: [] }], localEsperaId: loc.id }), 422, 'ocorrencias.0');
     await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: [f6, f7, f8], ocorrencias: [{ tipo: 'falta', descricao: 'Faltam dormentes', fardoId: f6, fotos: [foto] }], localEsperaId: loc.id }), 422, 'ocorrencias.0');
     await falhaCom(s.recebimentos.receber(en.id, { fardosLidos: [f6, f7, f8], ocorrencias: [{ tipo: 'falta', descricao: 'Faltam dormentes', fardoId: f6, quantidade: 99, fotos: [foto] }], localEsperaId: loc.id }), 422, 'ocorrencias.0');
     const faltas = [{ fardoId: f6, quantidade: 2 }];
@@ -347,7 +348,8 @@ describe('falta de dormentes e volume nominal × medido', () => {
     expect(jat.medidoM3).toBeUndefined();
     const rec = await s.recebimentos.receber(en.id, {
       fardosLidos: [f6, f7, f8], localEsperaId: loc.id,
-      ocorrencias: [{ tipo: 'falta', descricao: 'Faltam 2 dormentes no fardo', fardoId: f6, quantidade: 2, fotos: [foto] }],
+      // Falta sem foto: não se fotografa o que não chegou.
+      ocorrencias: [{ tipo: 'falta', descricao: 'Faltam 2 dormentes no fardo', fardoId: f6, quantidade: 2, fotos: [] }],
     });
     expect(rec.ocorrencias[0].quantidade).toBe(2);
     expect(rec.divergenciaVolume).toEqual(previa.divergenciaVolume);
@@ -357,7 +359,8 @@ describe('falta de dormentes e volume nominal × medido', () => {
     expect(insp.faltaDeclarada).toBe(2);
     expect(insp.justificativaSugerida).toContain('2 dormentes');
     const lidos = insp.dormentes.slice(0, insp.dormentes.length - 2);
-    for (const d of lidos) await s.inspecao.registrar(d.id, { origem: 'manual', resultado: 'aprovado', categoria: 1, medidas: { comprimentoCm: 280, larguraCm: 24, alturaCm: 17 } }, f6);
+    // O primeiro é lançado à mão sem medidas: entra no volume medido como estimado.
+    for (const [n, d] of lidos.entries()) await s.inspecao.registrar(d.id, { origem: 'manual', resultado: 'aprovado', categoria: 1, medidas: n === 0 ? undefined : { comprimentoCm: 280, larguraCm: 24, alturaCm: 17 } }, f6);
     const ins = await localPorCodigo(s, 'A-05');
     // Os não lidos cabem na falta declarada: conclui sem escrever a justificativa (vale a do sistema).
     const concluido = await s.inspecao.concluir(f6, { localId: ins.id });
@@ -369,6 +372,7 @@ describe('falta de dormentes e volume nominal × medido', () => {
     const jat2 = depois.divergenciaVolume!.find((d) => d.especieId === jat.especieId)!;
     expect(jat2.base).toBe('medido');
     expect(jat2.medidoM3).toBeGreaterThan(0);
+    expect(jat2.estimados).toBe(1);
     expect(invariantes()).toEqual([]);
   });
 });
@@ -439,6 +443,14 @@ describe('estoque, cadastros e contratos', () => {
     expect(f.localId).toBe(a05.id);
     expect((await localPorCodigo(s, 'LOC-A-05')).ocupacao).toBe(ocupacaoAntes + f.saldo);
     const mov = (await s.movimentacoes.listar({ filters: { tipo: 'transferencia' } })).items[0];
+    // Filtros do estoque por fardo e das movimentações.
+    expect((await s.estoque.porFardo({ filters: { localId: a05.id }, pageSize: 50 })).items.map((x) => x.id)).toContain('AR00224-01-F003');
+    expect((await s.movimentacoes.listar({ filters: { localId: a05.id, periodo: '7' } })).items[0].id).toBe(mov.id);
+    // Saldo por item no serviço: filtro por situação e busca pelo nome (história: Jatobá T200 em falta).
+    expect((await s.estoque.porItem({ filters: { situacao: 'falta' } })).items.map((x) => x.id)).toHaveLength(1);
+    expect((await s.estoque.porItem({ search: 'jatobá' })).items[0].situacao).toBe('falta');
+    const acima = (await s.estoque.porFardo({ filters: { acimaLimite: 'sim' }, pageSize: 50 })).items;
+    expect(acima.map((x) => x.id)).toEqual(['AR00224-01-F001']);
     expect(mov.fardoId).toBe('AR00224-01-F003');
     const umDormente = (await s.fardos.obter('AR00224-01-F003')).dormentes.find((d) => d.situacao === 'em_estoque')!;
     expect((await s.dormentes.obter(umDormente.id)).local?.codigo).toBe('A-05');

@@ -618,13 +618,38 @@ span.codigo { font-weight: 600; color: var(--texto); }
   .lista-dormentes-inspecao .id-codigo, .lista-dormentes-inspecao .mono { font-size: var(--fs-16); }
 }
 
-/* Volume por espécie: no celular, cada espécie vira um cartão (sem tabela larga) */
+/* Tabelas curtas que viram cartões no celular (seção 11.1): a primeira coluna é o título, as demais levam o rótulo
+   em `data-rotulo`. Usada no volume por espécie e nas abas da página do fardo. */
 @media (max-width: 760px) {
-  .tabela-volumes thead { display: none; }
-  .tabela-volumes, .tabela-volumes tbody { display: block; }
-  .tabela-volumes tr { display: grid; grid-template-columns: 1fr 1fr; gap: var(--esp-2) var(--esp-3); padding: var(--esp-3); border-bottom: 1px solid var(--borda); }
-  .tabela-volumes td { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0; border: 0; text-align: left; }
-  .tabela-volumes td::before { content: attr(data-rotulo); font-size: var(--fs-12); color: var(--texto-2); }
-  .tabela-volumes td:first-child { grid-column: 1 / -1; font-weight: 700; }
-  .tabela-volumes td:first-child::before { content: none; }
+  .tabela-cartoes thead { display: none; }
+  .tabela-cartoes, .tabela-cartoes tbody { display: block; }
+  .tabela-cartoes tr { display: grid; grid-template-columns: 1fr 1fr; gap: var(--esp-2) var(--esp-3); padding: var(--esp-3); border-bottom: 1px solid var(--borda); }
+  .tabela-cartoes td { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0; border: 0; text-align: left; }
+  .tabela-cartoes td::before { content: attr(data-rotulo); font-size: var(--fs-12); color: var(--texto-2); }
+  .tabela-cartoes td:first-child { grid-column: 1 / -1; font-weight: 700; }
+  .tabela-cartoes td:first-child::before { content: none; }
+}
+
+/* Transferir fardo (Etapa 7): fardo lido e confirmação em tela cheia no celular */
+.transferir-fardo { display: flex; flex-direction: column; gap: var(--esp-1); padding: var(--esp-3) var(--esp-4); border: 1px solid var(--borda); border-radius: var(--raio); background: var(--fundo); }
+.transferir-id { font-size: var(--fs-20); font-weight: 700; word-break: break-all; margin: 0; }
+.transferir-confirmacao { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--esp-2); padding: var(--esp-5) 0; }
+.transferir-confirmacao p { margin: 0; }
+.transferir-confirmacao .transferir-id { font-size: var(--fs-24); }
+.transferir-rota { display: flex; align-items: center; gap: var(--esp-3); font-size: var(--fs-24); font-weight: 700; }
+/* Mapa dos locais: cartões por tipo, com a ocupação em texto e a cor de alerta */
+.mapa-locais { display: flex; flex-direction: column; gap: var(--esp-5); margin-top: var(--esp-3); }
+.mapa-locais-grade { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--esp-3); }
+.cartao-local { display: flex; flex-direction: column; gap: var(--esp-2); padding: var(--esp-3) var(--esp-4); border: 1px solid var(--borda); border-left: 4px solid var(--neutro); border-radius: var(--raio); background: var(--superficie); color: var(--texto); text-decoration: none; min-height: var(--alvo-toque); }
+.cartao-local:hover { box-shadow: var(--sombra-1); }
+.cartao-local-armazenagem { border-left-color: var(--cor-primaria); }
+.cartao-local-expedicao { border-left-color: var(--ok); }
+.cartao-local-inspecao { border-left-color: var(--info); }
+.cartao-local-segregacao { border-left-color: var(--critico); }
+.cartao-local.ocupacao-laranja { background: var(--atencao-fundo); }
+.cartao-local.ocupacao-vermelho { background: var(--critico-fundo); }
+.cartao-local-topo { display: flex; justify-content: space-between; align-items: center; gap: var(--esp-2); }
+.cartao-local-codigo { font-size: var(--fs-20); font-weight: 700; }
+@media (max-width: 760px) {
+  .mapa-locais-grade { grid-template-columns: 1fr 1fr; }
 }

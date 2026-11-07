@@ -303,6 +303,8 @@ export interface DivergenciaVolume {
   documentalM3: number;
   nominalM3: number;
   medidoM3?: number;
+  /** Dormentes do volume medido sem medidas (lançados à mão), contados pelo volume do tamanho. */
+  estimados?: number;
   base: 'nominal' | 'medido';
   percentual: number;
   acimaTolerancia: boolean;
@@ -351,6 +353,8 @@ export interface Inspecao {
 export type SituacaoSaldo = 'falta' | 'ok' | 'excesso';
 
 export interface SaldoItem {
+  /** Calculado: `<especieId>|<tamanhoId>` (uma linha por espécie e tamanho). */
+  id: string;
   especieId: Id;
   tamanhoId: Id;
   /** Disponível (em estoque, sem reserva). */

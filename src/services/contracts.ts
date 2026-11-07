@@ -151,11 +151,16 @@ export interface Servicos {
   };
 
   estoque: {
-    porItem(): Promise<SaldoItem[]>;
-    /** Fardos com saldo (em estoque e abertos). */
+    /** Saldo por espécie e tamanho; filtros `especieId`, `tamanhoId` e `situacao`; a busca olha os nomes. */
+    porItem(q?: ListQuery): Promise<Paginado<SaldoItem>>;
+    /**
+     * Fardos com saldo (em estoque e abertos). Filtros além dos campos do fardo: `especieId` e `tamanhoId` (pelo item
+     * do contrato) e `acimaLimite` ("sim": idade acima do limite de dias).
+     */
     porFardo(q?: ListQuery): Promise<Paginado<Fardo>>;
   };
 
+  /** Filtros além dos campos: `periodo` (últimos 7, 30 ou 90 dias) e `localId` (de ou para o local). */
   movimentacoes: ServicoLista<Movimentacao>;
 
   rme: ServicoLista<Rme> & {
