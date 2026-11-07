@@ -143,6 +143,7 @@ export interface Servicos {
   /** `filters.noLocal`: fardos que estão no local (sem os baixados). */
   fardos: ServicoLista<Fardo> & {
     obter(id: Id): Promise<FardoDetalhe>;
+    /** Expedição só recebe o fardo com todos os dormentes reservados para uma RME pronta. */
     transferir(id: Id, localId: Id): Promise<Fardo>;
   };
 
@@ -154,8 +155,8 @@ export interface Servicos {
     /** Saldo por espécie e tamanho; filtros `especieId`, `tamanhoId` e `situacao`; a busca olha os nomes. */
     porItem(q?: ListQuery): Promise<Paginado<SaldoItem>>;
     /**
-     * Fardos com saldo (em estoque e abertos). Filtros além dos campos do fardo: `especieId` e `tamanhoId` (pelo item
-     * do contrato) e `acimaLimite` ("sim": idade acima do limite de dias).
+     * Fardos em estoque (com saldo; os baixados saem). `aberto` ("true"/"false") separa completos e abertos. Filtros
+     * além dos campos do fardo: `especieId` e `tamanhoId` (pelo item do contrato) e `acimaLimite` ("sim").
      */
     porFardo(q?: ListQuery): Promise<Paginado<Fardo>>;
   };
@@ -172,7 +173,7 @@ export interface Servicos {
     separar(numero: string, separacao: DadosSeparacao[]): Promise<Rme>;
     /** Baixa os dormentes reservados (a baixa só acontece aqui). */
     entregar(numero: string): Promise<Rme>;
-    /** Antes da entrega; libera as reservas. */
+    /** Antes da entrega; libera as reservas e devolve à origem o fardo que estava na expedição. */
     cancelar(numero: string, motivo: string): Promise<Rme>;
   };
 

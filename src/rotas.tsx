@@ -19,6 +19,8 @@ import LocalDetalhe from './pages/LocalDetalhe';
 import Locais from './pages/Locais';
 import Movimentacoes from './pages/Movimentacoes';
 import RecebimentoDetalhe from './pages/RecebimentoDetalhe';
+import RmeDetalhe from './pages/RmeDetalhe';
+import Rmes from './pages/Rmes';
 import Recebimentos from './pages/Recebimentos';
 import Simulador from './pages/Simulador';
 import Vitrine from './pages/Vitrine';
@@ -86,7 +88,9 @@ export const ROTAS: Rota[] = [
   { caminho: '/fardos/:id', tela: RedirecionaFardo, rotulo: 'Fardo', icone: 'box', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/locais/:codigo', tela: LocalDetalhe, rotulo: 'Local', icone: 'local', grupo: 'Estoque', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/movimentacoes', tela: Movimentacoes, rotulo: 'Movimentações', icone: 'swap', grupo: 'Estoque', permissoes: OPERACAO },
-  { caminho: '/saidas', tela: emConstrucao('Requisições (RME)', 8), rotulo: 'Requisições (RME)', icone: 'pedido', grupo: 'Saída' },
+  // Todos: o requisitante abre e acompanha as RMEs; o almoxarife separa e entrega.
+  { caminho: '/saidas', tela: Rmes, rotulo: 'Requisições (RME)', icone: 'pedido', grupo: 'Saída' },
+  { caminho: '/saidas/:numero', tela: RmeDetalhe, rotulo: 'RME', icone: 'pedido', grupo: 'Saída', foraDoMenu: true },
   { caminho: '/cadastros', tela: Cadastros, rotulo: 'Cadastros', icone: 'building', grupo: 'Cadastros', permissoes: OPERACAO },
   { caminho: '/fornecedores/:id', tela: FornecedorDetalhe, rotulo: 'Fornecedor', icone: 'fabrica', grupo: 'Cadastros', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/usuarios', tela: emConstrucao('Usuários', 11), rotulo: 'Usuários', icone: 'users', grupo: 'Cadastros', permissoes: ['admin'] },

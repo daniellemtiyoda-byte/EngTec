@@ -14,7 +14,6 @@ export function opcoesDe<K extends string>(mapa: Rotulos<K>, apenas?: K[]): Opca
 export const SITUACAO_DORMENTE_OPCOES = opcoesDe(SITUACAO_DORMENTE);
 export const SITUACAO_FARDO_OPCOES = opcoesDe(SITUACAO_FARDO);
 /** Fardos que contam no estoque (Estoque por fardo). */
-export const SITUACAO_FARDO_ESTOQUE_OPCOES = opcoesDe(SITUACAO_FARDO, ['em_estoque', 'aberto']);
 export const SITUACAO_ENTREGA_OPCOES = opcoesDe(SITUACAO_ENTREGA);
 export const SITUACAO_CONTRATO_OPCOES = opcoesDe(SITUACAO_CONTRATO);
 export const SITUACAO_RME_OPCOES = opcoesDe(SITUACAO_RME);

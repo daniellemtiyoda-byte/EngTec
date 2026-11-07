@@ -93,7 +93,7 @@ describe('história de demonstração', () => {
   it('tem as RMEs em cada situação, com fardo aberto pela saída', () => {
     const conta = (s: string) => e.rmes.filter((r) => r.situacao === s).length;
     expect([conta('aberta'), conta('em_separacao'), conta('pronta'), conta('entregue'), conta('cancelada')]).toEqual([1, 1, 1, 3, 1]);
-    expect(e.fardos.map((f) => fardoView(e, f, HOJE)).some((f) => f.situacao === 'aberto')).toBe(true);
+    expect(e.fardos.map((f) => fardoView(e, f, HOJE)).some((f) => f.situacao === 'em_estoque' && f.aberto)).toBe(true);
     expect(e.rmes.map((r) => r.numero)).toEqual(['RME-2026-0001', 'RME-2026-0002', 'RME-2026-0003', 'RME-2026-0004', 'RME-2026-0005', 'RME-2026-0006', 'RME-2026-0007']);
   });
 });

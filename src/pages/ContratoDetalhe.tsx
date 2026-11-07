@@ -1,3 +1,4 @@
+import { SituacaoFardo } from '../components/SituacaoFardo';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AbasSecao, useAbaNoEndereco, type Aba } from '../components/Abas';
@@ -58,7 +59,7 @@ export default function ContratoDetalhe() {
   const colunasFardo: Coluna<Fardo>[] = [
     { chave: 'id', titulo: 'Fardo', ordenavel: true, render: (f) => <IdCodigo id={f.id} /> },
     { chave: 'itemContratoId', titulo: 'Item', render: (f) => { const i = itemDe.get(f.itemContratoId); return i ? cad.descreverItem(i) : '—'; } },
-    { chave: 'situacao', titulo: 'Situação', render: (f) => <BadgeDe mapa={SITUACAO_FARDO} valor={f.situacao} /> },
+    { chave: 'situacao', titulo: 'Situação', render: (f) => <SituacaoFardo fardo={f} /> },
     { chave: 'saldo', titulo: 'Saldo', alinhar: 'right', ordenavel: true, render: (f) => `${numero(f.saldo)}/${numero(f.quantidadeInicial)}` },
     { chave: 'localId', titulo: 'Local', render: (f) => cad.codigoLocal(f.localId) },
     { chave: 'recebidoEm', titulo: 'Recebido em', ordenavel: true, render: (f) => data(f.recebidoEm) },

@@ -71,6 +71,8 @@ export default function FichaDormente() {
 
   const f: Ficha = r.dados;
   const d = f.dormente;
+  // Data da entrega: o evento de baixa do dormente (a RME entregue que o levou).
+  const entregueEm = [...d.historico].reverse().find((h) => h.tipo === 'baixado')?.quando;
   const { especie, tamanho, tratamento } = f.item;
   const relatorio = urlSegura(f.inspecao?.relatorioUrl);
   const eventos: EventoLinhaTempo[] = [...d.historico].reverse().map((ev) => ({
@@ -102,7 +104,12 @@ export default function FichaDormente() {
             </Par>
           ) : <Par rotulo="Local">{d.situacao === 'emitido' ? 'Em trânsito (ainda não chegou)' : d.situacao === 'baixado' ? 'Saiu do estoque' : '—'}</Par>}
           {f.localDesde && <Par rotulo="Desde">{dataHora(f.localDesde)}</Par>}
-          {f.rme && <Par rotulo={d.situacao === 'baixado' ? 'Saída' : 'Reservado para'}><span className="mono">{f.rme.numero}</span> · {f.rme.destino}</Par>}
+          {f.rme && (
+            <Par rotulo={d.situacao === 'baixado' ? 'Saída' : 'Reservado para'}>
+              <IdCodigo id={f.rme.numero} para={`/saidas/${f.rme.numero}`} /> · {f.rme.destino}
+              {d.situacao === 'baixado' && entregueEm && <> · entregue em {dataHora(entregueEm)}</>}
+            </Par>
+          )}
         </dl>
       </Cartao>
 

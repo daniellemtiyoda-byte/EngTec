@@ -27,7 +27,6 @@ export const SITUACAO_FARDO: Rotulos<SituacaoFardo> = {
   aguardando_inspecao: ['laranja', 'Aguardando inspeção'],
   em_inspecao: ['azul', 'Em inspeção'],
   em_estoque: ['verde', 'Em estoque'],
-  aberto: ['azul', 'Aberto'],
   baixado: ['cinza', 'Baixado'],
 };
 

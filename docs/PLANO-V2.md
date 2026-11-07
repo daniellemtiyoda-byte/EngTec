@@ -199,7 +199,9 @@ O contrato é cumprido por dormentes **aprovados**: o fornecedor pode emitir rep
 ### 5.4 Fardo e dormente (dois níveis)
 
 ```ts
-type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao' | 'em_estoque' | 'aberto' | 'baixado';
+type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao' | 'em_estoque' | 'baixado';
+// O fardo aberto (algum dormente já saiu numa RME) continua em estoque: `aberto: boolean` é calculado e aparece como
+// selo secundário "Aberto" ao lado de "Em estoque".
 interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId; entregaId?: string /* definida ao entrar numa entrega */; quantidadeInicial: number;
   saldo: number /* calculado: saldo físico = dormentes em_estoque + reservado */;
   disponivel: number /* calculado: dormentes em_estoque (livres para nova saída) */;
@@ -498,13 +500,13 @@ Primeiro item do grupo Entrada: é onde a entrega nasce, antes da chegada do mat
 - Por fardo: Fardo (link) · Item · Contrato · Local · Saldo (físico) · Disponível · Idade (dias, com alerta acima do limite) · Situação. Ordenação padrão: mais antigos primeiro.
 - Filtros: espécie, tamanho, local, situação, contrato, "acima do limite de dias".
 - Ação principal: **Transferir fardo** (ler QR do fardo → ler QR ou escolher local).
-- Por item: "Ver fardos" na linha abre a visão por fardo filtrada pelo item. Por fardo: abas de situação Todos · Em estoque · Abertos; filtros espécie, tamanho, local e idade; o contrato pela pesquisa (o ID do fardo começa por ele). O requisitante vê só a visão por item.
-- **Transferir fardo** (`TransferirFardo`, tela de campo): ler o QR do fardo; com fardo em estoque ou aberto, o leitor do QR do local abre sozinho; escolher o local na lista ou digitar o ID ficam como alternativa; confirmação em tela cheia no celular ("A-03 → A-05"). Também na página do fardo e em Movimentações.
+- Por item: "Ver fardos" na linha abre a visão por fardo filtrada pelo item. Por fardo (só fardos em estoque; os baixados saem desta tela e continuam na busca e na página do contrato): abas Todos · Completos · Abertos, situação "Em estoque" com o selo "Aberto" no fardo incompleto e, quando há reservados, "N reservados" na linha, embaixo do disponível; filtros espécie, tamanho, local e idade; o contrato pela pesquisa (o ID do fardo começa por ele). O requisitante vê só a visão por item.
+- **Transferir fardo** (`TransferirFardo`, tela de campo): ler o QR do fardo; com fardo em estoque, o leitor do QR do local abre sozinho; escolher o local na lista ou digitar o ID ficam como alternativa; confirmação em tela cheia no celular ("A-03 → A-05"). Também na página do fardo e em Movimentações.
 
 ### 9.12 Página do fardo (`/f/:id`) · padrão Objeto
 - Fatos-chave: Saldo/inicial (físico: em estoque + reservados) · Disponível · Local · Idade · Contrato · Item · Recebido em.
 - Abas: **Dormentes** (ID, situação, categoria, comprimento medido) · **Origem** (contrato, fornecedor, NF, DOF, recebimento, inspeção) · **Movimentações** · **Histórico**.
-- Ações por situação: aguardando inspeção → **Inspecionar**; em estoque/aberto → **Transferir**, **Imprimir etiqueta do fardo**. No celular, as ações ficam no rodapé fixo e as tabelas das abas viram cartões.
+- Ações por situação: aguardando inspeção → **Inspecionar**; em estoque → **Transferir**, **Imprimir etiqueta do fardo**. No celular, as ações ficam no rodapé fixo e as tabelas das abas viram cartões.
 
 ### 9.13 Ficha do dormente (`/d/:id`) · padrão Ficha rápida
 - Topo: ID grande em mono, badge de situação, espécie (nome científico + popular), classe, tamanho, tratamento.
@@ -535,9 +537,12 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 - Lista: abas Abertas · Em separação · Prontas · Entregues · Canceladas. Colunas: RME · Solicitante · Destino · Itens · Necessidade em · Situação.
 - **Nova RME** (requisitante): destino (obra ou trecho), data de necessidade, itens (espécie, tamanho, quantidade, mostrando o disponível).
 - **Separar** (almoxarife, assistente): 1) sugestão de fardos (abertos primeiro, depois os mais antigos), só com dormentes disponíveis (em estoque, não reservados); 2) leitura dos QR dos dormentes ou "fardo inteiro"; escolha diferente da sugestão pede justificativa; quantidade tem de bater com a pedida; 3) revisar e confirmar → dormentes `reservado` (continuam no saldo físico do fardo, saem do disponível), RME `pronta`.
-- **Entregar**: confirma a entrega → dormentes `baixado`, fardos com sobra ficam `aberto`, zerados `baixado`; gera movimentações `saida`.
+- **Entregar**: confirma a entrega → dormentes `baixado`, fardos com sobra continuam em estoque e ficam abertos, zerados `baixado`; gera movimentações `saida`.
+- **Expedição**: o local de expedição só aceita o fardo com todos os dormentes reservados para uma RME **pronta** ("Levar para a expedição" na página da RME, com leitura do QR do local); transferir outro fardo para a expedição é recusado com a explicação. Separação parcial deixa o fardo no local atual até a entrega. Cancelar a RME devolve à origem (o local de onde saiu) o fardo que estiver na expedição.
+- **Separar** como tela de campo (seção 11.1): cada leitura risca o dormente; dormente fora da sugestão é aceito com aviso laranja na hora (troca no mesmo fardo sem justificativa; troca de fardo pede justificativa na revisão); dormente de outro item, reservado ou fora do estoque é recusado; o QR do fardo separa o fardo inteiro quando cabe no que falta do item.
 - **Cancelar** antes da entrega libera as reservas.
-- Página da RME: fatos-chave (solicitante, destino, itens, situação), abas Itens · Separação (fardos e dormentes com link) · Histórico.
+- Página da RME: fatos-chave (solicitante, destino, itens, situação), abas Itens (pedida × separada) · Separação (fardos e dormentes com link, local, "fardo inteiro", "na expedição", sugestão seguida ou a justificativa) · Histórico. Ações por situação: Separar, Entregar, Cancelar RME (com motivo).
+- Nova RME: pedir acima do disponível é permitido com aviso; a separação só fecha com a quantidade inteira.
 
 ### 9.18 Cadastros (`/cadastros?aba=`) · `PainelAbas` (manter o padrão atual)
 - Abas: Espécies · Tamanhos · Tratamentos · Fornecedores · Empresas inspetoras (nome, CNPJ opcional, ativa ou inativa) · Locais.
@@ -696,7 +701,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - Estoque (por item e por fardo), página do fardo, Locais (mapa, lista e página do local, QR dos locais), Movimentações, transferência por leitura.
 - Pronto quando: transferir um fardo lendo o QR do fardo e do local atualiza estoque, local, movimentações e a ficha dos dormentes.
 
-### Etapa 8 · Saídas (RME)
+### Etapa 8 · Saídas (RME) (concluída)
 - Lista, nova RME, separação com sugestão e leitura, entrega, cancelamento, página da RME.
 - Pronto quando: uma RME entregue baixa os dormentes certos, o fardo fica aberto com o saldo restante e a ficha mostra o destino.
 
@@ -734,6 +739,9 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 - [ ] `CHANGELOG.md` e, se for o caso, `CLAUDE.md` atualizados
 
 ---
+
+### Melhorias futuras registradas
+- **Movimentação física parcial**: levar para a expedição só os dormentes separados de um fardo (sem o fardo inteiro), com rastreio do local de cada dormente. Hoje a separação parcial fica no local do fardo até a entrega.
 
 ## 15. Dados de demonstração (`mock/data.ts`)
 

@@ -483,6 +483,7 @@ span.codigo { font-weight: 600; color: var(--texto); }
 .leitor-aviso { min-height: 44px; display: flex; align-items: center; padding: var(--esp-2) var(--esp-3); border-radius: var(--raio); font-size: var(--fs-16); background: var(--neutro-fundo); }
 .leitor-aviso-ok { background: var(--ok-fundo); color: #0f5a30; font-weight: 700; }
 .leitor-aviso-erro { background: var(--critico-fundo); color: #8f1515; font-weight: 700; }
+.leitor-aviso-alerta { background: var(--atencao-fundo); color: #7a4300; font-weight: 700; }
 .leitor-digitar { display: flex; flex-direction: column; gap: 4px; }
 .leitor-digitar label { font-weight: 600; font-size: var(--fs-14); }
 .leitor-digitar-linha { display: flex; gap: var(--esp-2); }
@@ -653,3 +654,26 @@ span.codigo { font-weight: 600; color: var(--texto); }
 @media (max-width: 760px) {
   .mapa-locais-grade { grid-template-columns: 1fr 1fr; }
 }
+
+/* Situação do fardo com o selo "Aberto" e o disponível com os reservados explicados na linha */
+.situacao-fardo { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.disponivel-fardo { display: inline-flex; flex-direction: column; align-items: flex-end; }
+.detalhe-linha { font-size: var(--fs-12); color: var(--texto-2); font-weight: 400; white-space: nowrap; }
+.fato .disponivel-fardo, .lista-cartoes .disponivel-fardo { align-items: flex-start; }
+
+/* Separação da RME (Etapa 8): o que separar por item e por fardo; cada leitura risca o dormente */
+.separacao-lista { display: flex; flex-direction: column; gap: var(--esp-3); }
+.separacao-item { display: flex; flex-direction: column; gap: var(--esp-2); }
+.separacao-item-titulo { display: flex; justify-content: space-between; gap: var(--esp-2); font-size: var(--fs-16); margin: 0; }
+.separacao-fardo { border: 1px solid var(--borda); border-radius: var(--raio); padding: var(--esp-2) var(--esp-3); background: var(--superficie); }
+.separacao-fardo-titulo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2); margin: 0 0 var(--esp-2); }
+.separacao-dormentes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--esp-1); }
+.separacao-dormentes li { min-height: var(--alvo-toque); display: flex; align-items: center; }
+.separacao-dormentes li .mono { font-size: var(--fs-16); }
+.separacao-dormentes li.lido .mono { text-decoration: line-through; color: var(--ok); font-weight: 700; }
+.separacao-fora { border-left: 3px solid var(--atencao); padding-left: var(--esp-3); }
+.texto-ok { color: var(--ok); }
+.separacao-resultado { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-3); }
+.lista-codigos { display: flex; flex-wrap: wrap; gap: var(--esp-1) var(--esp-3); margin: var(--esp-2) 0; }
+.itens-rme { list-style: none; margin: 0 0 var(--esp-2); padding: 0; display: flex; flex-direction: column; gap: var(--esp-3); }
+.itens-rme li { display: flex; flex-direction: column; gap: var(--esp-2); padding-bottom: var(--esp-3); border-bottom: 1px solid var(--borda); }

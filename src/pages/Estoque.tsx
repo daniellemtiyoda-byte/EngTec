@@ -6,10 +6,11 @@ import { CabecalhoPagina } from '../components/Cabecalhos';
 import { CodigoLink } from '../components/Codigos';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { useToast } from '../components/Toast';
+import { DisponivelFardo, SituacaoFardo } from '../components/SituacaoFardo';
 import { TransferirFardo } from '../components/TransferirFardo';
 import { useAuth } from '../contexts/AuthContext';
 import { SITUACAO_SALDO_OPCOES } from '../dominio/opcoes';
-import { SITUACAO_FARDO, SITUACAO_SALDO } from '../dominio/rotulos';
+import { SITUACAO_SALDO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
@@ -66,12 +67,12 @@ export default function Estoque() {
     { chave: 'contratoId', titulo: 'Contrato', opcional: true, render: (f) => { const n = itens.get(f.itemContratoId)?.contrato; return n ? <Link className="mono" to={`/contratos/${n}`}>{n}</Link> : '—'; } },
     { chave: 'localId', titulo: 'Local', render: (f) => { const c = cad.codigoLocal(f.localId); return c !== '—' ? <Link className="mono" to={`/locais/${c}`}>{c}</Link> : c; } },
     { chave: 'saldo', titulo: 'Saldo', alinhar: 'right', ordenavel: true, render: (f) => `${numero(f.saldo)}/${numero(f.quantidadeInicial)}` },
-    { chave: 'disponivel', titulo: 'Disponível', alinhar: 'right', ordenavel: true, render: (f) => numero(f.disponivel) },
+    { chave: 'disponivel', titulo: 'Disponível', alinhar: 'right', ordenavel: true, render: (f) => <DisponivelFardo fardo={f} /> },
     {
       chave: 'idadeDias', titulo: 'Idade', alinhar: 'right', ordenavel: true,
       render: (f) => <>{f.idadeDias !== undefined ? dias(f.idadeDias) : '—'}{f.acimaLimiteDias && <> <Badge tom="laranja">acima do limite</Badge></>}</>,
     },
-    { chave: 'situacao', titulo: 'Situação', render: (f) => <BadgeDe mapa={SITUACAO_FARDO} valor={f.situacao} /> },
+    { chave: 'situacao', titulo: 'Situação', render: (f) => <SituacaoFardo fardo={f} /> },
   ];
 
   return (
@@ -98,8 +99,8 @@ export default function Estoque() {
         {visaoAtual === 'fardo' && (
           <ListPage<Fardo>
             key="fardo" titulo="Fardos em estoque" subnivel colunas={colunasFardo} recarregar={rec}
-            descricao={`Do mais antigo ao mais novo. Acima de ${numero(parametros.dados?.limiteDiasEstoque ?? 120)} dias o fardo fica em alerta. Pesquise pelo ID do fardo ou pelo contrato.`}
-            abasSituacao={{ chave: 'situacao', rotulo: 'Situação do fardo', abas: [{ valor: '', rotulo: 'Todos' }, { valor: 'em_estoque', rotulo: 'Em estoque' }, { valor: 'aberto', rotulo: 'Abertos' }] }}
+            descricao={`Fardos em estoque, do mais antigo ao mais novo; aberto é o fardo de que já saíram dormentes numa RME. Acima de ${numero(parametros.dados?.limiteDiasEstoque ?? 120)} dias o fardo fica em alerta. Pesquise pelo ID do fardo ou pelo contrato.`}
+            abasSituacao={{ chave: 'aberto', rotulo: 'Fardos completos ou abertos', abas: [{ valor: '', rotulo: 'Todos' }, { valor: 'false', rotulo: 'Completos' }, { valor: 'true', rotulo: 'Abertos' }] }}
             filtros={[
               { chave: 'especieId', rotulo: 'Espécie', opcoes: especies },
               { chave: 'tamanhoId', rotulo: 'Tamanho', opcoes: tamanhos },

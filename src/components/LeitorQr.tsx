@@ -11,8 +11,11 @@ declare global {
   interface Window { BarcodeDetector?: new (op: { formats: string[] }) => Detector }
 }
 
-/** Resposta do chamador a uma leitura (modo capturar): mensagem de retorno e se foi aceita. */
-export interface RetornoLeitura { ok: boolean; mensagem: string }
+/**
+ * Resposta do chamador a uma leitura (modo capturar): mensagem de retorno e se foi aceita. `alerta`: aceita, mas com
+ * aviso (laranja e vibração dupla), ex. dormente fora da sugestão na separação da RME.
+ */
+export interface RetornoLeitura { ok: boolean; mensagem: string; alerta?: boolean }
 
 interface Props {
   aberto: boolean;
@@ -76,7 +79,7 @@ export function LeitorQr({ aberto, aoFechar, modo = 'navegar', continuo, aoLer, 
     }
     const r = aoLer?.(c) ?? { ok: true, mensagem: `${c.id} lido.` };
     setAviso(r);
-    if (r.ok && typeof navigator.vibrate === 'function') navigator.vibrate(80);
+    if (r.ok && typeof navigator.vibrate === 'function') navigator.vibrate(r.alerta ? [80, 60, 80] : 80);
     if (r.ok && !continuo) { parar(); aoFechar(); }
     return r.ok;
   }, [modo, aoLer, continuo, aoFechar, nav, parar]);
@@ -179,7 +182,7 @@ export function LeitorQr({ aberto, aoFechar, modo = 'navegar', continuo, aoLer, 
             </button>
           )}
         </div>
-        <div className={`leitor-aviso${aviso ? (aviso.ok ? ' leitor-aviso-ok' : ' leitor-aviso-erro') : ''}`} aria-live="assertive" role="status">
+        <div className={`leitor-aviso${aviso ? (aviso.alerta ? ' leitor-aviso-alerta' : aviso.ok ? ' leitor-aviso-ok' : ' leitor-aviso-erro') : ''}`} aria-live="assertive" role="status">
           {aviso?.mensagem ?? (estado === 'ativa' ? 'Aponte a câmera para o QR da plaquinha.' : '')}
         </div>
         {children}

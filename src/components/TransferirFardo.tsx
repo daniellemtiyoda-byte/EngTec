@@ -20,6 +20,8 @@ interface Props {
   cad: Cadastros;
   /** Vindo da página do fardo: começa no passo do local. */
   fardoId?: string;
+  /** "Levar para a expedição" (RME pronta com o fardo inteiro reservado): só locais de expedição e o leitor já aberto. */
+  soExpedicao?: boolean;
   aoFechar: () => void;
   aoTransferir: (f: Fardo, de: string, para: string) => void;
 }
@@ -27,10 +29,11 @@ interface Props {
 /**
  * Transferir fardo (seções 9.11 e 11.1 do plano), tela de campo: ler o QR do fardo e, em seguida, o QR do local (o
  * leitor do local abre sozinho depois de um fardo válido); escolher o local na lista ou digitar o ID ficam como
- * alternativa. A confirmação ocupa a tela no celular. Só fardo em estoque ou aberto vai para local ativo de
- * armazenagem ou expedição diferente do atual (a mesma regra vale no serviço).
+ * alternativa. A confirmação ocupa a tela no celular. Só fardo em estoque vai para local ativo de armazenagem ou
+ * expedição diferente do atual; a expedição só recebe o fardo inteiro reservado para uma RME pronta (o serviço
+ * recusa com a explicação, que aparece aqui).
  */
-export function TransferirFardo({ aberto, cad, fardoId, aoFechar, aoTransferir }: Props) {
+export function TransferirFardo({ aberto, cad, fardoId, soExpedicao, aoFechar, aoTransferir }: Props) {
   const [passo, setPasso] = useState(0);
   const [lendo, setLendo] = useState<'fardo' | 'local' | null>(null);
   const [digitado, setDigitado] = useState('');
@@ -41,13 +44,13 @@ export function TransferirFardo({ aberto, cad, fardoId, aoFechar, aoTransferir }
   const [enviando, setEnviando] = useState(false);
 
   const atualId = fardo?.fardo.localId;
-  const destinos = (cad.listas?.locais ?? []).filter((l) => l.ativo && (l.tipo === 'armazenagem' || l.tipo === 'expedicao') && l.id !== atualId);
+  const destinos = (cad.listas?.locais ?? []).filter((l) => l.ativo && (soExpedicao ? l.tipo === 'expedicao' : l.tipo === 'armazenagem' || l.tipo === 'expedicao') && l.id !== atualId);
   const destino = destinos.find((l) => l.id === localId);
 
   useEffect(() => {
     if (!aberto) return;
     setPasso(0); setFardo(undefined); setLocalId(''); setErro(undefined); setDigitado('');
-    if (fardoId) void carregar(fardoId, false);
+    if (fardoId) void carregar(fardoId, !!soExpedicao);
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** `lido`: veio do leitor; com fardo válido, o leitor do local abre sozinho (dois toques de leitura). */
@@ -56,8 +59,8 @@ export function TransferirFardo({ aberto, cad, fardoId, aoFechar, aoTransferir }
     try {
       const d = await servicos.fardos.obter(id);
       setFardo(d);
-      if (d.fardo.situacao !== 'em_estoque' && d.fardo.situacao !== 'aberto') {
-        setErro(`O fardo ${d.fardo.id} não está em estoque: só fardo em estoque ou aberto pode ser transferido.`);
+      if (d.fardo.situacao !== 'em_estoque') {
+        setErro(`O fardo ${d.fardo.id} não está em estoque: só fardo em estoque pode ser transferido.`);
         setPasso(0);
         return;
       }
@@ -81,7 +84,7 @@ export function TransferirFardo({ aberto, cad, fardoId, aoFechar, aoTransferir }
     const codigo = c.id.replace(/^LOC-/, '');
     if (cad.listas?.locais.find((l) => l.id === atualId)?.codigo === codigo) return { ok: false, mensagem: `O fardo já está em ${codigo}. Leia outro local.` };
     const l = destinos.find((x) => x.codigo === codigo);
-    if (!l) return { ok: false, mensagem: `O local ${codigo} não recebe fardos (precisa ser ativo, de armazenagem ou expedição).` };
+    if (!l) return { ok: false, mensagem: soExpedicao ? `O local ${codigo} não é de expedição. Leia o QR do local de expedição.` : `O local ${codigo} não recebe fardos (precisa ser ativo, de armazenagem ou expedição).` };
     setLocalId(l.id); setPasso(2); setErro(undefined);
     return { ok: true, mensagem: `Destino ${codigo}.` };
   }
@@ -123,7 +126,7 @@ export function TransferirFardo({ aberto, cad, fardoId, aoFechar, aoTransferir }
   return (
     <>
       <Modal
-        largo titulo="Transferir fardo" aberto={aberto && !lendo} aoFechar={aoFechar}
+        largo titulo={soExpedicao ? 'Levar para a expedição' : 'Transferir fardo'} aberto={aberto && !lendo} aoFechar={aoFechar}
         rodape={<>
           {passo > (fardoId ? 1 : 0)
             ? <button type="button" className="btn btn-sec" onClick={() => { setErro(undefined); setPasso((p) => p - 1); }} disabled={enviando}>Voltar</button>
@@ -155,7 +158,7 @@ export function TransferirFardo({ aberto, cad, fardoId, aoFechar, aoTransferir }
           <div className="assistente-passo">
             {resumoFardo}
             <button type="button" className="btn btn-acao btn-grande botao-ler" onClick={() => setLendo('local')}><Icone nome="qr" /> Ler QR do local</button>
-            <p className="mudo">Ou escolha o destino (locais ativos de armazenagem ou expedição):</p>
+            <p className="mudo">{soExpedicao ? 'Ou escolha o local de expedição:' : 'Ou escolha o destino (locais ativos de armazenagem ou expedição):'}</p>
             <ul className="escolha-entregas" role="radiogroup" aria-label="Local de destino">
               {destinos.map((l) => (
                 <li key={l.id}>

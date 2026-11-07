@@ -4,8 +4,9 @@ import { CabecalhoObjeto, FatoChave } from '../components/Cabecalhos';
 import { Carregando, Erro, Vazio } from '../components/Estados';
 import { IdCodigo } from '../components/IdCodigo';
 import { ListPage, type Coluna } from '../components/ListPage';
+import { DisponivelFardo, SituacaoFardo } from '../components/SituacaoFardo';
 import { idLocal } from '../dominio/identificacao';
-import { SITUACAO_CADASTRO, SITUACAO_FARDO, TIPO_LOCAL } from '../dominio/rotulos';
+import { SITUACAO_CADASTRO, TIPO_LOCAL } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import { ApiError } from '../services/http';
@@ -28,7 +29,8 @@ export default function LocalDetalhe() {
 
   const colunas: Coluna<Fardo>[] = [
     { chave: 'id', titulo: 'Fardo', ordenavel: true, render: (f) => <IdCodigo id={f.id} para={`/f/${f.id}`} /> },
-    { chave: 'itemContratoId', titulo: 'Situação', render: (f) => <BadgeDe mapa={SITUACAO_FARDO} valor={f.situacao} /> },
+    { chave: 'itemContratoId', titulo: 'Situação', render: (f) => <SituacaoFardo fardo={f} /> },
+    { chave: 'disponivel', titulo: 'Disponível', alinhar: 'right', render: (f) => <DisponivelFardo fardo={f} /> },
     { chave: 'saldo', titulo: 'Saldo', alinhar: 'right', ordenavel: true, render: (f) => `${numero(f.saldo)}/${numero(f.quantidadeInicial)}` },
     { chave: 'idadeDias', titulo: 'Idade', alinhar: 'right', ordenavel: true, render: (f) => (f.idadeDias !== undefined ? dias(f.idadeDias) : '—') },
   ];

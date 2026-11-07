@@ -43,6 +43,11 @@ export function violacoes(e: Estado, hoje: string): string[] {
     const noFardo = e.dormentes.filter((d) => d.fardoId === f.id);
     v(fv.saldo === noFardo.filter((d) => d.situacao === 'em_estoque' || d.situacao === 'reservado').length, `Saldo do fardo ${f.id} diferente dos dormentes`);
     v(fv.disponivel === noFardo.filter((d) => d.situacao === 'em_estoque').length, `Disponível do fardo ${f.id} diferente dos dormentes`);
+    // Na expedição, só fardo inteiro reservado para uma RME pronta (ou já baixado na entrega).
+    if (fv.saldo > 0 && e.locais.find((l) => l.id === f.localId)?.tipo === 'expedicao') {
+      const rmes = new Set(noFardo.filter((d) => d.situacao === 'em_estoque' || d.situacao === 'reservado').map((d) => (d.situacao === 'reservado' ? d.rmeNumero : '')));
+      v(rmes.size === 1 && e.rmes.find((r) => r.numero === [...rmes][0])?.situacao === 'pronta', `Fardo ${f.id} na expedição sem estar inteiro reservado para uma RME pronta`);
+    }
     v(fv.saldo <= f.quantidadeInicial && noFardo.length === f.quantidadeInicial, `Fardo ${f.id} com quantidade incoerente`);
     if (f.entregaId) v(!!e.entregas.find((en) => en.id === f.entregaId)?.fardosIds.includes(f.id), `Fardo ${f.id} fora da lista da sua entrega`);
   }

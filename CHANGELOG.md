@@ -6,6 +6,22 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Adicionado
+- 2026-11-07: **Etapa 8 da v2: Requisições (RME).**
+  - **Por quê:** fechar a vida do dormente: a obra pede, o almoxarifado separa lendo os QR e entrega, e a ficha mostra para onde o dormente foi.
+  - **Requisições** (`/saidas`): abas Abertas, Em separação, Prontas, Entregues e Canceladas; **Nova RME** pelo requisitante (destino, data de necessidade, itens com o disponível visível).
+  - **Separação** (tela de campo): sugestão de fardos (abertos primeiro, depois os mais antigos), leitura dos QR dos dormentes que risca cada um e avisa na hora o que está fora da sugestão, QR do fardo para o fardo inteiro, marcar à mão, e revisão com a justificativa por fardo que difere da sugestão.
+  - **Página da RME** (`/saidas/:numero`): itens, separação por fardo e histórico; **Entregar** (baixa; fardo com sobra fica aberto, zerado fica baixado), **Cancelar RME** (libera as reservas e devolve à origem o fardo da expedição) e **Levar para a expedição** com leitura do QR do local quando o fardo inteiro está reservado.
+  - Ficha do dormente com a RME (link), o destino e a data da entrega; o QR e a busca de RME abrem a página da RME.
+  - Arquivos: `src/pages/{Rmes,RmeDetalhe,FichaDormente}.tsx`, `src/components/{NovaRme,SeparacaoAssistente,TransferirFardo,LeitorQr}.tsx`, `src/utils/busca.ts`, `src/rotas.tsx`, `src/services/mock/rme.ts`, `src/types/models.ts`, `src/styles.css`.
+
+### Alterado
+- 2026-11-07: **Fardo aberto continua em estoque.** A situação "aberto" sai; o fardo mostra "Em estoque" e o selo "Aberto" quando está incompleto (`fardo.aberto`, calculado). Estoque por fardo com abas Todos, Completos e Abertos, só fardos em estoque (os baixados saem desta tela e continuam na busca e na página do contrato). Arquivos: `src/types/models.ts`, `src/services/mock/{consultas,estoque,rme,index}.ts`, `src/dominio/{rotulos,opcoes}.ts`, `src/components/SituacaoFardo.tsx`, `src/pages/{Estoque,FardoDetalhe,LocalDetalhe,ContratoDetalhe,Vitrine}.tsx`.
+- 2026-11-07: **Saldo × disponível explicado na linha.** Com dormentes reservados, o disponível mostra "N reservados" embaixo (e a conta no título ao passar o mouse), também no cartão do celular. Arquivo: `src/components/SituacaoFardo.tsx`.
+- 2026-11-07: **Regra da expedição.** O local de expedição só aceita o fardo com todos os dormentes reservados para uma RME pronta; outro fardo é recusado com a explicação. Separação parcial fica no local atual até a entrega (movimentação física parcial registrada como melhoria futura). Arquivos: `src/services/mock/{estoque,invariantes}.ts`.
+  - Testes: 80 (expedição recusa separação parcial e aceita fardo inteiro de RME pronta, cancelamento devolve à origem, fardo aberto em estoque e o filtro `aberto`). Verificado no Chrome headless em 360 e 1280 px: lista de RMEs, nova RME no celular, separação (sugestão, leitura repetida e de outro item recusadas, revisão e confirmação), entrega, cancelamento, ficha do dormente entregue, estoque com abertos e reservados, transferência para a expedição recusada.
+  - Docs: `docs/PLANO-V2.md` (5.4, 9.11, 9.12, 9.17 e melhorias futuras), `docs/ESPECIFICACAO-FUNCIONAL.md` (seção 5 e melhorias futuras), `CLAUDE.md`.
+
+### Adicionado
 - 2026-11-07: **Etapa 7 da v2: Estoque, página do fardo, Locais e Movimentações.**
   - **Por quê:** depois da inspeção o fardo vive no estoque: é preciso ver o saldo por item e por fardo, saber onde cada fardo está e movê-lo lendo o QR, com cada movimentação registrada.
   - **Estoque** (`/estoque`): visões Por item (disponível, aguardando inspeção, reservado, não localizado, mínimo, máximo e falta/excesso; "Ver fardos") e Por fardo (abas Todos, Em estoque, Abertos; filtros espécie, tamanho, local e acima do limite de dias). O requisitante vê só a visão por item.

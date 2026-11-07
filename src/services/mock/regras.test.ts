@@ -404,7 +404,11 @@ describe('saída por RME', () => {
     const ficha = await s.dormentes.obter(primeiro.dormentesIds[0]);
     expect(ficha.dormente.situacao).toBe('baixado');
     expect(ficha.rme?.destino).toBe('Linha 10 · Trecho Teste');
-    expect((await s.fardos.obter(primeiro.fardoId)).fardo.situacao).toBe('aberto');
+    // O fardo aberto continua em estoque, com o selo "aberto".
+    const depois = (await s.fardos.obter(primeiro.fardoId)).fardo;
+    expect(depois.situacao).toBe('em_estoque');
+    expect(depois.aberto).toBe(true);
+    expect((await s.estoque.porFardo({ filters: { aberto: 'true' }, pageSize: 50 })).items.map((x) => x.id)).toContain(primeiro.fardoId);
     expect((await s.movimentacoes.listar({ filters: { tipo: 'saida', referencia: rme.numero } })).total).toBe(1);
     expect(invariantes()).toEqual([]);
   });
@@ -428,6 +432,49 @@ describe('saída por RME', () => {
     const cancelada = await s.rme.cancelar(rme.numero, 'Obra suspensa.');
     expect(cancelada.situacao).toBe('cancelada');
     expect((await s.dormentes.obter(dormentes[0])).dormente.situacao).toBe('em_estoque');
+    expect(invariantes()).toEqual([]);
+  });
+});
+
+describe('expedição', () => {
+  it('só recebe fardo inteiro reservado para RME pronta; separação parcial é recusada e cancelar devolve à origem', async () => {
+    const { s, como, invariantes } = montar('requisitante');
+    const c = await contrato(s, 'AR00224-01');
+    const item = c.itens[0];
+    const pedir = (quantidade: number) => s.rme.abrir({ destino: 'Linha 7 · Pátio', necessidadeEm: '2026-11-20', itens: [{ especieId: item.especieId, tamanhoId: item.tamanhoId, quantidade }] });
+    const separarSugestao = async (numero: string) => {
+      await s.rme.iniciarSeparacao(numero);
+      const sug = await s.rme.sugerirSeparacao(numero);
+      return s.rme.separar(numero, sug.itens[0].fardos.map((f) => ({ fardoId: f.fardoId, dormentesIds: f.dormentesIds })));
+    };
+    const exp = await localPorCodigo(s, 'EXP-01');
+    // Separação parcial (1 dormente): o fardo fica no local atual.
+    const parcial = await pedir(1);
+    como('almoxarife');
+    const p = await separarSugestao(parcial.numero);
+    const fardoId = p.separacao![0].fardoId;
+    const erro = await falhaCom(s.fardos.transferir(fardoId, exp.id), 422, 'localId');
+    expect(erro.message).toContain('expedição');
+    await s.rme.cancelar(parcial.numero, 'Teste');
+    // Fardo inteiro: um fardo do item sem reservas, com todos os dormentes separados (troca justificada).
+    const fardo = (await s.estoque.porFardo({ filters: { especieId: item.especieId, tamanhoId: item.tamanhoId }, pageSize: 50 })).items.find((f) => f.saldo === f.disponivel && f.id !== fardoId)!;
+    const ids = (await s.fardos.obter(fardo.id)).dormentes.filter((d) => d.situacao === 'em_estoque').map((d) => d.id);
+    como('requisitante');
+    const inteira = await pedir(ids.length);
+    como('almoxarife');
+    await s.rme.iniciarSeparacao(inteira.numero);
+    await s.rme.separar(inteira.numero, [{ fardoId: fardo.id, dormentesIds: ids, justificativa: 'Fardo inteiro para a expedição.' }]);
+    const origem = fardo.localId;
+    const naExpedicao = await s.fardos.transferir(fardo.id, exp.id);
+    expect(naExpedicao.localId).toBe(exp.id);
+    expect((await s.movimentacoes.listar({ filters: { referencia: inteira.numero, tipo: 'transferencia' } })).total).toBe(1);
+    expect(invariantes()).toEqual([]);
+    // Cancelar devolve o fardo ao local de onde saiu e libera as reservas.
+    await s.rme.cancelar(inteira.numero, 'Obra adiada.');
+    const devolvido = (await s.fardos.obter(fardo.id)).fardo;
+    expect(devolvido.localId).toBe(origem);
+    expect(devolvido.disponivel).toBe(fardo.disponivel);
+    expect((await s.movimentacoes.listar({ filters: { referencia: inteira.numero, tipo: 'transferencia' } })).total).toBe(2);
     expect(invariantes()).toEqual([]);
   });
 });

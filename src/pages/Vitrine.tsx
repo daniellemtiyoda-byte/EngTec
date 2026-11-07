@@ -46,14 +46,14 @@ const ITENS = [
   { especie: 'Manilkara huberi', item: 'Manilkara huberi · 2,00 m' },
 ];
 const LOCAIS = ['A-01', 'A-02', 'A-03', 'B-01', 'INSP-01'];
-const ORDEM_SITUACAO = ['em_estoque', 'em_estoque', 'aberto', 'em_estoque', 'aguardando_inspecao', 'baixado', 'em_estoque'];
+const ORDEM_SITUACAO = ['em_estoque', 'em_estoque', 'em_estoque', 'em_estoque', 'aguardando_inspecao', 'baixado', 'em_estoque'];
 
 // 18 fardos determinísticos (sem Math.random), como pede o plano para os dados de demonstração.
 const FARDOS: FardoExemplo[] = Array.from({ length: 18 }, (_, i) => {
   const situacao = ORDEM_SITUACAO[i % ORDEM_SITUACAO.length];
   const { especie, item } = ITENS[i % 2];
   const contrato = i < 12 ? 'AR00224-01' : 'AR00311-02';
-  const saldo = situacao === 'baixado' ? 0 : situacao === 'aberto' ? 6 : 14 - (i % 3 === 0 ? 1 : 0);
+  const saldo = situacao === 'baixado' ? 0 : i % 7 === 2 ? 6 : 14 - (i % 3 === 0 ? 1 : 0);
   return {
     id: `${contrato}-F${String(i + 1).padStart(3, '0')}`, item, especie, contrato,
     local: situacao === 'aguardando_inspecao' ? 'INSP-01' : situacao === 'baixado' ? '—' : LOCAIS[i % 4],
@@ -119,7 +119,7 @@ function ExemploLista() {
       colunas={colunas}
       acoesLinha={[
         { rotulo: 'Inspecionar', principal: true, visivel: (f) => f.situacao === 'aguardando_inspecao', aoClicar: exemplo },
-        { rotulo: 'Transferir', principal: true, visivel: (f) => f.situacao === 'em_estoque' || f.situacao === 'aberto', aoClicar: exemplo },
+        { rotulo: 'Transferir', principal: true, visivel: (f) => f.situacao === 'em_estoque', aoClicar: exemplo },
         { rotulo: 'Imprimir etiqueta', aoClicar: exemplo },
         { rotulo: 'Ver histórico', aoClicar: exemplo },
       ]}

@@ -234,7 +234,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
         const { especieId, tamanhoId, acimaLimite, ...filters } = q.filters ?? {};
         const itemDe = new Map(e.contratos.flatMap((c) => c.itens).map((i) => [i.id, i]));
         const lista = fardosView(e).filter((f) => {
-          if (f.situacao !== 'em_estoque' && f.situacao !== 'aberto') return false;
+          if (f.situacao !== 'em_estoque') return false;
           const item = itemDe.get(f.itemContratoId);
           return (!especieId || item?.especieId === especieId) && (!tamanhoId || item?.tamanhoId === tamanhoId) && (acimaLimite !== 'sim' || f.acimaLimiteDias);
         });

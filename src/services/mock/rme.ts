@@ -3,7 +3,7 @@ import type { Id, Rme, SeparacaoFardo, SugestaoSeparacao, Usuario } from '../../
 import type { DadosRme, DadosSeparacao } from '../contracts';
 import { dormentesDoFardo, fardoView } from './consultas';
 import { achar, evento, falha, hoje, instante, novoId, type Ctx, type Estado } from './estado';
-import { movimentarDormentes } from './estoque';
+import { devolverDaExpedicao, movimentarDormentes } from './estoque';
 
 /*
  * Saída por requisição (seção 9.17 do plano): aberta → em separação → pronta → entregue (ou cancelada antes da
@@ -63,22 +63,23 @@ function itemDoFardo(e: Estado, fardoId: Id) {
 export function sugerirSeparacao(e: Estado, numero: string, ctx: Ctx): SugestaoSeparacao {
   const r = acharRme(e, numero);
   const dia = hoje(ctx);
-  const candidatos = e.fardos.map((f) => fardoView(e, f, dia)).filter((f) => (f.situacao === 'em_estoque' || f.situacao === 'aberto') && f.disponivel > 0);
+  const candidatos = e.fardos.map((f) => fardoView(e, f, dia)).filter((f) => f.situacao === 'em_estoque' && f.disponivel > 0);
   return {
     itens: r.itens.map((it) => {
       const doItem = candidatos
         .filter((f) => { const i = itemDoFardo(e, f.id); return i.especieId === it.especieId && i.tamanhoId === it.tamanhoId; })
-        .sort((a, b) => Number(b.situacao === 'aberto') - Number(a.situacao === 'aberto') || (a.recebidoEm ?? '').localeCompare(b.recebidoEm ?? '') || a.id.localeCompare(b.id));
+        .sort((a, b) => Number(b.aberto) - Number(a.aberto) || (a.recebidoEm ?? '').localeCompare(b.recebidoEm ?? '') || a.id.localeCompare(b.id));
+      const livresDo = (id: Id) => dormentesDoFardo(e, id).filter((d) => d.situacao === 'em_estoque').map((d) => d.id).sort();
       let falta = it.quantidade;
       const fardos: SugestaoSeparacao['itens'][number]['fardos'] = [];
       for (const f of doItem) {
         if (falta <= 0) break;
-        const livres = dormentesDoFardo(e, f.id).filter((d) => d.situacao === 'em_estoque').map((d) => d.id).sort();
-        const pega = livres.slice(0, falta);
-        fardos.push({ fardoId: f.id, dormentesIds: pega, aberto: f.situacao === 'aberto', idadeDias: f.idadeDias });
+        const pega = livresDo(f.id).slice(0, falta);
+        fardos.push({ fardoId: f.id, dormentesIds: pega, aberto: f.aberto, idadeDias: f.idadeDias, localId: f.localId });
         falta -= pega.length;
       }
-      return { especieId: it.especieId, tamanhoId: it.tamanhoId, quantidade: it.quantidade, fardos, faltam: Math.max(0, falta) };
+      const candidatosDoItem = doItem.map((f) => ({ fardoId: f.id, dormentesIds: livresDo(f.id), aberto: f.aberto, idadeDias: f.idadeDias, localId: f.localId }));
+      return { especieId: it.especieId, tamanhoId: it.tamanhoId, quantidade: it.quantidade, fardos, candidatos: candidatosDoItem, faltam: Math.max(0, falta) };
     }),
   };
 }
@@ -145,11 +146,12 @@ export function entregarRme(e: Estado, numero: string, ctx: Ctx): Rme {
   return r;
 }
 
-/** Cancela antes da entrega e libera as reservas. */
+/** Cancela antes da entrega: libera as reservas e devolve à origem o fardo que já estava na expedição. */
 export function cancelarRme(e: Estado, numero: string, motivo: string, ctx: Ctx): Rme {
   const r = acharRme(e, numero);
   if (r.situacao === 'entregue' || r.situacao === 'cancelada') falha(409, `A RME ${r.numero} já foi ${r.situacao === 'entregue' ? 'entregue' : 'cancelada'}.`);
   if (!motivo?.trim()) falha(422, 'Informe o motivo do cancelamento.', { motivo: 'Motivo obrigatório.' });
+  for (const l of r.separacao ?? []) devolverDaExpedicao(e, l.fardoId, r.numero, ctx);
   const reservados = (r.separacao ?? []).flatMap((l) => l.dormentesIds);
   if (reservados.length) movimentarDormentes(e, reservados, 'em_estoque', { evento: { tipo: 'cancelado', descricao: `Reserva liberada: ${r.numero} cancelada`, referencia: r.numero } }, ctx);
   r.situacao = 'cancelada';

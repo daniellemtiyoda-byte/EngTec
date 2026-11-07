@@ -2,12 +2,11 @@ import { lerCodigo, rotaDoObjeto } from '../dominio/identificacao';
 
 /**
  * Para onde leva um código do sistema (links das tabelas, busca global, leitor de QR). Aceita o ID puro ou o link do
- * QR, reconhecidos por `lerCodigo()`. RME ainda abre a lista filtrada: a página da RME chega na Etapa 8.
+ * QR, reconhecidos por `lerCodigo()`.
  */
 export function rotaDoCodigo(texto: string): string | null {
   const c = lerCodigo(texto);
   if (!c) return null;
-  if (c.tipo === 'rme') return `/saidas?q=${encodeURIComponent(c.id)}`;
   return rotaDoObjeto(c);
 }
 

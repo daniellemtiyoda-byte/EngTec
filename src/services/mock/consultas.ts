@@ -38,15 +38,14 @@ export function volumeDoItem(e: Estado, itemContratoId: Id): number {
 
 /**
  * Situação do fardo, sempre derivada: antes do recebimento, em trânsito; recebido e sem conclusão da inspeção,
- * aguardando ou em inspeção (já há dormente inspecionado); concluído, pelo saldo: sem saldo, baixado; com dormente
- * que já saiu numa RME, aberto; senão, em estoque.
+ * aguardando ou em inspeção (já há dormente inspecionado); concluído, pelo saldo: sem saldo, baixado; senão, em
+ * estoque (o fardo aberto continua em estoque: ver `aberto` em `fardoView`).
  */
 export function situacaoFardo(e: Estado, f: FardoReg, dormentes = dormentesDoFardo(e, f.id)): SituacaoFardo {
   if (!f.recebidoEm) return 'em_transito';
   if (!f.conclusaoInspecao) return dormentes.some((d) => d.situacao === 'aguardando_inspecao' && d.inspecaoId) ? 'em_inspecao' : 'aguardando_inspecao';
   const saldo = dormentes.filter((d) => d.situacao === 'em_estoque' || d.situacao === 'reservado').length;
-  if (saldo === 0) return 'baixado';
-  return dormentes.some((d) => d.situacao === 'baixado') ? 'aberto' : 'em_estoque';
+  return saldo === 0 ? 'baixado' : 'em_estoque';
 }
 
 export function fardoView(e: Estado, f: FardoReg, hoje: string): Fardo {
@@ -55,9 +54,10 @@ export function fardoView(e: Estado, f: FardoReg, hoje: string): Fardo {
   const saldo = disponivel + ds.filter((d) => d.situacao === 'reservado').length;
   const idadeDias = f.recebidoEm ? Math.max(0, diasEntre(dataSP(new Date(f.recebidoEm)), hoje)) : undefined;
   const situacao = situacaoFardo(e, f, ds);
-  const comSaldo = situacao === 'em_estoque' || situacao === 'aberto';
+  const comSaldo = situacao === 'em_estoque';
+  const aberto = comSaldo && ds.some((d) => d.situacao === 'baixado');
   const progressoInspecao = f.recebidoEm && !f.conclusaoInspecao ? { inspecionados: ds.filter((d) => d.inspecaoId).length, total: ds.length } : undefined;
-  return { ...f, saldo, disponivel, situacao, idadeDias, acimaLimiteDias: comSaldo && (idadeDias ?? 0) > e.parametros.limiteDiasEstoque, progressoInspecao };
+  return { ...f, saldo, disponivel, situacao, aberto, idadeDias, acimaLimiteDias: comSaldo && (idadeDias ?? 0) > e.parametros.limiteDiasEstoque, progressoInspecao };
 }
 
 export function localView(e: Estado, l: LocalReg, hoje: string): Local {

@@ -8,7 +8,7 @@ describe('rotaDoCodigo', () => {
     expect(rotaDoCodigo('ar00224-01-f006')).toBe('/f/AR00224-01-F006');
     expect(rotaDoCodigo('AR00224-01')).toBe('/contratos/AR00224-01');
     expect(rotaDoCodigo('LOC-A-01')).toBe('/locais/A-01');
-    expect(rotaDoCodigo('RME-2026-0004')).toBe('/saidas?q=RME-2026-0004');
+    expect(rotaDoCodigo('RME-2026-0004')).toBe('/saidas/RME-2026-0004');
     expect(rotaDoCodigo('LT26-0042')).toBeNull();
   });
 });

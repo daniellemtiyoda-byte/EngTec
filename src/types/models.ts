@@ -144,7 +144,8 @@ export interface Contrato {
 
 // ---------- Fardo e dormente ----------
 
-export type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao' | 'em_estoque' | 'aberto' | 'baixado';
+/** O fardo aberto (algum dormente já saiu numa RME) continua em estoque; "aberto" é o campo calculado `aberto`. */
+export type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao' | 'em_estoque' | 'baixado';
 
 export interface ConclusaoInspecao { quando: string; quem: string; justificativa?: string; naoLocalizados: Id[] }
 
@@ -169,6 +170,8 @@ export interface Fardo {
   /** Disponível para nova saída: só os em estoque. */
   disponivel: number;
   situacao: SituacaoFardo;
+  /** Em estoque e incompleto: algum dormente já saiu numa RME (vem primeiro na sugestão de separação). */
+  aberto: boolean;
   /** Dias desde o recebimento. */
   idadeDias?: number;
   acimaLimiteDias: boolean;
@@ -409,7 +412,9 @@ export interface SugestaoSeparacao {
     especieId: Id;
     tamanhoId: Id;
     quantidade: number;
-    fardos: { fardoId: Id; dormentesIds: Id[]; aberto: boolean; idadeDias?: number }[];
+    fardos: { fardoId: Id; dormentesIds: Id[]; aberto: boolean; idadeDias?: number; localId?: Id }[];
+    /** Todos os fardos do item com dormentes disponíveis (para validar na hora a leitura fora da sugestão). */
+    candidatos: { fardoId: Id; dormentesIds: Id[]; aberto: boolean; idadeDias?: number; localId?: Id }[];
     /** Quanto não há disponível para atender o item. */
     faltam: number;
   }[];

@@ -8,6 +8,7 @@ import { IdCodigo } from '../components/IdCodigo';
 import { LinhaTempo } from '../components/LinhaTempo';
 import { Relacionados } from '../components/Relacionados';
 import { RodapeAcoes } from '../components/RodapeAcoes';
+import { DisponivelFardo, SituacaoFardo } from '../components/SituacaoFardo';
 import { useToast } from '../components/Toast';
 import { TransferirFardo } from '../components/TransferirFardo';
 import { RE_FARDO } from '../dominio/identificacao';
@@ -53,7 +54,7 @@ export default function FardoDetalhe() {
 
   // Ações por situação (seção 9.12): no celular, no rodapé fixo (seção 11.1).
   const inspecionar = (f.situacao === 'aguardando_inspecao' || f.situacao === 'em_inspecao') && pode('inspecao:operar');
-  const podeTransferir = (f.situacao === 'em_estoque' || f.situacao === 'aberto') && pode('estoque:movimentar');
+  const podeTransferir = f.situacao === 'em_estoque' && pode('estoque:movimentar');
   const acoes = (inspecionar || podeTransferir || f.emissaoId) ? <>
     {inspecionar && <Link className="btn btn-acao" to={`/inspecao/${f.id}`}>Inspecionar</Link>}
     {podeTransferir && <button type="button" className="btn btn-acao" onClick={() => setTransferir(true)}>Transferir</button>}
@@ -63,12 +64,12 @@ export default function FardoDetalhe() {
   return (
     <section className="painel">
       <CabecalhoObjeto
-        tipo="Fardo" id={f.id} situacao={<BadgeDe mapa={SITUACAO_FARDO} valor={f.situacao} />}
+        tipo="Fardo" id={f.id} situacao={<SituacaoFardo fardo={f} />}
         migalhas={[{ rotulo: 'Contratos', para: '/contratos' }, { rotulo: `Contrato ${contrato.numero}`, para: `/contratos/${contrato.numero}?aba=fardos` }, { rotulo: `Fardo ${f.id}` }]}
         acoes={!pequena && acoes}
         fatos={<>
           <FatoChave rotulo="Saldo" valor={`${numero(f.saldo)} de ${numero(f.quantidadeInicial)}`} />
-          <FatoChave rotulo="Disponível" valor={numero(f.disponivel)} />
+          <FatoChave rotulo="Disponível" valor={<DisponivelFardo fardo={f} />} />
           <FatoChave rotulo="Local" valor={local ? local.codigo : '—'} para={local ? `/locais/${local.codigo}` : undefined} />
           <FatoChave rotulo="Idade" valor={f.idadeDias !== undefined ? <>{dias(f.idadeDias)}{f.acimaLimiteDias && <span className="texto-critico"> · acima do limite</span>}</> : '—'} />
           <FatoChave rotulo="Contrato" valor={<span className="mono">{contrato.numero}</span>} para={`/contratos/${contrato.numero}`} />
