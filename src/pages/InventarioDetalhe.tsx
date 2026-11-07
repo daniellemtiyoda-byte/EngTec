@@ -21,6 +21,7 @@ import type { DiferencaInventario, GrupoDiferenca, Inventario, ResultadoInventar
 import { dataHora, numero } from '../utils/format';
 
 const TOM_LEITURA: Record<RetornoLeituraInventario['situacao'], Tom> = { conferido: 'verde', local_errado: 'laranja', inesperado: 'laranja', repetido: 'cinza' };
+const pct = (n: number) => `${n.toLocaleString('pt-BR')}%`;
 const GRUPOS: GrupoDiferenca[] = ['local_errado', 'nao_encontrado', 'inesperado'];
 const chaveDe = (d: DiferencaInventario) => `${d.tipo}:${d.id}`;
 
@@ -67,18 +68,19 @@ function ListaDiferencas({ grupo, itens, cad, justificativas, aoJustificar, erro
   );
 }
 
-/** Conferência por local: esperados, conferidos e percentual. */
+/** Conferência por local: esperados, localizados (em qualquer local do inventário) e no lugar certo. */
 function TabelaPorLocal({ r, cad }: { r: ResultadoInventario; cad: ReturnType<typeof useCadastros> }) {
   return (
     <div className="tabela-rolagem">
       <table className="tabela tabela-cartoes">
-        <thead><tr><th>Local</th><th className="al-right">Esperados</th><th className="al-right">Conferidos</th><th className="al-right">Diferenças</th></tr></thead>
+        <thead><tr><th>Local</th><th className="al-right">Esperados</th><th className="al-right">Localizados</th><th className="al-right">No lugar certo</th><th className="al-right">Diferenças</th></tr></thead>
         <tbody>
           {r.porLocal.map((l) => (
             <tr key={l.localId}>
               <td data-rotulo="Local"><Link to={`/locais/${cad.codigoLocal(l.localId)}`}>{cad.codigoLocal(l.localId)}</Link></td>
               <td data-rotulo="Esperados" className="al-right">{numero(l.esperados)}</td>
-              <td data-rotulo="Conferidos" className="al-right">{numero(l.conferidos)} ({l.percentual.toLocaleString('pt-BR')}%)</td>
+              <td data-rotulo="Localizados" className="al-right">{numero(l.localizados)} ({pct(l.percentualLocalizados)})</td>
+              <td data-rotulo="No lugar certo" className="al-right">{numero(l.noLugarCerto)} ({pct(l.percentualNoLugarCerto)})</td>
               <td data-rotulo="Diferenças" className="al-right">{numero(l.diferencas)}</td>
             </tr>
           ))}
@@ -140,7 +142,7 @@ export default function InventarioDetalhe() {
     setEnviando(true); setErros({});
     try {
       const f = await servicos.inventarios.fechar(inv.id, justificativas);
-      notificar('sucesso', `${f.numero} fechado: ${numero(f.resultado!.conferidos)} de ${numero(f.resultado!.esperados)} conferidos.`);
+      notificar('sucesso', `${f.numero} fechado: ${numero(f.resultado!.localizados)} de ${numero(f.resultado!.esperados)} localizados, ${numero(f.resultado!.noLugarCerto)} no lugar certo.`);
       setRevisar(false); r.recarregar();
     } catch (e) {
       if (e instanceof ApiError && e.detalhes) setErros(e.detalhes);
@@ -188,7 +190,8 @@ export default function InventarioDetalhe() {
           {inv.fechadoEm && <FatoChave rotulo="Fechado" valor={`${dataHora(inv.fechadoEm)} · ${inv.fechadoPor}`} />}
           <FatoChave rotulo="Esperados" valor={numero(res?.esperados ?? inv.esperados.length)} />
           <FatoChave rotulo="Leituras" valor={numero(inv.leituras.length)} />
-          {res && <FatoChave rotulo="Conferidos" valor={`${numero(res.conferidos)} (${res.percentual.toLocaleString('pt-BR')}%)`} />}
+          {res && <FatoChave rotulo="Localizados" valor={`${numero(res.localizados)} (${pct(res.percentualLocalizados)})`} />}
+          {res && <FatoChave rotulo="No lugar certo" valor={`${numero(res.noLugarCerto)} (${pct(res.percentualNoLugarCerto)})`} />}
         </>}
       />
 
@@ -231,7 +234,7 @@ export default function InventarioDetalhe() {
       >
         {!previa ? <Carregando /> : (
           <>
-            <p>{numero(previa.conferidos)} de {numero(previa.esperados)} conferidos ({previa.percentual.toLocaleString('pt-BR')}%). Ao fechar: o local errado é corrigido por transferência, os não encontrados passam a "não localizado" e os inesperados ficam registrados com a justificativa. Não há ajuste de quantidade.</p>
+            <p>{numero(previa.localizados)} de {numero(previa.esperados)} localizados ({pct(previa.percentualLocalizados)}), {numero(previa.noLugarCerto)} no lugar certo ({pct(previa.percentualNoLugarCerto)}). O primeiro número vai para os relatórios do IBAMA. Ao fechar: o local errado é corrigido por transferência, os não encontrados passam a "não localizado" e os inesperados ficam registrados com a justificativa. Não há ajuste de quantidade.</p>
             <TabelaPorLocal r={previa} cad={cad} />
             {!previa.diferencas.length && <p className="mudo">Nenhuma diferença.</p>}
             {GRUPOS.map((g) => (

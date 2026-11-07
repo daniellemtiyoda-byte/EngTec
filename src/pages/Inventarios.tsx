@@ -16,6 +16,7 @@ const ABAS: { valor: SituacaoInventario; rotulo: string }[] = [
   { valor: 'aberto', rotulo: 'Abertos' },
   { valor: 'fechado', rotulo: 'Fechados' },
 ];
+const pct = (n: number) => `${n.toLocaleString('pt-BR')}%`;
 const contar = () => Promise.all(ABAS.map((a) => servicos.inventarios.listar({ pageSize: 1, filters: { situacao: a.valor } }).then((r) => r.total)));
 
 /**
@@ -35,7 +36,8 @@ export default function Inventarios() {
     { chave: 'numero', titulo: 'Inventário', ordenavel: true, render: (i) => <span className="mono">{i.numero}</span> },
     { chave: 'locaisIds', titulo: 'Locais', quebrar: true, render: (i) => i.locaisIds.map((id) => cad.codigoLocal(id)).join(', ') },
     { chave: 'esperados', titulo: 'Esperados', alinhar: 'right', render: (i) => numero(i.esperados.length) },
-    { chave: 'resultado', titulo: 'Conferidos', alinhar: 'right', render: (i) => (i.resultado ? `${numero(i.resultado.conferidos)} (${i.resultado.percentual.toLocaleString('pt-BR')}%)` : '—') },
+    { chave: 'resultado', titulo: 'Localizados', alinhar: 'right', render: (i) => (i.resultado ? `${numero(i.resultado.localizados)} (${pct(i.resultado.percentualLocalizados)})` : '—') },
+    { chave: 'noLugarCerto', titulo: 'No lugar certo', alinhar: 'right', render: (i) => (i.resultado ? `${numero(i.resultado.noLugarCerto)} (${pct(i.resultado.percentualNoLugarCerto)})` : '—') },
     { chave: 'diferencas', titulo: 'Diferenças', alinhar: 'right', render: (i) => (i.resultado ? numero(i.resultado.diferencas.length) : '—') },
     { chave: 'abertoEm', titulo: 'Aberto em', ordenavel: true, render: (i) => dataHora(i.abertoEm) },
     { chave: 'fechadoEm', titulo: 'Fechado em', opcional: true, render: (i) => dataHora(i.fechadoEm) },

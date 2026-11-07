@@ -38,7 +38,8 @@ export function violacoes(e: Estado, hoje: string): string[] {
     const noInventario = e.inventarios.some((i) => i.resultado?.diferencas.some((x) => x.grupo === 'nao_encontrado' && x.id === d.id));
     if (d.situacao === 'nao_localizado') v((!!f.conclusaoInspecao?.naoLocalizados.includes(d.id) && !!f.conclusaoInspecao.justificativa) || noInventario, `Não localizado ${d.id} sem registro na conclusão do fardo nem no inventário`);
     if (d.situacao === 'perdido') v(e.perdas.some((p) => p.dormenteId === d.id), `Perdido ${d.id} sem perda registrada`);
-    if (d.situacao === 'reservado') v(e.rmes.find((r) => r.numero === d.rmeNumero)?.situacao === 'pronta', `Reservado ${d.id} sem RME pronta`);
+    // Reservado: RME pronta ou em separação (completando, depois de um reservado não encontrado no inventário).
+    if (d.situacao === 'reservado') v(['pronta', 'em_separacao'].includes(e.rmes.find((r) => r.numero === d.rmeNumero)?.situacao ?? ''), `Reservado ${d.id} sem RME pronta ou em separação`);
     if (d.situacao === 'baixado') v(e.rmes.find((r) => r.numero === d.rmeNumero)?.situacao === 'entregue', `Baixado ${d.id} sem RME entregue`);
   }
 
@@ -51,7 +52,7 @@ export function violacoes(e: Estado, hoje: string): string[] {
     // Na expedição, só fardo inteiro reservado para uma RME pronta (ou já baixado na entrega).
     if (fv.saldo > 0 && e.locais.find((l) => l.id === f.localId)?.tipo === 'expedicao') {
       const rmes = new Set(noFardo.filter((d) => d.situacao === 'em_estoque' || d.situacao === 'reservado').map((d) => (d.situacao === 'reservado' ? d.rmeNumero : '')));
-      v(rmes.size === 1 && e.rmes.find((r) => r.numero === [...rmes][0])?.situacao === 'pronta', `Fardo ${f.id} na expedição sem estar inteiro reservado para uma RME pronta`);
+      v(rmes.size === 1 && ['pronta', 'em_separacao'].includes(e.rmes.find((r) => r.numero === [...rmes][0])?.situacao ?? ''), `Fardo ${f.id} na expedição sem estar inteiro reservado para uma RME`);
     }
     v(fv.saldo <= f.quantidadeInicial && noFardo.length === f.quantidadeInicial, `Fardo ${f.id} com quantidade incoerente`);
     if (f.entregaId) v(!!e.entregas.find((en) => en.id === f.entregaId)?.fardosIds.includes(f.id), `Fardo ${f.id} fora da lista da sua entrega`);
@@ -59,7 +60,7 @@ export function violacoes(e: Estado, hoje: string): string[] {
 
   for (const r of e.rmes) {
     const separados = (r.separacao ?? []).flatMap((s) => s.dormentesIds);
-    const esperada = r.situacao === 'pronta' ? 'reservado' : r.situacao === 'entregue' ? 'baixado' : null;
+    const esperada = r.situacao === 'pronta' || r.situacao === 'em_separacao' ? 'reservado' : r.situacao === 'entregue' ? 'baixado' : null;
     if (esperada) v(separados.every((id) => e.dormentes.find((d) => d.id === id)?.situacao === esperada), `RME ${r.numero} (${r.situacao}) com dormentes fora de "${esperada}"`);
     if (r.situacao === 'pronta' || r.situacao === 'entregue') v(r.itens.reduce((s, i) => s + i.quantidade, 0) === separados.length, `RME ${r.numero} separada com quantidade diferente da pedida`);
   }

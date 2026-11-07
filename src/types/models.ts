@@ -624,13 +624,27 @@ export interface DiferencaInventario {
   justificativa?: string;
 }
 
-export interface ResultadoLocalInventario { localId: Id; esperados: number; conferidos: number; percentual: number; diferencas: number }
+/**
+ * Dois números por local: localizados (achados em qualquer local do inventário; é o que os relatórios do IBAMA usam) e
+ * no lugar certo (lidos no local em que o sistema os esperava; a operação usa os dois).
+ */
+export interface ResultadoLocalInventario {
+  localId: Id;
+  esperados: number;
+  localizados: number;
+  noLugarCerto: number;
+  percentualLocalizados: number;
+  percentualNoLugarCerto: number;
+  diferencas: number;
+}
 
 export interface ResultadoInventario {
   porLocal: ResultadoLocalInventario[];
   esperados: number;
-  conferidos: number;
-  percentual: number;
+  localizados: number;
+  noLugarCerto: number;
+  percentualLocalizados: number;
+  percentualNoLugarCerto: number;
   diferencas: DiferencaInventario[];
 }
 
@@ -662,8 +676,11 @@ export interface InventarioDoLocal {
   numero?: string;
   fechadoEm?: string;
   esperados: number;
-  conferidos: number;
-  percentual?: number;
+  localizados: number;
+  noLugarCerto: number;
+  /** Percentual de localizados (o dos relatórios do IBAMA). */
+  percentualLocalizados?: number;
+  percentualNoLugarCerto?: number;
   localErrado: number;
   naoEncontrados: number;
   inesperados: number;
@@ -712,6 +729,8 @@ export interface SaldoPatioEspecie {
 export interface SugestaoSeparacao {
   itens: (ItemRme & {
     fardos: { fardoId: Id; dormentesIds: Id[]; aberto: boolean; idadeDias?: number; localId?: Id }[];
+    /** Já reservados para o item numa separação anterior (a `quantidade` aqui é a que falta para completar). */
+    jaSeparados: number;
     /** Todos os fardos do item com dormentes disponíveis (para validar na hora a leitura fora da sugestão). */
     candidatos: { fardoId: Id; dormentesIds: Id[]; aberto: boolean; idadeDias?: number; localId?: Id }[];
     /** Quanto não há disponível para atender o item. */

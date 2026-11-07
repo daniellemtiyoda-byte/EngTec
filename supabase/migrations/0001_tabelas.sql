@@ -5,6 +5,15 @@
 -- IDs, transições da situação do dormente e coerência entre a situação e os campos que ela exige.
 -- Executar no editor SQL do Supabase, na ordem dos arquivos.
 
+-- Relógio: o instante atual, que a carga da demonstração e os testes podem fixar (set_config('holz.agora', ...)).
+-- Fora disso, é o now() do banco.
+create or replace function public.agora() returns timestamptz
+language sql stable as $$ select coalesce(nullif(current_setting('holz.agora', true), '')::timestamptz, now()) $$;
+
+-- Dia de hoje em São Paulo (as datas de negócio são do fuso da CPTM).
+create or replace function public.hoje() returns date
+language sql stable as $$ select (public.agora() at time zone 'America/Sao_Paulo')::date $$;
+
 -- ---------------------------------------------------------------------------------------------------------------
 -- Ids técnicos: prefixo + número (es0001, mv0042), como no mock. A carga inicial ajusta as sequências (seed.sql).
 -- ---------------------------------------------------------------------------------------------------------------
@@ -102,6 +111,7 @@ create table public.atas (
 );
 
 create table public.ata_itens (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   ata_id text not null references public.atas(id),
   tamanho_id text not null references public.tamanhos(id),
   quantidade integer not null check (quantidade > 0),
@@ -117,7 +127,7 @@ create table public.contratos (
   gestor text not null,
   situacao text not null default 'vigente' check (situacao in ('vigente', 'cancelado')),   -- "concluído" é calculado
   motivo_cancelamento text,
-  criado_em timestamptz not null default now(),
+  criado_em timestamptz not null default public.agora(),
   criado_por text not null,
   -- Próximas sequências de fardo e dormente (emitidas pelo fornecedor; nunca voltam nem se repetem).
   proximo_fardo integer not null default 1 check (proximo_fardo between 1 and 1000),
@@ -126,6 +136,7 @@ create table public.contratos (
 );
 
 create table public.contrato_itens (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   id text primary key default public.novo_id('ic'),
   contrato_id text not null references public.contratos(id),
   tamanho_id text not null references public.tamanhos(id),
@@ -134,6 +145,7 @@ create table public.contrato_itens (
 );
 
 create table public.contrato_parcelas (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   contrato_id text not null references public.contratos(id),
   numero integer not null check (numero between 1 and 12),
   tamanho_id text not null references public.tamanhos(id),
@@ -149,7 +161,7 @@ create table public.anexos (
   nome text not null,
   tipo text not null check (tipo in ('pdf', 'xml', 'imagem')),
   caminho text,                      -- caminho no bucket: <entidade>/<id>/<arquivo>; vazio nos dados de demonstração
-  enviado_em timestamptz not null default now(),
+  enviado_em timestamptz not null default public.agora(),
   enviado_por text not null
 );
 
@@ -168,7 +180,7 @@ create table public.emissoes (
   nf jsonb not null,                 -- NF de exemplo { numero, serie, chaveAcesso, emissao, itens }
   dof jsonb not null,                -- DOF de exemplo { numero, validade, volumes }
   entrega_id text,
-  criado_em timestamptz not null default now(),
+  criado_em timestamptz not null default public.agora(),
   criado_por text not null
 );
 
@@ -182,11 +194,12 @@ create table public.nfs (
   emissao date not null,
   entrega_id text,
   xml jsonb,
-  criado_em timestamptz not null default now(),
+  criado_em timestamptz not null default public.agora(),
   criado_por text not null
 );
 
 create table public.nf_itens (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   nf_id text not null references public.nfs(id),
   item_contrato_id text not null references public.contrato_itens(id),
   quantidade integer not null check (quantidade > 0),
@@ -206,6 +219,7 @@ create table public.dofs (
 );
 
 create table public.dof_volumes (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   dof_id text not null references public.dofs(id),
   especie_id text not null references public.especies(id),
   volume_m3 numeric not null check (volume_m3 > 0),
@@ -225,7 +239,7 @@ create table public.entregas (
   boletim jsonb,                     -- Boletim de Inspeção { numero, data, empresaInspetoraId, itens, arquivo }
   relatorio_tecnico jsonb,           -- { numero, data, arquivo }
   laudo jsonb,                       -- Laudo Técnico { numero, emitidoEm, emitidoPor, aprovados, reprovados }
-  criado_em timestamptz not null default now(),
+  criado_em timestamptz not null default public.agora(),
   criado_por text not null
 );
 create unique index entregas_laudo_numero on public.entregas ((laudo->>'numero')) where laudo is not null;
@@ -299,7 +313,7 @@ create table public.recebimentos (
   entrega_id text not null references public.entregas(id),
   nf_id text not null references public.nfs(id),
   dof_id text not null references public.dofs(id),
-  recebido_em timestamptz not null default now(),
+  recebido_em timestamptz not null default public.agora(),
   recebido_por text not null,
   canhoto jsonb,
   fardos_esperados text[] not null default '{}',
@@ -324,7 +338,7 @@ create table public.inspecoes (
   largura_cm numeric,
   altura_cm numeric,
   inspetor text not null,
-  inspecionado_em timestamptz not null default now(),
+  inspecionado_em timestamptz not null default public.agora(),
   origem text not null check (origem in ('inspector', 'manual', 'simulado')),
   relatorio_url text,
   check (resultado <> 'aprovado' or categoria is not null)
@@ -343,7 +357,7 @@ create table public.movimentacoes (
   quantidade integer not null check (quantidade > 0),
   de_local_id text references public.locais(id),
   para_local_id text references public.locais(id),
-  quando timestamptz not null default now(),
+  quando timestamptz not null default public.agora(),
   quem text not null,
   referencia text
 );
@@ -359,7 +373,7 @@ create table public.rmes (
   necessidade_em date not null,
   situacao text not null default 'aberta' check (situacao in ('aberta', 'em_separacao', 'pronta', 'entregue', 'cancelada')),
   motivo_cancelamento text,
-  criado_em timestamptz not null default now(),
+  criado_em timestamptz not null default public.agora(),
   check (situacao <> 'cancelada' or motivo_cancelamento is not null)
 );
 
@@ -376,6 +390,7 @@ create table public.rme_itens (
 );
 
 create table public.rme_separacao (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   rme_id text not null references public.rmes(id),
   fardo_id text not null references public.fardos(id),
   dormentes_ids text[] not null check (cardinality(dormentes_ids) > 0),
@@ -397,7 +412,7 @@ create table public.eventos (
   descricao text not null,
   referencia text,
   quem text not null,
-  quando timestamptz not null default now()
+  quando timestamptz not null default public.agora()
 );
 create index eventos_entidade on public.eventos (entidade, entidade_id, quando);
 
@@ -420,10 +435,11 @@ create table public.saldos_dof (
   data date not null,
   observacao text,
   quem text not null,
-  quando timestamptz not null default now()
+  quando timestamptz not null default public.agora()
 );
 
 create table public.saldos_dof_itens (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   saldo_id text not null references public.saldos_dof(id),
   especie_id text not null references public.especies(id),
   volume_m3 numeric not null check (volume_m3 >= 0),
@@ -440,7 +456,7 @@ create table public.perdas (
   volume_m3 numeric not null,
   motivo text not null check (motivo in ('extravio', 'avaria', 'incendio', 'intemperie', 'outro')),
   descricao text,
-  quando timestamptz not null default now(),
+  quando timestamptz not null default public.agora(),
   quem text not null,
   comunicado_em timestamptz,
   comunicado_por text,
@@ -455,18 +471,23 @@ create table public.inventarios (
   numero text not null unique check (numero ~ '^INV-\d{4}-\d{4}$'),
   locais_ids text[] not null check (cardinality(locais_ids) > 0),
   situacao text not null default 'aberto' check (situacao in ('aberto', 'fechado')),
-  aberto_em timestamptz not null default now(),
+  aberto_em timestamptz not null default public.agora(),
   aberto_por text not null,
   fechado_em timestamptz,
   fechado_por text,
+  -- Totais gravados no fechamento: localizados (em qualquer local do inventário; os relatórios do IBAMA usam este)
+  -- e no lugar certo (no local esperado).
   esperados_total integer,
-  conferidos_total integer,
-  percentual numeric,
+  localizados_total integer,
+  no_lugar_certo_total integer,
+  percentual_localizados numeric,
+  percentual_no_lugar_certo numeric,
   check ((situacao = 'fechado') = (fechado_em is not null))
 );
 
 -- O que deveria estar em cada local na abertura (dormente a dormente).
 create table public.inventario_esperados (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   inventario_id text not null references public.inventarios(id),
   dormente_id text not null references public.dormentes(id),
   fardo_id text not null references public.fardos(id),
@@ -480,7 +501,7 @@ create table public.inventario_leituras (
   tipo text not null check (tipo in ('fardo', 'dormente')),
   item_id text not null,
   local_id text not null references public.locais(id),
-  quando timestamptz not null default now(),
+  quando timestamptz not null default public.agora(),
   quem text not null,
   primary key (inventario_id, ordem)
 );
@@ -490,13 +511,16 @@ create table public.inventario_locais (
   inventario_id text not null references public.inventarios(id),
   local_id text not null references public.locais(id),
   esperados integer not null,
-  conferidos integer not null,
-  percentual numeric not null,
+  localizados integer not null,
+  no_lugar_certo integer not null,
+  percentual_localizados numeric not null,
+  percentual_no_lugar_certo numeric not null,
   diferencas integer not null,
   primary key (inventario_id, local_id)
 );
 
 create table public.inventario_diferencas (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   inventario_id text not null references public.inventarios(id),
   grupo text not null check (grupo in ('local_errado', 'nao_encontrado', 'inesperado')),
   tipo text not null check (tipo in ('fardo', 'dormente')),
@@ -524,6 +548,7 @@ create table public.parametros (
 );
 
 create table public.niveis_estoque (
+  ordem integer not null default 0,         -- ordem da lista (a mesma do app)
   classe smallint not null check (classe in (1, 2)),
   tamanho_id text not null references public.tamanhos(id),
   minimo integer not null check (minimo >= 0),

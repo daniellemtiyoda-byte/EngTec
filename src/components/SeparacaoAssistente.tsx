@@ -213,7 +213,7 @@ export function SeparacaoAssistente({ aberto, rme, cad, aoFechar, aoSeparar }: P
             <p>Destino: <strong>{rme.destino}</strong> ({TIPO_DESTINO[rme.tipoDestino][1]}, classe mínima sugerida {ordinalClasse(sugerida)}). Fardos abertos primeiro, depois os mais antigos; só dormentes disponíveis (fora da cura).</p>
             {sugestao.itens.map((it, n) => (
               <section key={n} className="separacao-item">
-                <h3 className="separacao-item-titulo">{descricao(n)} · {numero(it.quantidade)} dormentes</h3>
+                <h3 className="separacao-item-titulo">{descricao(n)} · {numero(it.quantidade)} dormentes{it.jaSeparados > 0 && <span className="mudo"> (faltam para completar; {numero(it.jaSeparados)} já reservados)</span>}</h3>
                 {it.fardos.length === 0 ? <Vazio mensagem="Nenhum fardo com disponível para este item." /> : (
                   <ul className="lista-simples">
                     {it.fardos.map((f) => (

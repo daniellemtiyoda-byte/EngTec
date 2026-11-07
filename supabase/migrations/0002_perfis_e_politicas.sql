@@ -13,7 +13,7 @@ create table public.perfis (
   email text not null unique,
   perfil text not null default 'requisitante' check (perfil in ('administrador', 'almoxarife', 'gestor', 'requisitante')),
   ativo boolean not null default true,
-  criado_em timestamptz not null default now()
+  criado_em timestamptz not null default public.agora()
 );
 alter table public.rmes add constraint rmes_solicitante_fk foreign key (solicitante_id) references public.perfis(id);
 

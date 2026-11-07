@@ -971,7 +971,11 @@ describe('inventário físico por leitura de QR', () => {
     await s.ibama.registrarPerda(sumido.id, { motivo: 'extravio' });
     const porLocal = await s.ibama.inventarioPorLocal();
     const l1 = porLocal.find((x) => x.localId === a01.local.id)!;
-    expect([l1.numero, l1.naoEncontrados, l1.percentual! < 100]).toEqual([fechado.numero, 1, true]);
+    expect([l1.numero, l1.naoEncontrados, l1.percentualLocalizados! < 100]).toEqual([fechado.numero, 1, true]);
+    // A-02: o fardo lido em A-01 conta como localizado, mas não no lugar certo.
+    const r2 = fechado.resultado!.porLocal.find((x) => x.localId === a02.local.id)!;
+    expect(r2.localizados).toBe(r2.esperados);
+    expect(r2.noLugarCerto).toBeLessThan(r2.esperados);
     expect((await s.locais.obterPorCodigo('A-01')).ultimoInventarioEm).toBe(fechado.fechadoEm);
     expect(invariantes()).toEqual([]);
   });
@@ -986,7 +990,22 @@ describe('inventário físico por leitura de QR', () => {
     for (const x of inv.esperados.filter((y) => y.dormenteId !== faltando)) await s.inventarios.ler(inv.id, { tipo: 'dormente', id: x.dormenteId, localId: x.localId });
     await s.inventarios.fechar(inv.id, {});
     const rme = await s.rme.obter(pronta.numero);
-    expect([rme.situacao, rme.separacao]).toEqual(['em_separacao', undefined]);
+    // Só o não encontrado sai; as demais reservas ficam e a RME volta a "em separação" para completar.
+    expect(rme.situacao).toBe('em_separacao');
+    const restantes = rme.separacao!.flatMap((l) => l.dormentesIds);
+    expect(restantes).not.toContain(faltando);
+    expect(restantes.length).toBe(pronta.separacao!.flatMap((l) => l.dormentesIds).length - 1);
+    for (const id of restantes) expect((await s.dormentes.obter(id)).dormente.situacao).toBe('reservado');
+    const ev = await s.eventos.listar({ filters: { entidade: 'rme', entidadeId: rme.id } });
+    expect(ev.items[0].descricao).toContain('faltam 1');
+    // Completar: a sugestão pede só o que falta; separar soma à separação anterior e a RME fica pronta de novo.
+    const sug = await s.rme.sugerirSeparacao(rme.numero);
+    expect(sug.itens.reduce((t, i) => t + i.quantidade, 0)).toBe(1);
+    expect(sug.itens.reduce((t, i) => t + i.jaSeparados, 0)).toBe(restantes.length);
+    const novo = sug.itens.flatMap((i) => i.fardos).map((f) => ({ fardoId: f.fardoId, dormentesIds: f.dormentesIds, justificativa: 'completar' }));
+    const pronta2 = await s.rme.separar(rme.numero, novo);
+    expect(pronta2.situacao).toBe('pronta');
+    expect(pronta2.separacao!.flatMap((l) => l.dormentesIds).length).toBe(restantes.length + 1);
     expect((await s.dormentes.obter(faltando)).dormente.situacao).toBe('nao_localizado');
     expect(invariantes()).toEqual([]);
   });

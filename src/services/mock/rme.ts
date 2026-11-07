@@ -80,7 +80,10 @@ export function sugerirSeparacao(e: Estado, numero: string, ctx: Ctx): SugestaoS
   const dia = hoje(ctx);
   const candidatos = e.fardos.map((f) => fardoView(e, f, dia)).filter((f) => f.situacao === 'em_estoque' && f.disponivel > 0);
   return {
-    itens: r.itens.map((it) => {
+    itens: r.itens.map((item) => {
+      // Separação anterior (ex. um reservado não encontrado no inventário saiu): sugere só o que falta.
+      const jaSeparados = jaReservados(e, r, item);
+      const it = { ...item, quantidade: Math.max(0, item.quantidade - jaSeparados) };
       const doItem = candidatos
         .filter((f) => { const i = itemDoFardo(e, f.id); return i.tamanhoId === it.tamanhoId && i.classe === it.classe && (!it.especieId || f.especieId === it.especieId); })
         .sort((a, b) => Number(b.aberto) - Number(a.aberto) || (a.recebidoEm ?? '').localeCompare(b.recebidoEm ?? '') || a.id.localeCompare(b.id));
@@ -94,14 +97,25 @@ export function sugerirSeparacao(e: Estado, numero: string, ctx: Ctx): SugestaoS
         falta -= pega.length;
       }
       const candidatosDoItem = doItem.map((f) => ({ fardoId: f.id, dormentesIds: livresDo(f.id), aberto: f.aberto, idadeDias: f.idadeDias, localId: f.localId })).filter((f) => f.dormentesIds.length);
-      return { ...it, fardos: fardos.filter((f) => f.dormentesIds.length), candidatos: candidatosDoItem, faltam: Math.max(0, falta) };
+      return { ...it, jaSeparados, fardos: fardos.filter((f) => f.dormentesIds.length), candidatos: candidatosDoItem, faltam: Math.max(0, falta) };
     }),
   };
 }
 
+/** Dormentes já reservados para o item nesta RME (separação anterior, mantida quando a RME volta a "em separação"). */
+function jaReservados(e: Estado, r: Rme, item: ItemRme): number {
+  return (r.separacao ?? []).flatMap((l) => l.dormentesIds).filter((id) => {
+    const d = e.dormentes.find((x) => x.id === id);
+    if (!d || d.situacao !== 'reservado') return false;
+    const i = itemDoFardo(e, d.fardoId);
+    return i.tamanhoId === item.tamanhoId && i.classe === item.classe;
+  }).length;
+}
+
 /**
- * Separa: reserva os dormentes e deixa a RME pronta. A quantidade de cada item tem de bater com a pedida. Trocar
- * dormentes dentro do fardo sugerido não pede justificativa; trocar de fardo ou mudar a quantidade do fardo pede.
+ * Separa: reserva os dormentes e deixa a RME pronta. A quantidade de cada item (somada ao que já estava reservado,
+ * quando a separação é completada) tem de bater com a pedida. Trocar dormentes dentro do fardo sugerido não pede
+ * justificativa; trocar de fardo ou mudar a quantidade do fardo pede.
  */
 export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[], ctx: Ctx): Rme {
   const r = acharRme(e, numero);
@@ -144,7 +158,7 @@ export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[
     };
   });
   r.itens.forEach((i, n) => {
-    const total = totalPorItem.get(chaveItem(i)) ?? 0;
+    const total = (totalPorItem.get(chaveItem(i)) ?? 0) + jaReservados(e, r, i);
     if (total !== i.quantidade) campos[`itens.${n}`] = `Separados ${total} de ${i.quantidade}: a quantidade tem de bater com a pedida.`;
   });
   if (Object.keys(campos).length) falha(422, 'Confira a separação.', campos);
@@ -152,9 +166,21 @@ export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[
   for (const l of linhas) {
     movimentarDormentes(e, l.dormentesIds, 'reservado', { rmeNumero: r.numero, evento: { tipo: 'reservado', descricao: `Reservado para a ${r.numero} (${r.destino})`, referencia: r.numero } }, ctx);
   }
-  r.separacao = linhas;
+  // Completar: as linhas novas somam-se às da separação anterior (mesmo fardo, mesma linha).
+  const anterior = r.separacao ?? [];
+  const juntas = [...anterior.map((l) => ({ ...l, dormentesIds: [...l.dormentesIds] }))];
+  for (const l of linhas) {
+    const mesma = juntas.find((x) => x.fardoId === l.fardoId);
+    if (mesma) {
+      mesma.dormentesIds.push(...l.dormentesIds);
+      mesma.seguiuSugestao = mesma.seguiuSugestao && l.seguiuSugestao;
+      mesma.justificativa = [mesma.justificativa, l.justificativa].filter(Boolean).join(' · ') || undefined;
+      mesma.justificativaClasse = mesma.justificativaClasse ?? l.justificativaClasse;
+    } else juntas.push(l);
+  }
+  r.separacao = juntas;
   r.situacao = 'pronta';
-  registrar(e, ctx, 'rme', r.id, 'reservado', `Separação concluída: ${usados.size} dormentes reservados${linhas.some((l) => !l.seguiuSugestao) ? ' (com troca de fardo justificada)' : ''}`);
+  registrar(e, ctx, 'rme', r.id, 'reservado', `${anterior.length ? 'Separação completada' : 'Separação concluída'}: ${usados.size} dormentes reservados${linhas.some((l) => !l.seguiuSugestao) ? ' (com troca de fardo justificada)' : ''}`);
   return r;
 }
 

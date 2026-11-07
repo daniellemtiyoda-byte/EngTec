@@ -4,7 +4,7 @@ import type {
 } from '../../types/models';
 import { localDoDormente } from './consultas';
 import { achar, falha, instante, novoId, proximoNumero, registrar, type Ctx, type Estado } from './estado';
-import { devolverDaExpedicao, movimentarDormentes } from './estoque';
+import { movimentarDormentes } from './estoque';
 
 /**
  * Inventário físico por leitura de QR (IN Ibama 21/2014, art. 41: o saldo tem de ser fiel ao físico). Abre para um ou
@@ -162,23 +162,30 @@ export function analisarInventario(e: Estado, inv: Inventario, justificativas: R
   }
   for (const f of fardosSemSaldo) inesperado('fardo', f.id, f.id, f.localId, `Fardo lido em ${codigoLocal(e, f.localId)} sem dormentes no pátio (baixado, perdido ou não recebido).`);
 
+  // Localizados: achados em qualquer local do inventário. No lugar certo: lidos no local esperado (sem correção).
+  const pct = (n: number, de: number) => (de ? Math.round((n / de) * 1000) / 10 : 100);
   const porLocal = inv.locaisIds.map((localId) => {
     const doLocal = esperados.filter((x) => x.localId === localId);
-    const ok = doLocal.filter((x) => conferidos.has(x.dormenteId) && !movidos.has(x.fardoId) && !diferencas.some((d) => d.tipo === 'dormente' && d.id === x.dormenteId)).length;
+    const localizados = doLocal.filter((x) => visto.has(x.dormenteId)).length;
+    const noLugarCerto = doLocal.filter((x) => conferidos.has(x.dormenteId) && !movidos.has(x.fardoId) && !diferencas.some((d) => d.tipo === 'dormente' && d.id === x.dormenteId)).length;
     const dif = diferencas.filter((d) => d.localId === localId || (d.grupo === 'inesperado' && d.lidoEmId === localId)).length;
-    return { localId, esperados: doLocal.length, conferidos: ok, percentual: doLocal.length ? Math.round((ok / doLocal.length) * 1000) / 10 : 100, diferencas: dif };
+    return {
+      localId, esperados: doLocal.length, localizados, noLugarCerto,
+      percentualLocalizados: pct(localizados, doLocal.length), percentualNoLugarCerto: pct(noLugarCerto, doLocal.length), diferencas: dif,
+    };
   });
-  const totalOk = porLocal.reduce((s, l) => s + l.conferidos, 0);
+  const localizados = porLocal.reduce((s, l) => s + l.localizados, 0);
+  const noLugarCerto = porLocal.reduce((s, l) => s + l.noLugarCerto, 0);
   return {
-    porLocal, esperados: esperados.length, conferidos: totalOk,
-    percentual: esperados.length ? Math.round((totalOk / esperados.length) * 1000) / 10 : 100, diferencas,
+    porLocal, esperados: esperados.length, localizados, noLugarCerto,
+    percentualLocalizados: pct(localizados, esperados.length), percentualNoLugarCerto: pct(noLugarCerto, esperados.length), diferencas,
   };
 }
 
 /**
  * Fecha o inventário (numa escrita só): corrige o local errado por transferência automática (com evento), passa os não
- * encontrados a "não localizado" (seguem o fluxo de perda; reservado sai da separação da RME, que volta a "em
- * separação") e grava os inesperados com a justificativa, obrigatória.
+ * encontrados a "não localizado" (seguem o fluxo de perda; o reservado sai da separação da RME, que volta a "em
+ * separação" para completar; as demais reservas ficam) e grava os inesperados com a justificativa, obrigatória.
  */
 export function fecharInventario(e: Estado, id: Id, justificativas: Record<string, string>, ctx: Ctx): Inventario {
   const inv = aberto(e, id);
@@ -207,15 +214,13 @@ export function fecharInventario(e: Estado, id: Id, justificativas: Record<strin
       const x = achar(e.dormentes, (y) => y.id === d.id, 'Dormente');
       const rme = x.situacao === 'reservado' ? e.rmes.find((y) => y.numero === x.rmeNumero) : undefined;
       movimentarDormentes(e, [x.id], 'nao_localizado', { evento: { tipo: 'nao_localizado', descricao: `Não encontrado no inventário ${ref} (${codigoLocal(e, d.localId)})`, referencia: ref } }, ctx);
-      // Reservado não encontrado: a separação da RME é desfeita (reservas liberadas, fardo da expedição devolvido) e a
-      // RME volta a "em separação", para separar de novo.
+      // Reservado não encontrado: só ele sai da separação; as demais reservas ficam (e o fardo na expedição também).
+      // A RME volta a "em separação" para completar a quantidade que falta.
       if (rme?.separacao) {
-        for (const l of rme.separacao) devolverDaExpedicao(e, l.fardoId, rme.numero, ctx);
-        const outros = rme.separacao.flatMap((l) => l.dormentesIds).filter((y) => e.dormentes.find((z) => z.id === y)?.situacao === 'reservado');
-        if (outros.length) movimentarDormentes(e, outros, 'em_estoque', { evento: { tipo: 'cancelado', descricao: `Reserva liberada: dormente ${x.id} da ${rme.numero} não encontrado no inventário ${ref}`, referencia: rme.numero } }, ctx);
-        rme.separacao = undefined;
-        rme.situacao = 'em_separacao';
-        registrar(e, ctx, 'rme', rme.id, 'alterado', `Dormente ${x.id} não encontrado no inventário ${ref}: separação desfeita; separe de novo`, ref);
+        rme.separacao = rme.separacao.map((l) => ({ ...l, dormentesIds: l.dormentesIds.filter((y) => y !== x.id) })).filter((l) => l.dormentesIds.length);
+        if (rme.situacao === 'pronta') rme.situacao = 'em_separacao';
+        const faltam = rme.itens.reduce((s, i) => s + i.quantidade, 0) - rme.separacao.reduce((s, l) => s + l.dormentesIds.length, 0);
+        registrar(e, ctx, 'rme', rme.id, 'alterado', `Dormente ${x.id} não encontrado no inventário ${ref}: saiu da separação; faltam ${faltam} para completar`, ref);
       }
     } else {
       registrar(e, ctx, d.tipo === 'fardo' ? 'fardo' : 'dormente', d.id, 'ocorrencia', `Inesperado no inventário ${ref}: ${d.motivo} Justificativa: ${d.justificativa}`, ref);
@@ -226,7 +231,7 @@ export function fecharInventario(e: Estado, id: Id, justificativas: Record<strin
   inv.fechadoPor = ctx.quem;
   inv.resultado = r;
   const n = (g: string) => r.diferencas.filter((d) => d.grupo === g).length;
-  registrar(e, ctx, 'inventario', inv.id, 'fechado', `Inventário fechado: ${r.conferidos} de ${r.esperados} conferidos (${r.percentual}%); ${n('local_errado')} em local errado, ${n('nao_encontrado')} não encontrado(s), ${n('inesperado')} inesperado(s)`, ref);
+  registrar(e, ctx, 'inventario', inv.id, 'fechado', `Inventário fechado: ${r.localizados} de ${r.esperados} localizados (${r.percentualLocalizados}%), ${r.noLugarCerto} no lugar certo (${r.percentualNoLugarCerto}%); ${n('local_errado')} em local errado, ${n('nao_encontrado')} não encontrado(s), ${n('inesperado')} inesperado(s)`, ref);
   return inv;
 }
 
@@ -239,7 +244,8 @@ export function inventarioPorLocal(e: Estado): InventarioDoLocal[] {
     const difs = inv?.resultado?.diferencas.filter((d) => d.localId === l.id || (d.grupo === 'inesperado' && d.lidoEmId === l.id)) ?? [];
     return {
       localId: l.id, inventarioId: inv?.id, numero: inv?.numero, fechadoEm: inv?.fechadoEm,
-      esperados: r?.esperados ?? 0, conferidos: r?.conferidos ?? 0, percentual: r?.percentual,
+      esperados: r?.esperados ?? 0, localizados: r?.localizados ?? 0, noLugarCerto: r?.noLugarCerto ?? 0,
+      percentualLocalizados: r?.percentualLocalizados, percentualNoLugarCerto: r?.percentualNoLugarCerto,
       localErrado: difs.filter((d) => d.grupo === 'local_errado').length,
       naoEncontrados: difs.filter((d) => d.grupo === 'nao_encontrado').length,
       inesperados: difs.filter((d) => d.grupo === 'inesperado').length,

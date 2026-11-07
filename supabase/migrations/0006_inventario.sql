@@ -11,6 +11,10 @@
 create or replace function public.no_patio(s text) returns boolean
 language sql immutable as $$ select s in ('aguardando_inspecao', 'em_estoque', 'reservado', 'reprovado') $$;
 
+-- Percentual com uma casa (100 quando não havia nada esperado), como no mock.
+create or replace function public.pct(n integer, de integer) returns numeric
+language sql immutable as $$ select case when de = 0 then 100 else round(n * 100.0 / de, 1) end $$;
+
 create or replace function public.codigo_do_local(p_id text) returns text
 language sql stable set search_path = public as $$ select coalesce((select codigo from public.locais where id = p_id), '—') $$;
 
@@ -22,7 +26,7 @@ declare
   v_local public.locais;
   v_outro text;
   v_inv public.inventarios;
-  v_ano text := to_char(now() at time zone 'America/Sao_Paulo', 'YYYY');
+  v_ano text := to_char(public.agora() at time zone 'America/Sao_Paulo', 'YYYY');
 begin
   perform public.exigir('estoque:movimentar');
   if cardinality(v_ids) = 0 then
@@ -229,25 +233,29 @@ begin
   from (select distinct on (item_id) item_id, local_id from public.inventario_leituras where inventario_id = p_id and tipo = 'fardo' order by item_id, ordem) l
   where not exists (select 1 from public.dormentes d where d.fardo_id = l.item_id and d.situacao in ('aguardando_inspecao', 'em_estoque', 'reservado'));
 
+  -- Localizados: achados em qualquer local do inventário. No lugar certo: lidos no local esperado, sem correção.
   with por_local as (
     select x.local_id,
       count(*) filter (where public.no_patio(d.situacao)) as esperados,
+      count(*) filter (where public.no_patio(d.situacao) and exists (select 1 from _vistos v where v.dormente_id = x.dormente_id)) as localizados,
       count(*) filter (where public.no_patio(d.situacao) and exists (select 1 from _conferidos c where c.dormente_id = x.dormente_id)
         and not exists (select 1 from _movidos m where m.fardo_id = x.fardo_id)
-        and not exists (select 1 from _difs f where f.tipo = 'dormente' and f.item_id = x.dormente_id)) as conferidos
+        and not exists (select 1 from _difs f where f.tipo = 'dormente' and f.item_id = x.dormente_id)) as no_lugar_certo
     from public.inventario_esperados x join public.dormentes d on d.id = x.dormente_id
     where x.inventario_id = p_id group by x.local_id
   ), locais as (
-    select l.id as local_id, coalesce(p.esperados, 0) as esperados, coalesce(p.conferidos, 0) as conferidos,
+    select l.id as local_id, l.ordem, coalesce(p.esperados, 0) as esperados, coalesce(p.localizados, 0) as localizados, coalesce(p.no_lugar_certo, 0) as no_lugar_certo,
       (select count(*) from _difs f where f.local_id = l.id or (f.grupo = 'inesperado' and f.lido_em_id = l.id)) as diferencas
-    from unnest(v_inv.locais_ids) l(id) left join por_local p on p.local_id = l.id
+    from unnest(v_inv.locais_ids) with ordinality l(id, ordem) left join por_local p on p.local_id = l.id
   )
   select jsonb_build_object(
-    'porLocal', coalesce((select jsonb_agg(jsonb_build_object('localId', local_id, 'esperados', esperados, 'conferidos', conferidos,
-      'percentual', case when esperados = 0 then 100 else round(conferidos * 100.0 / esperados, 1) end, 'diferencas', diferencas)) from locais), '[]'),
+    'porLocal', coalesce((select jsonb_agg(jsonb_build_object('localId', local_id, 'esperados', esperados, 'localizados', localizados, 'noLugarCerto', no_lugar_certo,
+      'percentualLocalizados', public.pct(localizados, esperados), 'percentualNoLugarCerto', public.pct(no_lugar_certo, esperados), 'diferencas', diferencas) order by ordem) from locais), '[]'),
     'esperados', (select coalesce(sum(esperados), 0) from locais),
-    'conferidos', (select coalesce(sum(conferidos), 0) from locais),
-    'percentual', (select case when coalesce(sum(esperados), 0) = 0 then 100 else round(sum(conferidos) * 100.0 / sum(esperados), 1) end from locais),
+    'localizados', (select coalesce(sum(localizados), 0) from locais),
+    'noLugarCerto', (select coalesce(sum(no_lugar_certo), 0) from locais),
+    'percentualLocalizados', (select public.pct(coalesce(sum(localizados), 0)::int, coalesce(sum(esperados), 0)::int) from locais),
+    'percentualNoLugarCerto', (select public.pct(coalesce(sum(no_lugar_certo), 0)::int, coalesce(sum(esperados), 0)::int) from locais),
     'diferencas', coalesce((select jsonb_agg(jsonb_strip_nulls(jsonb_build_object('grupo', grupo, 'tipo', tipo, 'id', item_id, 'fardoId', fardo_id,
       'localId', local_id, 'lidoEmId', lido_em_id, 'quantidade', quantidade, 'motivo', motivo, 'justificativa', justificativa))
       order by case grupo when 'local_errado' then 1 when 'nao_encontrado' then 2 else 3 end, item_id) from _difs), '[]')
@@ -275,7 +283,6 @@ declare
   v_rme public.rmes;
   v_ref text;
   v_desc text;
-  v_origem text;
 begin
   perform public.exigir('estoque:movimentar');
   select * into v_inv from public.inventarios where id = p_id for update;      -- trava: duas pessoas não fecham juntas
@@ -317,30 +324,18 @@ begin
         local_id = case when v_dorm.situacao = 'reprovado' then null else local_id end
       where id = v_d.id;
       perform public.registrar_evento('dormente', v_d.id, 'nao_localizado', format('Não encontrado no inventário %s (%s)', v_ref, public.codigo_do_local(v_d."localId")), v_ref);
-      -- Reservado não encontrado: a separação da RME é desfeita e ela volta a "em separação".
+      -- Reservado não encontrado: só ele sai da separação; as demais reservas ficam (e o fardo na expedição também).
+      -- A RME volta a "em separação" para completar a quantidade que falta.
       if v_rme.id is not null then
-        -- Fardo que já estava na expedição volta ao local de onde saiu (a última transferência para lá).
-        for v_origem in select s.fardo_id from public.rme_separacao s join public.fardos f on f.id = s.fardo_id
-          join public.locais lo on lo.id = f.local_id where s.rme_id = v_rme.id and lo.tipo = 'expedicao'
-        loop
-          insert into public.movimentacoes (tipo, fardo_id, dormentes_ids, quantidade, de_local_id, para_local_id, quem, referencia)
-          select 'transferencia', f.id, array_agg(d.id), count(d.id), f.local_id,
-            (select m.de_local_id from public.movimentacoes m where m.fardo_id = f.id and m.tipo = 'transferencia' and m.para_local_id = f.local_id order by m.quando desc limit 1),
-            public.quem(), v_rme.numero
-          from public.fardos f join public.dormentes d on d.fardo_id = f.id and d.situacao in ('em_estoque', 'reservado')
-          where f.id = v_origem group by f.id, f.local_id;
-          update public.fardos f set local_id = (select m.de_local_id from public.movimentacoes m where m.fardo_id = f.id and m.tipo = 'transferencia'
-            and m.para_local_id = f.local_id order by m.quando desc limit 1) where f.id = v_origem;
-          perform public.registrar_evento('fardo', v_origem, 'transferido', format('Devolvido da expedição: separação da %s desfeita', v_rme.numero), v_rme.numero);
-        end loop;
-        perform public.registrar_evento('dormente', d.id, 'cancelado', format('Reserva liberada: dormente %s da %s não encontrado no inventário %s', v_d.id, v_rme.numero, v_ref), v_rme.numero)
-        from public.dormentes d where d.rme_numero = v_rme.numero and d.situacao = 'reservado';
-        update public.dormentes set situacao = 'em_estoque', rme_numero = null where rme_numero = v_rme.numero and situacao = 'reservado';
+        update public.rme_separacao set dormentes_ids = array_remove(dormentes_ids, v_d.id)
+        where rme_id = v_rme.id and v_d.id = any(dormentes_ids) and cardinality(dormentes_ids) > 1;
         perform set_config('holz.permitir_troca', 'sim', true);
-        delete from public.rme_separacao where rme_id = v_rme.id;
+        delete from public.rme_separacao where rme_id = v_rme.id and dormentes_ids = array[v_d.id];
         perform set_config('holz.permitir_troca', '', true);
-        update public.rmes set situacao = 'em_separacao' where id = v_rme.id;
-        perform public.registrar_evento('rme', v_rme.id, 'alterado', format('Dormente %s não encontrado no inventário %s: separação desfeita; separe de novo', v_d.id, v_ref), v_ref);
+        update public.rmes set situacao = 'em_separacao' where id = v_rme.id and situacao = 'pronta';
+        perform public.registrar_evento('rme', v_rme.id, 'alterado', format('Dormente %s não encontrado no inventário %s: saiu da separação; faltam %s para completar', v_d.id, v_ref,
+          (select coalesce(sum(quantidade), 0) from public.rme_itens where rme_id = v_rme.id)
+          - (select coalesce(sum(cardinality(dormentes_ids)), 0) from public.rme_separacao where rme_id = v_rme.id)), v_ref);
       end if;
 
     else
@@ -351,16 +346,18 @@ begin
     values (p_id, v_d.grupo, v_d.tipo, v_d.id, v_d."fardoId", v_d."localId", v_d."lidoEmId", v_d.quantidade, v_d.motivo, v_d.justificativa);
   end loop;
 
-  insert into public.inventario_locais (inventario_id, local_id, esperados, conferidos, percentual, diferencas)
-  select p_id, x->>'localId', (x->>'esperados')::int, (x->>'conferidos')::int, (x->>'percentual')::numeric, (x->>'diferencas')::int
+  insert into public.inventario_locais (inventario_id, local_id, esperados, localizados, no_lugar_certo, percentual_localizados, percentual_no_lugar_certo, diferencas)
+  select p_id, x->>'localId', (x->>'esperados')::int, (x->>'localizados')::int, (x->>'noLugarCerto')::int,
+    (x->>'percentualLocalizados')::numeric, (x->>'percentualNoLugarCerto')::numeric, (x->>'diferencas')::int
   from jsonb_array_elements(v_res->'porLocal') x;
 
-  update public.inventarios set situacao = 'fechado', fechado_em = now(), fechado_por = public.quem(),
-    esperados_total = (v_res->>'esperados')::int, conferidos_total = (v_res->>'conferidos')::int, percentual = (v_res->>'percentual')::numeric
+  update public.inventarios set situacao = 'fechado', fechado_em = public.agora(), fechado_por = public.quem(),
+    esperados_total = (v_res->>'esperados')::int, localizados_total = (v_res->>'localizados')::int, no_lugar_certo_total = (v_res->>'noLugarCerto')::int,
+    percentual_localizados = (v_res->>'percentualLocalizados')::numeric, percentual_no_lugar_certo = (v_res->>'percentualNoLugarCerto')::numeric
   where id = p_id returning * into v_inv;
 
-  perform public.registrar_evento('inventario', p_id, 'fechado', format('Inventário fechado: %s de %s conferidos (%s%%); %s em local errado, %s não encontrado(s), %s inesperado(s)',
-    v_res->>'conferidos', v_res->>'esperados', v_res->>'percentual',
+  perform public.registrar_evento('inventario', p_id, 'fechado', format('Inventário fechado: %s de %s localizados (%s%%), %s no lugar certo (%s%%); %s em local errado, %s não encontrado(s), %s inesperado(s)',
+    v_res->>'localizados', v_res->>'esperados', v_res->>'percentualLocalizados', v_res->>'noLugarCerto', v_res->>'percentualNoLugarCerto',
     (select count(*) from jsonb_array_elements(v_res->'diferencas') x where x->>'grupo' = 'local_errado'),
     (select count(*) from jsonb_array_elements(v_res->'diferencas') x where x->>'grupo' = 'nao_encontrado'),
     (select count(*) from jsonb_array_elements(v_res->'diferencas') x where x->>'grupo' = 'inesperado')), v_ref);
@@ -370,13 +367,14 @@ end $$;
 -- Último inventário fechado de cada local ativo (relatórios do IBAMA e Inventário para vistoria).
 create or replace view public.v_inventario_por_local with (security_invoker = true) as
 select l.id as local_id, u.inventario_id, u.numero, u.fechado_em,
-  coalesce(u.esperados, 0) as esperados, coalesce(u.conferidos, 0) as conferidos, u.percentual,
+  coalesce(u.esperados, 0) as esperados, coalesce(u.localizados, 0) as localizados, coalesce(u.no_lugar_certo, 0) as no_lugar_certo,
+  u.percentual_localizados, u.percentual_no_lugar_certo,
   coalesce((select count(*) from public.inventario_diferencas d where d.inventario_id = u.inventario_id and d.grupo = 'local_errado' and d.local_id = l.id), 0) as local_errado,
   coalesce((select count(*) from public.inventario_diferencas d where d.inventario_id = u.inventario_id and d.grupo = 'nao_encontrado' and d.local_id = l.id), 0) as nao_encontrados,
   coalesce((select count(*) from public.inventario_diferencas d where d.inventario_id = u.inventario_id and d.grupo = 'inesperado' and d.lido_em_id = l.id), 0) as inesperados
 from public.locais l
 left join lateral (
-  select i.id as inventario_id, i.numero, i.fechado_em, il.esperados, il.conferidos, il.percentual
+  select i.id as inventario_id, i.numero, i.fechado_em, il.esperados, il.localizados, il.no_lugar_certo, il.percentual_localizados, il.percentual_no_lugar_certo
   from public.inventario_locais il join public.inventarios i on i.id = il.inventario_id
   where il.local_id = l.id and i.situacao = 'fechado' order by i.fechado_em desc limit 1
 ) u on true
