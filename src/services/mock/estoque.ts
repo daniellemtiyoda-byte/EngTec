@@ -1,6 +1,6 @@
 import type { Evento, Id, SituacaoDormente } from '../../types/models';
 import { fardoView, localView } from './consultas';
-import { achar, evento, falha, hoje, instante, novoId, type Ctx, type Estado, type FardoReg } from './estado';
+import { achar, registrar, falha, hoje, instante, novoId, type Ctx, type Estado, type FardoReg } from './estado';
 
 /**
  * Transições permitidas da situação do dormente. É a única porta de mudança de saldo: o saldo do fardo é sempre
@@ -30,14 +30,13 @@ export function movimentarDormentes(e: Estado, ids: Id[], para: SituacaoDormente
   for (const d of dormentes) {
     if (!TRANSICOES[d.situacao].includes(para)) falha(409, `O dormente ${d.id} não pode passar de "${d.situacao}" para "${para}".`);
   }
-  const ev = evento(ctx, op.evento.tipo, op.evento.descricao, op.evento.referencia);
   for (const d of dormentes) {
     if (para === 'reservado' || para === 'baixado') d.rmeNumero = op.rmeNumero;
     if (para === 'em_estoque' && d.situacao === 'reservado') d.rmeNumero = undefined;
     if (para === 'reprovado') d.localId = op.localId;
     if (para === 'retirado') d.localId = undefined;
     d.situacao = para;
-    d.historico.push({ ...ev });
+    registrar(e, ctx, 'dormente', d.id, op.evento.tipo, op.evento.descricao, op.evento.referencia);
   }
 }
 
@@ -64,9 +63,8 @@ export function transferirFardo(e: Estado, fardoId: Id, localId: Id, ctx: Ctx): 
     referencia = rme.numero;
   }
   const descricao = `Transferido de ${origem?.codigo ?? '—'} para ${destino.codigo}${referencia ? ` (${referencia})` : ''}`;
-  const ev = evento(ctx, 'transferido', descricao, referencia);
-  f.historico.push(ev);
-  for (const d of noFardo) d.historico.push({ ...ev });
+  registrar(e, ctx, 'fardo', f.id, 'transferido', descricao, referencia);
+  for (const d of noFardo) registrar(e, ctx, 'dormente', d.id, 'transferido', descricao, referencia);
   e.movimentacoes.push({
     id: novoId(e, 'mv'), tipo: 'transferencia', fardoId: f.id, dormentesIds: noFardo.map((d) => d.id), quantidade: noFardo.length,
     deLocalId: f.localId, paraLocalId: destino.id, quando: instante(ctx), quem: ctx.quem, referencia,
@@ -84,9 +82,9 @@ export function devolverDaExpedicao(e: Estado, fardoId: Id, rmeNumero: string, c
   const origem = e.locais.find((l) => l.id === ida?.deLocalId);
   if (!origem) return;
   const noFardo = e.dormentes.filter((d) => d.fardoId === f.id && (d.situacao === 'em_estoque' || d.situacao === 'reservado'));
-  const ev = evento(ctx, 'transferido', `Devolvido de ${aqui.codigo} para ${origem.codigo}: ${rmeNumero} cancelada`, rmeNumero);
-  f.historico.push(ev);
-  for (const d of noFardo) d.historico.push({ ...ev });
+  const descricao = `Devolvido de ${aqui.codigo} para ${origem.codigo}: ${rmeNumero} cancelada`;
+  registrar(e, ctx, 'fardo', f.id, 'transferido', descricao, rmeNumero);
+  for (const d of noFardo) registrar(e, ctx, 'dormente', d.id, 'transferido', descricao, rmeNumero);
   e.movimentacoes.push({
     id: novoId(e, 'mv'), tipo: 'transferencia', fardoId: f.id, dormentesIds: noFardo.map((d) => d.id), quantidade: noFardo.length,
     deLocalId: aqui.id, paraLocalId: origem.id, quando: instante(ctx), quem: ctx.quem, referencia: rmeNumero,

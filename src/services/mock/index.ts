@@ -13,11 +13,12 @@ import {
 } from './consultas';
 import { criarDados } from './data';
 import { cadastrarEntrega, declararDof } from './documentos';
-import { achar, falha, type Ctx, type Estado } from './estado';
+import { achar, falha, registrar, type Ctx, type Estado } from './estado';
 import { transferirFardo } from './estoque';
 import { concluirInspecao, registrarComunicacao, registrarInspecao, registrarRetirada, simularFardo } from './inspecao';
 import { alertas, indicadores, pendencias } from './painel';
 import { armazenamentoPadrao, carregar, salvar, type Armazenamento } from './persistencia';
+import { informarSaldoDof, marcarDestinacaoLancada, saldoPatio } from './ibama';
 import { emitirLaudo, previaRecebimento, receber } from './recebimento';
 import { abrirRme, acharRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
 import { emitir, xmlDaNf } from './simulador';
@@ -39,6 +40,20 @@ export interface OpcoesMock {
  * recebimento, inspeção, estoque, rme, painel) e campos calculados em consultas.ts. Aqui só a ligação:
  * sessão e permissões (como as políticas do banco farão), escrita atômica e persistência.
  */
+/** Monta as visões que as telas usam; lança erro se algum registro salvo não serve mais (campo ou data inválidos). */
+function conferirVisoes(e: Estado, hoje: string) {
+  for (const x of e.fornecedores) fornecedorView(x, hoje);
+  for (const x of e.atas) ataView(e, x, hoje);
+  for (const x of e.contratos) contratoView(e, x, hoje);
+  for (const x of e.fardos) fardoView(e, x, hoje);
+  for (const x of e.locais) localView(e, x, hoje);
+  for (const x of e.dofs) dofView(e, x, hoje);
+  for (const x of e.entregas) entregaView(e, x, hoje);
+  for (const x of e.emissoes) emissaoView(e, x);
+  for (const s of saldoPorItem(e, hoje)) if (s.liberacaoCura) new Date(s.liberacaoCura).toISOString();
+  for (const x of [...e.rmes, ...e.fardos.filter((f) => f.recebidoEm)]) new Date('criadoEm' in x ? x.criadoEm : x.recebidoEm!).toISOString();
+}
+
 export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
   const agora = op.agora ?? (() => new Date());
   const armazenamento = op.armazenamento === undefined ? armazenamentoPadrao() : op.armazenamento;
@@ -46,7 +61,10 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
   const atraso = op.atrasoMs ?? 250;
   const dia = () => dataSP(agora());
 
-  let estado: Estado = carregar(armazenamento) ?? criarDados(agora());
+  // Estado salvo de outra versão, de formato diferente ou que não monta as visões das telas é descartado: a demonstração
+  // é recriada e nenhuma tela quebra por dado antigo guardado no navegador.
+  const novo = criarDados(agora());
+  let estado: Estado = carregar(armazenamento, novo, (e) => conferirVisoes(e, dia())) ?? novo;
   salvar(armazenamento, estado);
 
   async function sessao(permissoes?: Permissao[]): Promise<Usuario> {
@@ -94,43 +112,43 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
     fornecedores: {
       listar: (q) => ler((e) => paginar(e.fornecedores.map((f) => fornecedorView(f, dia())), q)),
       obter: (id) => ler((e) => fornecedorView(achar(e.fornecedores, (f) => f.id === id, 'Fornecedor'), dia())),
-      criar: (d) => escrever(CADASTROS, (e) => fornecedorView(salvarFornecedor(e, d), dia())),
-      atualizar: (id, d) => escrever(CADASTROS, (e) => fornecedorView(salvarFornecedor(e, d, id), dia())),
-      inativar: (id) => escrever(CADASTROS, (e) => fornecedorView(situacaoFornecedor(e, id, 'inativo'), dia())),
-      reativar: (id) => escrever(CADASTROS, (e) => fornecedorView(situacaoFornecedor(e, id, 'ativo'), dia())),
+      criar: (d) => escrever(CADASTROS, (e, ctx) => fornecedorView(salvarFornecedor(e, d, ctx), dia())),
+      atualizar: (id, d) => escrever(CADASTROS, (e, ctx) => fornecedorView(salvarFornecedor(e, d, ctx, id), dia())),
+      inativar: (id) => escrever(CADASTROS, (e, ctx) => fornecedorView(situacaoFornecedor(e, id, 'inativo', ctx), dia())),
+      reativar: (id) => escrever(CADASTROS, (e, ctx) => fornecedorView(situacaoFornecedor(e, id, 'ativo', ctx), dia())),
       resumo: (id) => ler((e) => resumoFornecedor(e, id, dia())),
     },
     especies: {
       listar: (q) => ler((e) => paginar(e.especies, q)),
       obter: (id) => ler((e) => achar(e.especies, (x) => x.id === id, 'Espécie')),
-      criar: (d) => escrever(CADASTROS, (e) => salvarEspecie(e, d)),
-      atualizar: (id, d) => escrever(CADASTROS, (e) => salvarEspecie(e, d, id)),
-      inativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.especies, id, false, 'Espécie')),
-      reativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.especies, id, true, 'Espécie')),
+      criar: (d) => escrever(CADASTROS, (e, ctx) => salvarEspecie(e, d, ctx)),
+      atualizar: (id, d) => escrever(CADASTROS, (e, ctx) => salvarEspecie(e, d, ctx, id)),
+      inativar: (id) => escrever(CADASTROS, (e, ctx) => alterarAtivo(e, ctx, e.especies, id, false, 'Espécie')),
+      reativar: (id) => escrever(CADASTROS, (e, ctx) => alterarAtivo(e, ctx, e.especies, id, true, 'Espécie')),
     },
     tamanhos: {
       listar: (q) => ler((e) => paginar(e.tamanhos.map(tamanhoView), q)),
       obter: (id) => ler((e) => tamanhoView(achar(e.tamanhos, (x) => x.id === id, 'Tamanho'))),
-      criar: (d) => escrever(CADASTROS, (e) => tamanhoView(salvarTamanho(e, d))),
-      atualizar: (id, d) => escrever(CADASTROS, (e) => tamanhoView(salvarTamanho(e, d, id))),
-      inativar: (id) => escrever(CADASTROS, (e) => tamanhoView(alterarAtivo(e.tamanhos, id, false, 'Tamanho'))),
-      reativar: (id) => escrever(CADASTROS, (e) => tamanhoView(alterarAtivo(e.tamanhos, id, true, 'Tamanho'))),
+      criar: (d) => escrever(CADASTROS, (e, ctx) => tamanhoView(salvarTamanho(e, d, ctx))),
+      atualizar: (id, d) => escrever(CADASTROS, (e, ctx) => tamanhoView(salvarTamanho(e, d, ctx, id))),
+      inativar: (id) => escrever(CADASTROS, (e, ctx) => tamanhoView(alterarAtivo(e, ctx, e.tamanhos, id, false, 'Tamanho'))),
+      reativar: (id) => escrever(CADASTROS, (e, ctx) => tamanhoView(alterarAtivo(e, ctx, e.tamanhos, id, true, 'Tamanho'))),
     },
     tratamentos: {
       listar: (q) => ler((e) => paginar(e.tratamentos, q)),
       obter: (id) => ler((e) => achar(e.tratamentos, (x) => x.id === id, 'Tratamento')),
-      criar: (d) => escrever(CADASTROS, (e) => salvarTratamento(e, d)),
-      atualizar: (id, d) => escrever(CADASTROS, (e) => salvarTratamento(e, d, id)),
-      inativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.tratamentos, id, false, 'Tratamento')),
-      reativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.tratamentos, id, true, 'Tratamento')),
+      criar: (d) => escrever(CADASTROS, (e, ctx) => salvarTratamento(e, d, ctx)),
+      atualizar: (id, d) => escrever(CADASTROS, (e, ctx) => salvarTratamento(e, d, ctx, id)),
+      inativar: (id) => escrever(CADASTROS, (e, ctx) => alterarAtivo(e, ctx, e.tratamentos, id, false, 'Tratamento')),
+      reativar: (id) => escrever(CADASTROS, (e, ctx) => alterarAtivo(e, ctx, e.tratamentos, id, true, 'Tratamento')),
     },
     empresasInspetoras: {
       listar: (q) => ler((e) => paginar(e.empresasInspetoras, q)),
       obter: (id) => ler((e) => achar(e.empresasInspetoras, (x) => x.id === id, 'Empresa inspetora')),
-      criar: (d) => escrever(CADASTROS, (e) => salvarEmpresaInspetora(e, d)),
-      atualizar: (id, d) => escrever(CADASTROS, (e) => salvarEmpresaInspetora(e, d, id)),
-      inativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.empresasInspetoras, id, false, 'Empresa inspetora')),
-      reativar: (id) => escrever(CADASTROS, (e) => alterarAtivo(e.empresasInspetoras, id, true, 'Empresa inspetora')),
+      criar: (d) => escrever(CADASTROS, (e, ctx) => salvarEmpresaInspetora(e, d, ctx)),
+      atualizar: (id, d) => escrever(CADASTROS, (e, ctx) => salvarEmpresaInspetora(e, d, ctx, id)),
+      inativar: (id) => escrever(CADASTROS, (e, ctx) => alterarAtivo(e, ctx, e.empresasInspetoras, id, false, 'Empresa inspetora')),
+      reativar: (id) => escrever(CADASTROS, (e, ctx) => alterarAtivo(e, ctx, e.empresasInspetoras, id, true, 'Empresa inspetora')),
     },
     locais: {
       listar: (q) => ler((e) => paginar(e.locais.map((l) => localView(e, l, dia())), q)),
@@ -139,14 +157,15 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       criar: (d) => escrever(CADASTROS, (e, ctx) => localView(e, salvarLocal(e, d, ctx), dia())),
       atualizar: (id, d) => escrever(CADASTROS, (e, ctx) => localView(e, salvarLocal(e, d, ctx, id), dia())),
       inativar: (id) => escrever(CADASTROS, (e, ctx) => localView(e, inativarLocal(e, id, ctx), dia())),
-      reativar: (id) => escrever(CADASTROS, (e) => localView(e, reativarLocal(e, id), dia())),
+      reativar: (id) => escrever(CADASTROS, (e, ctx) => localView(e, reativarLocal(e, id, ctx), dia())),
     },
     usuarios: {
       listar: (q) => ler((e) => paginar(e.usuarios, q)),
-      atualizar: (id, d) => escrever(['admin'], (e) => {
+      atualizar: (id, d) => escrever(['admin'], (e, ctx) => {
         const u = achar(e.usuarios, (x) => x.id === id, 'Usuário');
         if (d.perfil) { if (!PERFIS[d.perfil]) falha(422, 'Perfil inválido.', { perfil: 'Escolha um perfil.' }); u.perfil = d.perfil; u.permissoes = [...PERFIS[d.perfil].permissoes]; }
         if (d.ativo !== undefined) u.ativo = d.ativo;
+        registrar(e, ctx, 'usuario', u.id, 'alterado', `Usuário ${u.nome}: perfil ${u.perfil}, ${u.ativo ? 'ativo' : 'inativo'}`);
         return u;
       }),
     },
@@ -252,6 +271,10 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       }),
     },
 
+    eventos: {
+      listar: (q = {}) => ler((e) => paginar(e.eventos, q.sortBy || q.sort ? q : { ...q, sort: [{ campo: 'quando', dir: 'desc' }, { campo: 'id', dir: 'desc' }] })),
+    },
+
     movimentacoes: {
       listar: (q = {}) => ler((e) => {
         const { periodo, localId, ...filters } = q.filters ?? {};
@@ -276,9 +299,21 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       }),
     },
 
+    ibama: {
+      destinacoes: (q = {}) => ler((e) => {
+        const { lancado, de, ate, ...filters } = q.filters ?? {};
+        const lista = e.destinacoes.filter((d) => (!lancado || (lancado === 'sim') === !!d.lancadoEm) && (!de || d.entregueEm.slice(0, 10) >= de) && (!ate || d.entregueEm.slice(0, 10) <= ate));
+        return paginar(lista, maisRecentes('entregueEm')({ ...q, filters }));
+      }),
+      marcarLancado: (id) => escrever(['dof:declarar'], (e, ctx) => marcarDestinacaoLancada(e, id, ctx)),
+      saldosInformados: (q = {}) => ler((e) => paginar(e.saldosDof, q.sortBy || q.sort ? q : { ...q, sort: [{ campo: 'data', dir: 'desc' }, { campo: 'quando', dir: 'desc' }] })),
+      informarSaldo: (d) => escrever(['dof:declarar'], (e, ctx) => informarSaldoDof(e, d, ctx)),
+      saldoPatio: () => ler((e) => saldoPatio(e)),
+    },
+
     parametros: {
       obter: () => ler((e) => e.parametros),
-      atualizar: (d) => escrever(['admin'], (e) => {
+      atualizar: (d) => escrever(['admin'], (e, ctx) => {
         const p: Parametros = { ...e.parametros, ...d, toleranciaVolumePct: e.parametros.toleranciaVolumePct };
         const campos: Record<string, string> = {};
         if (!Number.isInteger(p.limiteDiasEstoque) || p.limiteDiasEstoque <= 0) campos.limiteDiasEstoque = 'Dias inteiros, maior que zero.';
@@ -290,6 +325,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
         p.niveis.forEach((n, i) => { if (!(n.minimo >= 0 && n.maximo >= n.minimo)) campos[`niveis.${i}`] = 'Mínimo de 0 para cima e máximo maior ou igual ao mínimo.'; });
         if (Object.keys(campos).length) falha(422, 'Confira os parâmetros.', campos);
         e.parametros = p;
+        registrar(e, ctx, 'parametros', 'parametros', 'alterado', `Parâmetros alterados: ${Object.keys(d).join(', ')}`);
         return p;
       }),
       reiniciarDemonstracao: async () => {

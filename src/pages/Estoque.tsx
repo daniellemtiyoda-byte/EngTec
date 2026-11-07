@@ -62,7 +62,16 @@ export default function Estoque() {
     { chave: 'naoLocalizado', titulo: 'Não localizado', alinhar: 'right', opcional: true, render: (s) => numero(s.naoLocalizado) },
     { chave: 'minimo', titulo: 'Mínimo', alinhar: 'right', render: (s) => (s.minimo || s.maximo ? numero(s.minimo) : '—') },
     { chave: 'maximo', titulo: 'Máximo', alinhar: 'right', render: (s) => (s.minimo || s.maximo ? numero(s.maximo) : '—') },
-    { chave: 'situacao', titulo: 'Situação', render: (s) => <BadgeDe mapa={SITUACAO_SALDO} valor={s.situacao} /> },
+    // O nível compara o disponível somado à cura: abaixo do mínimo só por causa da cura não é falta (sem reposição).
+    {
+      chave: 'situacao', titulo: 'Situação',
+      render: (s) => (
+        <span className="disponivel-fardo">
+          <BadgeDe mapa={SITUACAO_SALDO} valor={s.situacao} />
+          {s.emCura > 0 && s.minimo > 0 && s.emEstoque < s.minimo && s.situacao !== 'falta' && <span className="detalhe-linha">contando {numero(s.emCura)} em cura</span>}
+        </span>
+      ),
+    },
     {
       chave: 'especies', titulo: 'Espécies (disponível)', quebrar: true, opcional: true,
       render: (s) => (s.especies.length ? s.especies.map((x) => `${cad.nomeEspecie(x.especieId)} ${numero(x.emEstoque)}`).join(' · ') : '—'),
@@ -88,7 +97,7 @@ export default function Estoque() {
     <>
       <CabecalhoPagina
         titulo="Estoque"
-        subtitulo="Saldo por classe e tamanho (via corrente e AMV) e os fardos guardados. Falta e excesso comparam o disponível com o mínimo e o máximo de Configurações."
+        subtitulo="Saldo por classe e tamanho (via corrente e AMV) e os fardos guardados. Falta e excesso comparam o disponível, somado ao que está em cura, com o mínimo e o máximo de Configurações."
         acoes={movimentar && <button className="btn btn-pri" onClick={() => setTransferir({})}>Transferir fardo</button>}
       />
       <AbasSecao abas={abas} ativa={visaoAtual} aoEscolher={setVisao} rotulo="Visão do estoque">

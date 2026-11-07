@@ -41,11 +41,33 @@ export interface Usuario {
 export interface Anexo { id: Id; nome: string; tipo: 'pdf' | 'xml' | 'imagem'; url?: string; enviadoEm: string; enviadoPor: string }
 
 export type TipoEvento =
+  | 'criado' | 'alterado' | 'inativado' | 'reativado' | 'cancelado'
   | 'emitido' | 'recebido' | 'inspecionado' | 'guardado' | 'transferido' | 'reservado' | 'baixado'
-  | 'segregado' | 'nao_localizado' | 'cancelado' | 'ocorrencia' | 'retirado';
+  | 'segregado' | 'nao_localizado' | 'ocorrencia' | 'declarado' | 'laudo' | 'comunicado' | 'retirado'
+  | 'lancado' | 'informado';
 
-/** Evento do histórico de um objeto: quem, quando, o que e o documento de referência. */
-export interface Evento { quando: string; quem: string; tipo: TipoEvento; descricao: string; referencia?: string }
+/** O que o evento descreve (a linha do tempo de cada objeto filtra por entidade e id). */
+export type EntidadeEvento =
+  | 'fardo' | 'dormente' | 'contrato' | 'ata' | 'entrega' | 'rme' | 'fornecedor' | 'cadastro' | 'local' | 'parametros' | 'usuario'
+  | 'saldo_dof';
+
+/**
+ * Evento (histórico e auditoria): toda operação que muda o estado registra um. É a fonte das linhas do tempo da ficha
+ * do dormente, do fardo, do contrato e da RME. No Supabase, uma tabela só de inclusão (sem alterar nem apagar).
+ */
+export interface Evento {
+  id: Id;
+  tipo: TipoEvento;
+  entidade: EntidadeEvento;
+  entidadeId: Id;
+  descricao: string;
+  referencia?: string;
+  quem: string;
+  quando: string;
+}
+
+/** Feriado considerado no cálculo de dias úteis (prazo do laudo, comunicação e retirada de reprovados). */
+export interface Feriado { data: string; nome: string; abrangencia: 'nacional' | 'estadual' | 'municipal' }
 
 // ---------- Cadastros ----------
 
@@ -246,7 +268,6 @@ export interface Fardo {
   recebidoEm?: string;
   conclusaoInspecao?: ConclusaoInspecao;
   reprovacao?: ReprovacaoFardo;
-  historico: Evento[];
   // calculados:
   /** Saldo físico: dormentes em estoque + reservados (ainda estão no fardo). */
   saldo: number;
@@ -291,7 +312,6 @@ export interface Dormente {
   rmeNumero?: string;
   /** Só do reprovado: local de segregação. Os demais estão no local do fardo. */
   localId?: Id;
-  historico: Evento[];
 }
 
 // ---------- Entrada ----------
@@ -541,7 +561,49 @@ export interface Rme {
   situacao: SituacaoRme;
   motivoCancelamento?: string;
   criadoEm: string;
-  historico: Evento[];
+}
+
+// ---------- IBAMA (IN Ibama 21/2014) ----------
+
+/**
+ * Destinação final: o volume por espécie de uma RME entregue, que a CPTM lança como "Destinação Final" no sistema DOF
+ * para baixar o saldo virtual. Gerada na entrega da RME; `lancadoEm` e `lancadoPor` quando for lançada.
+ */
+export interface DestinacaoFinal {
+  id: Id;
+  rmeId: Id;
+  rmeNumero: string;
+  especieId: Id;
+  quantidade: number;
+  /** Volume medido na inspeção (sem medidas, o volume do tamanho). */
+  volumeM3: number;
+  entregueEm: string;
+  lancadoEm?: string;
+  lancadoPor?: string;
+}
+
+/** Saldo informado do DOF: o saldo por espécie que aparece no sistema DOF numa data (registro periódico). */
+export interface SaldoDofInformado {
+  id: Id;
+  /** Data do saldo consultado no sistema DOF. */
+  data: string;
+  itens: { especieId: Id; volumeM3: number }[];
+  observacao?: string;
+  quem: string;
+  quando: string;
+}
+
+/** Calculado: saldo físico do pátio por espécie (e tamanho), comparado com o último saldo informado do DOF (art. 41). */
+export interface SaldoPatioEspecie {
+  especieId: Id;
+  quantidade: number;
+  fisicoM3: number;
+  porTamanho: { tamanhoId: Id; quantidade: number; volumeM3: number }[];
+  informadoM3?: number;
+  informadoEm?: string;
+  diferencaPct?: number;
+  /** Diferença acima de 10% (tolerância do art. 41). */
+  acimaTolerancia: boolean;
 }
 
 /** Sugestão de separação: fardos abertos primeiro (mais antigos antes), depois os demais do mais antigo ao mais novo. */
@@ -570,6 +632,8 @@ export interface Parametros {
   niveis: NivelEstoque[];
   /** Antecedência (dias úteis) dos alertas do prazo do laudo: [atenção, crítico]. */
   alertaLaudoDias: [number, number];
+  /** Feriados fora dos dias úteis (nacionais, do estado e da cidade de São Paulo). */
+  feriados: Feriado[];
   /** Mostra o Simulador e os botões "Simular". */
   modoDemonstracao: boolean;
 }
@@ -610,6 +674,8 @@ export interface FardoDetalhe {
   dof?: Dof;
   recebimento?: Recebimento;
   movimentacoes: Movimentacao[];
+  /** Linha do tempo do fardo (eventos), do mais antigo ao mais novo. */
+  eventos: Evento[];
 }
 
 /** Ficha do dormente (seção 9.13): tudo que se liga a ele, já montado. */
@@ -633,6 +699,8 @@ export interface FichaDormente {
   empresaInspetora?: EmpresaInspetora;
   /** Garantia de 5 anos a partir da entrega (recebimento do fardo). */
   garantiaAte?: string;
+  /** Linha do tempo do dormente (eventos), do mais antigo ao mais novo. */
+  eventos: Evento[];
 }
 
 /** Tela de inspeção de um fardo: cada dormente com a inspeção que vale. */

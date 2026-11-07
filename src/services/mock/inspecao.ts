@@ -3,7 +3,7 @@ import { PRAZO_COMUNICACAO_REPROVADOS_DIAS_UTEIS, PRAZO_RETIRADA_REPROVADOS_DIAS
 import type { Categoria, Id, Inspecao, ResultadoInspecao, VereditoInspector } from '../../types/models';
 import type { DadosInspecao } from '../contracts';
 import { dormentesDoFardo, justificativaDaFalta, tamanhoDoItem } from './consultas';
-import { achar, evento, falha, hoje, instante, novoId, type Ctx, type Estado, type FardoReg } from './estado';
+import { achar, registrar, falha, hoje, instante, novoId, type Ctx, type Estado, type FardoReg } from './estado';
 import { localDeSegregacao, movimentarDormentes } from './estoque';
 
 /*
@@ -48,7 +48,7 @@ export function registrarInspecao(e: Estado, dormenteId: Id, dados: DadosInspeca
   d.inspecaoId = insp.id;
   d.categoria = categoria;
   d.medidas = dados.medidas ?? d.medidas;
-  d.historico.push(evento(ctx, 'inspecionado', `Inspecionado: ${rotuloResultado(resultado, categoria)}${dados.origem === 'manual' ? ' (lançado à mão)' : ''}`));
+  registrar(e, ctx, 'dormente', d.id, 'inspecionado', `Inspecionado: ${rotuloResultado(resultado, categoria)}${dados.origem === 'manual' ? ' (lançado à mão)' : ''}`);
 
   if (tardia) {
     // Encontrado depois da conclusão do fardo: segue o fluxo na hora.
@@ -79,9 +79,9 @@ function registrarReprovacao(e: Estado, f: FardoReg, ids: Id[], ctx: Ctx) {
   if (f.reprovacao && !f.reprovacao.retiradoEm) { f.reprovacao.dormentesIds.push(...ids); return; }
   const dia = hoje(ctx);
   f.reprovacao = {
-    dormentesIds: [...ids], comunicarAte: somarDiasUteis(dia, PRAZO_COMUNICACAO_REPROVADOS_DIAS_UTEIS), retirarAte: somarDiasUteis(dia, PRAZO_RETIRADA_REPROVADOS_DIAS_UTEIS),
+    dormentesIds: [...ids], comunicarAte: somarDiasUteis(dia, PRAZO_COMUNICACAO_REPROVADOS_DIAS_UTEIS, e.parametros.feriados), retirarAte: somarDiasUteis(dia, PRAZO_RETIRADA_REPROVADOS_DIAS_UTEIS, e.parametros.feriados),
   };
-  f.historico.push(evento(ctx, 'ocorrencia', `${ids.length} reprovado(s): comunicar o fornecedor até ${f.reprovacao.comunicarAte}; retirada até ${f.reprovacao.retirarAte}`));
+  registrar(e, ctx, 'fardo', f.id, 'segregado', `${ids.length} reprovado(s): comunicar o fornecedor até ${f.reprovacao.comunicarAte}; retirada até ${f.reprovacao.retirarAte}`);
 }
 
 /** Registra que o fornecedor foi comunicado dos reprovados do fardo. */
@@ -91,7 +91,7 @@ export function registrarComunicacao(e: Estado, fardoId: Id, ctx: Ctx) {
   if (f.reprovacao.comunicadoEm) falha(409, 'A comunicação ao fornecedor já foi registrada.');
   f.reprovacao.comunicadoEm = instante(ctx);
   f.reprovacao.comunicadoPor = ctx.quem;
-  f.historico.push(evento(ctx, 'ocorrencia', `Fornecedor comunicado dos ${f.reprovacao.dormentesIds.length} reprovado(s)`));
+  registrar(e, ctx, 'fardo', f.id, 'comunicado', `Fornecedor comunicado dos ${f.reprovacao.dormentesIds.length} reprovado(s)`);
   return f;
 }
 
@@ -108,7 +108,7 @@ export function registrarRetirada(e: Estado, fardoId: Id, ctx: Ctx) {
   e.movimentacoes.push({ id: novoId(e, 'mv'), tipo: 'retirada', fardoId: f.id, dormentesIds: ids, quantidade: ids.length, deLocalId: seg, quando: instante(ctx), quem: ctx.quem });
   r.retiradoEm = instante(ctx);
   r.retiradoPor = ctx.quem;
-  f.historico.push(evento(ctx, 'ocorrencia', `${ids.length} reprovado(s) retirado(s) pelo fornecedor`));
+  registrar(e, ctx, 'fardo', f.id, 'retirado', `${ids.length} reprovado(s) retirado(s) pelo fornecedor`);
   return f;
 }
 
@@ -167,7 +167,7 @@ export function concluirInspecao(e: Estado, fardoId: Id, dados: { localId: Id; j
   }
   f.localId = local.id;
   f.conclusaoInspecao = { quando: instante(ctx), quem: ctx.quem, justificativa: naoLidos.length ? justificativa : undefined, naoLocalizados: naoLidos };
-  f.historico.push(evento(ctx, 'inspecionado', `Inspeção concluída: ${aprovados.length} aprovados, ${reprovados.length} reprovados${naoLidos.length ? `, ${naoLidos.length} não localizados` : ''}`));
-  f.historico.push(evento(ctx, 'guardado', `Guardado em ${local.codigo}`));
+  registrar(e, ctx, 'fardo', f.id, 'inspecionado', `Inspeção concluída: ${aprovados.length} aprovados, ${reprovados.length} reprovados${naoLidos.length ? `, ${naoLidos.length} não localizados` : ''}`);
+  registrar(e, ctx, 'fardo', f.id, 'guardado', `Guardado em ${local.codigo}`);
   return f;
 }

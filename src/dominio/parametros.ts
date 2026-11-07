@@ -3,7 +3,7 @@
  * regras valem no banco. Valores que a CPTM ainda vai definir NÃO ficam aqui: estão em `servicos.parametros`
  * (limite de dias em estoque, antecedência dos alertas de DOF, níveis de estoque, limites das categorias).
  */
-import type { Categoria, Classe, NivelPrazo, RegrasAta, ResultadoInspecao, SituacaoParcela, SituacaoSaldo, TipoDestino, VereditoInspector } from '../types/models';
+import type { Categoria, Classe, Feriado, NivelPrazo, RegrasAta, ResultadoInspecao, SituacaoParcela, SituacaoSaldo, TipoDestino, VereditoInspector } from '../types/models';
 
 /** Divergência de volume acima disto (por espécie) gera alerta: regra da IN Ibama, não editável. */
 export const TOLERANCIA_VOLUME_PCT = 10;
@@ -110,26 +110,51 @@ export function diasEntre(de: string, ate: string): number {
   return Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / DIA_MS);
 }
 
-/** Soma dias úteis (segunda a sexta) a uma data AAAA-MM-DD. Feriados ainda não entram (a CPTM pode fornecer o calendário). */
-export function somarDiasUteis(aaaammdd: string, dias: number): string {
+/**
+ * Feriados de 2026 e 2027 nos dados iniciais: nacionais (inclusive a Consciência Negra, nacional desde 2024), do estado
+ * de São Paulo (9 de julho) e da cidade de São Paulo (25 de janeiro e Corpus Christi). Carnaval é ponto facultativo e
+ * não entra. Editáveis nos parâmetros.
+ */
+export const FERIADOS_PADRAO: Feriado[] = [2026, 2027].flatMap((ano) => {
+  const pascoa = ano === 2026 ? '2026-04-05' : '2027-03-28';
+  const n = (data: string, nome: string): Feriado => ({ data, nome, abrangencia: 'nacional' });
+  return [
+    n(`${ano}-01-01`, 'Confraternização Universal'),
+    { data: `${ano}-01-25`, nome: 'Aniversário da cidade de São Paulo', abrangencia: 'municipal' as const },
+    n(somarDias(pascoa, -2), 'Sexta-feira Santa'),
+    n(`${ano}-04-21`, 'Tiradentes'),
+    n(`${ano}-05-01`, 'Dia do Trabalho'),
+    { data: somarDias(pascoa, 60), nome: 'Corpus Christi', abrangencia: 'municipal' as const },
+    { data: `${ano}-07-09`, nome: 'Revolução Constitucionalista', abrangencia: 'estadual' as const },
+    n(`${ano}-09-07`, 'Independência do Brasil'),
+    n(`${ano}-10-12`, 'Nossa Senhora Aparecida'),
+    n(`${ano}-11-02`, 'Finados'),
+    n(`${ano}-11-15`, 'Proclamação da República'),
+    n(`${ano}-11-20`, 'Dia Nacional de Zumbi e da Consciência Negra'),
+    n(`${ano}-12-25`, 'Natal'),
+  ];
+});
+
+const util = (d: string, feriados: Set<string>) => { const s = new Date(`${d}T00:00:00Z`).getUTCDay(); return s !== 0 && s !== 6 && !feriados.has(d); };
+
+/** Soma dias úteis (segunda a sexta, fora os feriados dos parâmetros) a uma data AAAA-MM-DD. */
+export function somarDiasUteis(aaaammdd: string, dias: number, feriados: Feriado[] = []): string {
+  const f = new Set(feriados.map((x) => x.data));
   let d = aaaammdd;
   let falta = dias;
   while (falta > 0) {
     d = somarDias(d, 1);
-    const semana = new Date(`${d}T00:00:00Z`).getUTCDay();
-    if (semana !== 0 && semana !== 6) falta--;
+    if (util(d, f)) falta--;
   }
   return d;
 }
 
-/** Dias úteis de `de` até `ate` (negativo se `ate` já passou). */
-export function diasUteisEntre(de: string, ate: string): number {
-  if (ate < de) return -diasUteisEntre(ate, de);
+/** Dias úteis de `de` até `ate` (negativo se `ate` já passou), fora os feriados. */
+export function diasUteisEntre(de: string, ate: string, feriados: Feriado[] = []): number {
+  if (ate < de) return -diasUteisEntre(ate, de, feriados);
+  const f = new Set(feriados.map((x) => x.data));
   let n = 0;
-  for (let d = de; d < ate; d = somarDias(d, 1)) {
-    const semana = new Date(`${somarDias(d, 1)}T00:00:00Z`).getUTCDay();
-    if (semana !== 0 && semana !== 6) n++;
-  }
+  for (let d = de; d < ate; d = somarDias(d, 1)) if (util(somarDias(d, 1), f)) n++;
   return n;
 }
 
@@ -161,9 +186,9 @@ export function situacaoParcela(quantidade: number, recebidos: number, fim: stri
 }
 
 /** Nível do prazo em dias úteis (laudo): vencido, crítico, atenção ou ok. */
-export function nivelPrazoUteis(prazo: string, hoje: string, [atencao, critico]: [number, number]): NivelPrazo {
+export function nivelPrazoUteis(prazo: string, hoje: string, [atencao, critico]: [number, number], feriados: Feriado[] = []): NivelPrazo {
   if (hoje > prazo) return 'vencido';
-  const dias = diasUteisEntre(hoje, prazo);
+  const dias = diasUteisEntre(hoje, prazo, feriados);
   if (dias <= critico) return 'critico';
   if (dias <= atencao) return 'atencao';
   return 'ok';

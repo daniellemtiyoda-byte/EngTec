@@ -28,8 +28,6 @@ function Prazo({ ate, feito }: { ate: string; feito?: string }) {
   return <>{data(ate)}{hojeSP() > ate && <> <Badge tom="vermelho">atrasado</Badge></>}</>;
 }
 
-/** Evento que marcou o dormente como não localizado (data e justificativa da conclusão do fardo). */
-const marcacao = (d: Dormente) => [...d.historico].reverse().find((h) => h.tipo === 'nao_localizado');
 
 /**
  * Inspeção (seção 9.10 do plano): a fila dos fardos recebidos e ainda não concluídos, com o progresso; os dormentes
@@ -42,6 +40,9 @@ export default function Inspecao() {
   const cad = useCadastros();
   const [aba, setAba] = useAbaNoEndereco<AbaInspecao>(ABAS);
   const totais = useAsync(contar, []);
+  // Evento que marcou cada dormente como não localizado (data e justificativa da conclusão do fardo), do mais recente.
+  const marcas = useAsync(() => servicos.eventos.listar({ filters: { entidade: 'dormente', tipo: 'nao_localizado' }, pageSize: 1000 }), []);
+  const marcacao = (d: Dormente) => marcas.dados?.items.find((h) => h.entidadeId === d.id);
   const contratos = useAsync(() => servicos.contratos.listar({ pageSize: 500 }), []);
   const itens = new Map((contratos.dados?.items ?? []).flatMap((c) => c.itens.map((i) => [i.id, i] as const)));
   const operar = pode('inspecao:operar');

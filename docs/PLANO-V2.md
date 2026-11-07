@@ -73,6 +73,7 @@ O menu segue a **jornada do dormente** (contrato → NF e DOF → recebimento �
 | Grupo | Item do menu | Rota | Perfis |
 | --- | --- | --- | --- |
 | Início | Painel | `/` | Todos |
+| Início | Relatórios (seção IBAMA) | `/relatorios` | Administrador, Almoxarife, Gestor (Etapa 10) |
 | Suprimento | Contratos | `/contratos` | Administrador, Almoxarife, Gestor |
 | Suprimento | Simulador do fornecedor (selo "Demo") | `/simulador` | Administrador, Almoxarife |
 | Entrada | NF e DOF | `/documentos` | Administrador, Almoxarife, Gestor |
@@ -146,7 +147,7 @@ Ficha do dormente ──► Fardo, Local, Contrato, Fornecedor, NF, DOF, Recebim
 
 ## 5. Modelo de dados (TypeScript, `src/types/models.ts`)
 
-Reescrever o arquivo. Manter `Paginado<T>`, `ListQuery`, `Origem`, `Usuario`. Todo registro que muda de estado guarda `quem` e `quando` (`criadoPor`, `criadoEm`, e eventos em `historico`).
+Reescrever o arquivo. Manter `Paginado<T>`, `ListQuery`, `Origem`, `Usuario`. Todo registro que muda de estado guarda `quem` e `quando` (`criadoPor`, `criadoEm`), e toda operação que muda o estado registra um **Evento** (histórico e auditoria, tabela própria).
 
 ### 5.1 Identificação (`src/dominio/identificacao.ts`, novo)
 
@@ -223,15 +224,19 @@ interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId /* = tama
   disponivel: number /* calculado: dormentes em_estoque (livres para nova saída) */;
   localId?: string; situacao: SituacaoFardo;
   conclusaoInspecao?: { quando; quem; justificativa? /* obrigatória com não localizados */; naoLocalizados: string[] };
-  recebidoEm?: string; idadeDias?: number /* calculado */; historico: Evento[] }
+  recebidoEm?: string; idadeDias?: number /* calculado */ }
 
 type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'retirado' | 'nao_localizado';
 interface Dormente { id /* AR00224-01-000357 */; contratoId; itemContratoId; fardoId: string; especieId; classe; tratamentoId; usinaTratamento; dataTratamento /* do próprio dormente */;
   situacao: SituacaoDormente; categoria?: number; medidas?: { comprimentoCm; larguraCm; alturaCm };
-  inspecaoId?: string; rmeNumero?: string; historico: Evento[] }
+  inspecaoId?: string; rmeNumero?: string }
 
-interface Evento { quando; quem; tipo: 'emitido' | 'recebido' | 'inspecionado' | 'guardado' | 'transferido'
-  | 'reservado' | 'baixado' | 'segregado' | 'nao_localizado' | 'cancelado'; descricao: string; referencia?: string }
+// Histórico e auditoria: uma tabela só de inclusão. As linhas do tempo da ficha, do fardo, do contrato e da RME vêm dela.
+interface Evento { id; tipo: 'criado' | 'alterado' | 'inativado' | 'reativado' | 'cancelado' | 'emitido' | 'recebido' | 'inspecionado'
+  | 'guardado' | 'transferido' | 'reservado' | 'baixado' | 'segregado' | 'nao_localizado' | 'ocorrencia' | 'declarado' | 'laudo'
+  | 'comunicado' | 'retirado' | 'lancado' | 'informado';
+  entidade: 'fardo' | 'dormente' | 'contrato' | 'ata' | 'entrega' | 'rme' | 'fornecedor' | 'cadastro' | 'local' | 'parametros' | 'usuario' | 'saldo_dof';
+  entidadeId; descricao: string; referencia?: string; quem; quando }
 ```
 
 Invariantes (garantidas no serviço, nunca na tela):
@@ -291,7 +296,7 @@ Regras **provisórias**, a confirmar com o time da inspeção (ficam em `dominio
 - **Cura:** dormentes tratados com **CCA ou CCB** só ficam disponíveis para separação **15 dias após a data de tratamento**. Antes disso aparecem "em cura" no estoque, com a data de liberação; não entram na sugestão nem na separação.
 - **Classe pelo destino da RME:** o requisitante informa o tipo de destino (linha principal de tráfego pesado, linha principal de tráfego médio, desvio ou pátio). O sistema sugere a classe mínima (**1ª para tráfego pesado; 2ª aceita nos demais**) e, se a separação usar classe inferior à sugerida, avisa e pede justificativa.
 
-**Modelo fechado (antes do Supabase).** Entidades gravadas, que viram tabelas: Usuário (perfil), Fornecedor, Espécie, Tamanho, Tratamento, Empresa inspetora, Local, Ata (com regras e itens registrados), Contrato (com itens e parcelas), Emissão do fornecedor (Simulador), Fardo (com marcação, conclusão da inspeção e reprovação), Dormente, NF (com itens), DOF (com volumes por espécie), Entrega (com boletim, relatório técnico e laudo), Recebimento (com ocorrências e canhoto), Inspeção, Movimentação, RME (com itens e separação), Parâmetros (com níveis de estoque) e Anexo. Tudo o mais (saldo, disponível, em cura, situação do fardo e da parcela, prazos, divergência de volume, saldo da ata, garantia) é calculado: no Supabase, views e funções.
+**Modelo fechado (antes do Supabase).** Entidades gravadas, que viram tabelas: Usuário (perfil), Fornecedor, Espécie, Tamanho, Tratamento, Empresa inspetora, Local, Ata (com regras e itens registrados), Contrato (com itens e parcelas), Emissão do fornecedor (Simulador), Fardo (com marcação, conclusão da inspeção e reprovação), Dormente, NF (com itens), DOF (com volumes por espécie), Entrega (com boletim, relatório técnico e laudo), Recebimento (com ocorrências e canhoto), Inspeção, Movimentação, RME (com itens e separação), Evento, Destinação final, Saldo informado do DOF, Parâmetros (com níveis de estoque e feriados) e Anexo. Tudo o mais (saldo, disponível, em cura, situação do fardo e da parcela, prazos, divergência de volume, saldo da ata, garantia) é calculado: no Supabase, views e funções.
 
 ### 5.6 Estoque e saída
 
@@ -305,12 +310,22 @@ type SituacaoRme = 'aberta' | 'em_separacao' | 'pronta' | 'entregue' | 'cancelad
 interface Rme { id; numero /* RME-2026-0012 */; solicitanteId; destino: string /* obra ou trecho */;
   tipoDestino: 'principal_pesado' | 'principal_medio' | 'desvio' | 'patio' /* sugere a classe mínima */; necessidadeEm: string;
   itens: { tamanhoId; classe /* obrigatórios */; categoriaMinima? /* padrão: qualquer aprovado */; especieId?; quantidade }[]; separacao?: { fardoId; dormentesIds: string[]; seguiuSugestao: boolean; justificativa?; justificativaClasse? /* classe abaixo da sugerida */ }[];
-  situacao: SituacaoRme; historico: Evento[] }
+  situacao: SituacaoRme }
+
+// IBAMA (IN Ibama 21/2014)
+// Gerada na entrega da RME, uma por espécie: o volume a lançar como "Destinação Final" no sistema DOF (baixa o saldo virtual).
+interface DestinacaoFinal { id; rmeId; rmeNumero; especieId; quantidade; volumeM3 /* medido; sem medidas, o do tamanho */; entregueEm; lancadoEm?; lancadoPor? }
+// Registro periódico do saldo que aparece no sistema DOF, por espécie.
+interface SaldoDofInformado { id; data; itens: { especieId; volumeM3 }[]; observacao?; quem; quando }
+// Calculado: saldo físico do pátio por espécie e tamanho × último saldo informado (alerta acima de 10%, art. 41).
+interface SaldoPatioEspecie { especieId; quantidade; fisicoM3; porTamanho: { tamanhoId; quantidade; volumeM3 }[]; informadoM3?; informadoEm?; diferencaPct?; acimaTolerancia }
 ```
+
+O **nível de estoque** (`SaldoItem.situacao`) compara o mínimo e o máximo com o **disponível somado ao que está em cura**: item abaixo do mínimo só por causa da cura não é falta e não gera alerta de reposição. A tela mostra a parte em cura separada, com a data de liberação.
 
 ### 5.7 Parâmetros (`servicos.parametros`, editados em Configurações)
 
-`limiteDiasEstoque` (provisório 120), `alertaDofDias` ([3, 1]), `toleranciaVolumePct` (10, regra IBAMA, só leitura), `limitesCategoria` ([80, 50], provisório), `dormentesPorFardoPadrao` (14, sugestão do simulador), `niveis: NivelEstoque[]`, `modoDemonstracao` (mostra o Simulador).
+`limiteDiasEstoque` (provisório 120), `alertaDofDias` ([3, 1]), `toleranciaVolumePct` (10, regra IBAMA, só leitura), `limitesCategoria` ([80, 50], provisório), `dormentesPorFardoPadrao` (14, sugestão do simulador), `niveis: NivelEstoque[]`, `modoDemonstracao` (mostra o Simulador), `feriados: Feriado[]` (`{ data, nome, abrangencia: 'nacional' | 'estadual' | 'municipal' }`, fora dos dias úteis do prazo do laudo e da comunicação e retirada de reprovados; os dados iniciais trazem os feriados nacionais e os do estado e da cidade de São Paulo de 2026 e 2027).
 
 ---
 
@@ -335,6 +350,8 @@ Manter o padrão: telas importam só `servicos`; contrato em `contracts.ts`; cad
 | `estoque` | `porItem(q)` (paginado; filtros espécie, tamanho e situação; busca pelos nomes), `porFardo(q)` (filtros espécie, tamanho, local, situação e `acimaLimite`) |
 | `movimentacoes` | `listar` (filtros tipo, `periodo` em dias e `localId` de ou para) |
 | `rme` | `listar`, `obter`, `abrir`, `iniciarSeparacao(numero)`, `sugerirSeparacao(numero)`, `separar`, `entregar`, `cancelar` |
+| `eventos` | `listar` (filtros `entidade`, `entidadeId` e `tipo`; do mais recente ao mais antigo) |
+| `ibama` | `destinacoes(q)` (filtros `lancado`, `especieId`, `de`, `ate`), `marcarLancado(id)`, `saldosInformados(q)`, `informarSaldo({ data, itens, observacao? })`, `saldoPatio()`; as ações exigem `dof:declarar` |
 | `parametros` | `obter`, `atualizar`, `reiniciarDemonstracao()` (só no mock) |
 
 **Mock (até a Etapa 9).**
@@ -589,6 +606,21 @@ Ver seção 10. Aberto pelo botão do topo, pela busca e pelos assistentes.
 - Usuários: lista (nome, e-mail, perfil, situação) e edita só perfil e situação. As contas são criadas no painel do Supabase (Etapa 9); até lá a lista mostra os quatro perfis de demonstração.
 - Configurações: parâmetros da seção 5.7, com a tabela de **níveis de estoque** (mínimo e máximo por espécie + tamanho) editável, o interruptor **Modo demonstração** e, só no mock, **Reiniciar dados de demonstração**.
 
+### 9.21 Relatórios (`/relatorios`) · seção IBAMA (Etapa 10)
+
+Item de menu **Relatórios** (grupo Início, depois do Painel), com a seção **IBAMA** (IN Ibama 21/2014; reaproveita a "Prestação de contas ao IBAMA" do PRD da v1). O sistema não substitui o sistema DOF nem o Sinaflor: organiza o que a CPTM precisa lançar e conferir lá. Todos os relatórios têm **filtro de período**, **exportação em CSV** e **versão para impressão** (`@media print`, como as folhas de etiquetas). Perfis: administrador, almoxarife e gestor (`operacao:consultar`); as ações exigem `dof:declarar`.
+
+| Relatório | O que mostra | Norma | Serviço |
+| --- | --- | --- | --- |
+| 1. Saldo do pátio | Volume em m³ por espécie (nome científico) e tamanho dos dormentes no pátio (aguardando inspeção, em estoque, reservados, reprovados ainda não retirados e não localizados), comparado com o último saldo informado do DOF, com a diferença e alerta acima de 10%; ação **Informar saldo do DOF** | art. 41 | `ibama.saldoPatio()`, `ibama.informarSaldo()`, `ibama.saldosInformados()` |
+| 2. Destinação final | Volume por espécie das RMEs entregues no período, lançado ou não no DOF, com a ação **Marcar como lançado no DOF** e alerta para as pendências | baixa do saldo virtual | `ibama.destinacoes()`, `ibama.marcarLancado()` |
+| 3. DOFs a declarar | Atalho para a aba já existente em NF e DOF (`/documentos?aba=a_declarar`) | art. 51 | `dof` |
+| 4. Divergências de volume | DOF × volume medido na inspeção (nominal enquanto não há medido), por entrega e espécie, com a justificativa | art. 53 | `entrega.divergenciaVolume` |
+| 5. Inventário para vistoria | Fardos por local e espécie, com quantidade, m³, NF e DOF de origem | art. 65 | `estoque.porFardo` + documentos |
+| 6. Movimento anual | Entradas (recebimentos) e saídas (destinação final) por espécie e volume no ano | relatório anual (obrigatoriedade a confirmar com a CPTM) | movimentações + destinações |
+
+Alertas no Painel (Etapa 10): saldo do pátio acima de 10% do informado, destinação final pendente de lançamento e saldo do DOF sem atualização há mais de 30 dias.
+
 ### 9.20 Vitrine (`/vitrine`)
 - Interna: fora do menu, só administrador (`admin`). Dados fixos no próprio arquivo, sem serviço.
 - Mostra um exemplo do padrão Lista (cabeçalho, abas de situação, barra de filtros, tabela com ação na linha, cartões no celular) e um do padrão Objeto (cabeçalho do objeto com fatos-chave, abas, relacionados, linha do tempo), mais os componentes visuais da seção 7.3.
@@ -749,6 +781,7 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 ### Etapa 10 · Painel e alertas
 - Indicadores por perfil, taxa de reprovação por empresa inspetora, "Para fazer agora", gráfico de estoque por item com mínimo e máximo, entregas dos contratos, alertas (DOF, falta/excesso, idade, não localizados). "Início de campo" do almoxarife no celular (seção 11.1).
 - Já preparado no serviço desde o modelo real: parcelas atrasadas, laudos perto do prazo e vencidos, reprovados aguardando retirada, pontualidade por fornecedor, via corrente × AMV e a reposição (saldo na ata vigente e "Novo contrato").
+- **Relatórios** com a seção IBAMA (seção 9.21): saldo do pátio, destinação final, DOFs a declarar, divergências de volume, inventário para vistoria e movimento anual, com período, CSV e impressão. O modelo e os serviços (`ibama`) já existem desde o modelo fechado.
 - Pronto quando: todo número leva à lista filtrada e cada perfil vê só o que lhe cabe.
 
 ### Etapa 11 · Acabamento e demonstração
@@ -827,4 +860,5 @@ Executado na Etapa 11, já com o Supabase, para computador e celular compartilha
 | Nome popular de *Dialium guianense* | "Jataipeba" (a confirmar com a CPTM) |
 | Padrão da plaquinha de identificação e lista de espécies aceitas por classe | Obter a Especificação Técnica CPTM **AD1956-4**; no protótipo, o fornecedor informa espécie e classe por fardo e qualquer espécie que ele fornece é aceita |
 | Classe mínima por tipo de destino e prazo de cura | 1ª para linha principal de tráfego pesado, 2ª nos demais; cura de 15 dias para CCA e CCB (PIM-14 do DNIT e NBR 7511), até a AD1956-4 |
-| Feriados no cálculo de dias úteis (laudo, comunicação e retirada de reprovados) | Só sábados e domingos ficam de fora (a CPTM pode fornecer o calendário) |
+| Feriados no cálculo de dias úteis (laudo, comunicação e retirada de reprovados) | Lista editável nos parâmetros, com os feriados nacionais, do estado e da cidade de São Paulo de 2026 e 2027 (Carnaval, ponto facultativo, fora); confirmar o calendário da CPTM |
+| Relatório anual ao IBAMA e destinação dos reprovados retirados | Confirmar se a CPTM entrega relatório anual (RAPP) e como os reprovados devolvidos ao fornecedor saem do saldo do DOF |

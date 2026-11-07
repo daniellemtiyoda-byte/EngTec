@@ -9,7 +9,7 @@ import { Aviso, Carregando, Erro, Vazio } from '../components/Estados';
 import { FormModal } from '../components/FormModal';
 import { IdCodigo } from '../components/IdCodigo';
 import { BarraProgresso } from '../components/Indicadores';
-import { LinhaTempo, type EventoLinhaTempo } from '../components/LinhaTempo';
+import { LinhaTempo, linhaDoEvento, type EventoLinhaTempo } from '../components/LinhaTempo';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { MenuAcoes } from '../components/MenuAcoes';
 import { Relacionados } from '../components/Relacionados';
@@ -35,6 +35,7 @@ export default function ContratoDetalhe() {
   const r = useAsync(() => servicos.contratos.obter(num), [num]);
   const entregas = useAsync(() => servicos.documentos.listarEntregas({ pageSize: 200, filters: { contratoId: r.dados?.id ?? '-' } }), [r.dados?.id]);
   const parametros = useAsync(() => servicos.parametros.obter(), []);
+  const historico = useAsync(() => servicos.eventos.listar({ pageSize: 500, filters: { entidade: 'contrato', entidadeId: r.dados?.id ?? '-' } }), [r.dados?.id]);
   const [aba, setAba] = useAbaNoEndereco<AbaContrato>(['itens', 'parcelas', 'fardos', 'entregas', 'historico']);
   const [editar, setEditar] = useState(false);
   const [cancelar, setCancelar] = useState(false);
@@ -66,11 +67,8 @@ export default function ContratoDetalhe() {
     { chave: 'recebidoEm', titulo: 'Recebido em', ordenavel: true, render: (f) => data(f.recebidoEm) },
   ];
 
-  // Histórico do contrato: criação e entregas (cada entrega tem a sua NF e DOF).
-  const eventos: EventoLinhaTempo[] = [
-    ...lista.map((en) => ({ quando: en.criadoEm, quem: en.criadoPor, titulo: `Entrega da NF ${en.nfNumero} ${en.origem === 'simulador' ? 'gerada no simulador' : 'cadastrada'}`, detalhe: `${en.fardosIds.length} fardo(s), ${en.dormentes} dormentes`, marca: 'NF' })),
-    { quando: c.criadoEm, quem: c.criadoPor, titulo: 'Contrato criado', detalhe: `${c.itens.length} item(ns), ${numero(t.contratado)} dormentes`, marca: 'CT' },
-  ].sort((a, b) => b.quando.localeCompare(a.quando));
+  // Histórico do contrato: os eventos registrados (criação, edição, emissões, entregas, laudos, cancelamento).
+  const eventos: EventoLinhaTempo[] = (historico.dados?.items ?? []).map(linhaDoEvento);
 
   return (
     <section className="painel">

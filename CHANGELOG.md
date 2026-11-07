@@ -5,6 +5,21 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Corrigido
+- 2026-11-07: **Estoque e RME mostravam "Não foi possível carregar os dados" no ambiente local.**
+  - **Causa:** o navegador guardava o estado do mock gravado por uma versão anterior do código com a mesma `VERSAO_ESTADO` (fardos sem a data de tratamento, RMEs sem campos novos); ao montar as telas, a data vazia gerava "Invalid time value".
+  - **Correção:** versão dos dados subida para 9 e, ao abrir, o estado salvo é descartado (e a demonstração recriada) quando o formato não bate com o atual (`mesmoFormato` em `persistencia.ts`) ou quando não monta as visões das telas (`conferirVisoes` em `mock/index.ts`). Teste cobre cinco formas de dado antigo e confirma que o estado no formato atual é mantido. Todas as telas conferidas no Chrome headless, inclusive depois de estragar o estado salvo.
+
+### Adicionado
+- 2026-11-07: **Evento (histórico e auditoria), feriados, nível de estoque com a cura e o modelo do IBAMA**, antes do Supabase.
+  - **Evento:** tipo, entidade, id da entidade, descrição, referência, quem e quando; toda operação que muda o estado registra um (cadastros, atas, contratos, emissões, entregas, recebimentos, inspeção, laudo, reprovados, movimentações, RME, parâmetros, usuários). Fardo, dormente e RME perdem o `historico` gravado; as linhas do tempo da ficha, do fardo, do contrato e da RME vêm dos eventos (`servicos.eventos.listar`).
+  - **Feriados:** `parametros.feriados`, com os nacionais e os do estado e da cidade de São Paulo de 2026 e 2027, usados nos dias úteis do prazo do laudo e da comunicação e retirada de reprovados. A entrega da história com o laudo vencido foi recuada 3 dias para continuar vencida.
+  - **Nível com a cura:** o mínimo e o máximo comparam o disponível somado ao em cura; abaixo só pela cura não é falta. O Estoque mostra a cura separada com a liberação e "contando N em cura" na situação; a história tem o caso (006220 de 1ª classe).
+  - **IBAMA (IN Ibama 21/2014):** destinação final por espécie de cada RME entregue (volume a lançar no sistema DOF, com quem e quando lançou e evento) e saldo informado do DOF por espécie e data, com o saldo físico do pátio por espécie e tamanho para comparar (alerta acima de 10%). Serviço `ibama`; as telas (item Relatórios, seção IBAMA, seis relatórios com período, CSV e impressão) entram na etapa do Painel.
+  - Testes: 98 (dado antigo, eventos e linhas do tempo, feriados, nível com cura, destinação final e saldo do DOF).
+  - Docs: `docs/PLANO-V2.md` (3.2, 5, 5.6, 5.7, 6, nova 9.21, Etapa 10, pendências), `docs/ESPECIFICACAO-FUNCIONAL.md`, `CLAUDE.md`.
+  - Arquivos: `src/types/models.ts`, `src/services/contracts.ts`, `src/dominio/{parametros,rotulos}.ts`, `src/services/mock/{estado,persistencia,consultas,cadastros,documentos,recebimento,inspecao,estoque,rme,simulador,ibama,data,index}.ts`, testes, `src/components/LinhaTempo.tsx`, `src/pages/{Estoque,FichaDormente,FardoDetalhe,ContratoDetalhe,RmeDetalhe,Inspecao}.tsx`.
+
 ### Alterado
 - 2026-11-07: **Modelo fechado antes do Supabase: marcação, cura, tipo de destino da RME, URL da Vercel e nova ordem das etapas.**
   - **Por quê:** a próxima etapa cria o banco no Supabase, então o modelo precisa estar completo; e as regras técnicas dos dormentes de madeira (PIM-14 do DNIT e NBR 7511, até a AD1956-4 da CPTM) mudam o que pode sair do estoque.

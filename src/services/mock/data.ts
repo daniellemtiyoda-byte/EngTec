@@ -1,6 +1,6 @@
 import {
   dataSP, somarDias, ALERTA_DOF_DIAS_PADRAO, ALERTA_LAUDO_DIAS_PADRAO, DORMENTES_POR_FARDO_PADRAO, LIMITE_DIAS_ESTOQUE_PADRAO, LIMITES_CATEGORIA_PADRAO,
-  REGRAS_ATA_PADRAO, TOLERANCIA_VOLUME_PCT,
+  FERIADOS_PADRAO, REGRAS_ATA_PADRAO, TOLERANCIA_VOLUME_PCT,
 } from '../../dominio/parametros';
 import { PERFIS, PERFIS_LISTA, type Perfil } from '../../dominio/permissoes';
 import type { Classe, Id, TipoDestino, Usuario } from '../../types/models';
@@ -8,6 +8,7 @@ import { criarAta, criarContrato, salvarEmpresaInspetora, salvarEspecie, salvarF
 import { declararDof } from './documentos';
 import { VERSAO_ESTADO, type Ctx, type EntregaReg, type Estado } from './estado';
 import { concluirInspecao, registrarComunicacao, registrarInspecao, registrarRetirada, simularFardo } from './inspecao';
+import { informarSaldoDof, marcarDestinacaoLancada, saldoPatio } from './ibama';
 import { emitirLaudo, receber } from './recebimento';
 import { abrirRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
 import { emitir } from './simulador';
@@ -39,10 +40,11 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     versao: VERSAO_ESTADO, dataBase: base,
     usuarios: PERFIS_LISTA.map(usuarioDemo),
     fornecedores: [], especies: [], tamanhos: [], tratamentos: [], empresasInspetoras: [], locais: [], atas: [], contratos: [], fardos: [], dormentes: [],
-    emissoes: [], nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [],
+    emissoes: [], nfs: [], dofs: [], entregas: [], recebimentos: [], inspecoes: [], movimentacoes: [], rmes: [], eventos: [], destinacoes: [], saldosDof: [],
     parametros: {
       limiteDiasEstoque: LIMITE_DIAS_ESTOQUE_PADRAO, alertaDofDias: [...ALERTA_DOF_DIAS_PADRAO], toleranciaVolumePct: TOLERANCIA_VOLUME_PCT,
       limitesCategoria: [...LIMITES_CATEGORIA_PADRAO], dormentesPorFardoPadrao: DORMENTES_POR_FARDO_PADRAO, niveis: [], alertaLaudoDias: [...ALERTA_LAUDO_DIAS_PADRAO],
+      feriados: FERIADOS_PADRAO.map((f) => ({ ...f })),
       modoDemonstracao: true,
     },
     contadores: {},
@@ -59,23 +61,23 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   // ---------- Cadastros ----------
   em(400);
   const [jataipeba, macaranduba, cumaru, jatoba] = [
-    salvarEspecie(e, { nomeCientifico: 'Dialium guianense', nomePopular: 'Jataipeba' }),
-    salvarEspecie(e, { nomeCientifico: 'Manilkara huberi', nomePopular: 'Maçaranduba' }),
-    salvarEspecie(e, { nomeCientifico: 'Dipteryx odorata', nomePopular: 'Cumaru' }),
-    salvarEspecie(e, { nomeCientifico: 'Hymenaea courbaril', nomePopular: 'Jatobá' }),
+    salvarEspecie(e, { nomeCientifico: 'Dialium guianense', nomePopular: 'Jataipeba' }, adm()),
+    salvarEspecie(e, { nomeCientifico: 'Manilkara huberi', nomePopular: 'Maçaranduba' }, adm()),
+    salvarEspecie(e, { nomeCientifico: 'Dipteryx odorata', nomePopular: 'Cumaru' }, adm()),
+    salvarEspecie(e, { nomeCientifico: 'Hymenaea courbaril', nomePopular: 'Jatobá' }, adm()),
   ];
   // Itens de compra da CPTM: código de material, todos com 240 mm × 170 mm. 2,80 m = via corrente; 3,00 a 5,40 m = AMV.
   const tamanho = (codigo: string, comprimentoCm: number) =>
-    salvarTamanho(e, { codigo, comprimentoCm, larguraCm: 24, alturaCm: 17, uso: comprimentoCm === 280 ? 'via_corrente' : 'amv', medidas: 'confirmado' });
+    salvarTamanho(e, { codigo, comprimentoCm, larguraCm: 24, alturaCm: 17, uso: comprimentoCm === 280 ? 'via_corrente' : 'amv', medidas: 'confirmado' }, adm());
   const [t006234, t006219, t006220, t006221, t006222] = [
     tamanho('006234', 280), tamanho('006219', 300), tamanho('006220', 320), tamanho('006221', 340), tamanho('006222', 360),
   ];
   const amvMaiores = [['006223', 380], ['006224', 400], ['006225', 420], ['006226', 440], ['006227', 460], ['006228', 480], ['006231', 540]] as const;
   const outrosAmv = amvMaiores.map(([c, cm]) => tamanho(c, cm));
-  salvarTratamento(e, { preservativo: 'CCA', empresa: 'Tratadora Exemplo A Ltda.' });
-  salvarTratamento(e, { preservativo: 'CCB', empresa: 'Tratadora Exemplo B Ltda.' });
-  salvarEmpresaInspetora(e, { nome: 'IPT' });
-  salvarEmpresaInspetora(e, { nome: 'UFV' });
+  salvarTratamento(e, { preservativo: 'CCA', empresa: 'Tratadora Exemplo A Ltda.' }, adm());
+  salvarTratamento(e, { preservativo: 'CCB', empresa: 'Tratadora Exemplo B Ltda.' }, adm());
+  salvarEmpresaInspetora(e, { nome: 'IPT' }, adm());
+  salvarEmpresaInspetora(e, { nome: 'UFV' }, adm());
   const local = (codigo: string, descricao: string, tipo: 'armazenagem' | 'inspecao' | 'segregacao' | 'expedicao', capacidade: number) =>
     salvarLocal(e, { codigo, descricao, tipo, capacidade }, adm());
   const [a01, a02, a03, a04, a05] = ['A-01', 'A-02', 'A-03', 'A-04', 'A-05'].map((c, i) => local(c, `Pátio A, área ${i + 1}`, 'armazenagem', 200));
@@ -83,9 +85,9 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   local('SEG-01', 'Segregação de reprovados', 'segregacao', 60);
   local('EXP-01', 'Expedição', 'expedicao', 120);
 
-  const fA = salvarFornecedor(e, { razaoSocial: 'Madeireira Exemplo A Ltda.', cnpj: '00000000000101', cidadeUf: 'Cidade A/PA', ctfIbama: '1000001', ctfValidade: somarDias(base, 400), especiesIds: [jataipeba.id, macaranduba.id, cumaru.id] });
-  const fB = salvarFornecedor(e, { razaoSocial: 'Florestal Exemplo B S.A.', cnpj: '00000000000102', cidadeUf: 'Cidade B/MT', ctfIbama: '1000002', ctfValidade: somarDias(base, 20), especiesIds: [macaranduba.id, jatoba.id] });
-  salvarFornecedor(e, { razaoSocial: 'Serraria Exemplo C Ltda.', cnpj: '00000000000103', cidadeUf: 'Cidade C/RO', ctfIbama: '1000003', ctfValidade: somarDias(base, -10), especiesIds: [jataipeba.id] });
+  const fA = salvarFornecedor(e, { razaoSocial: 'Madeireira Exemplo A Ltda.', cnpj: '00000000000101', cidadeUf: 'Cidade A/PA', ctfIbama: '1000001', ctfValidade: somarDias(base, 400), especiesIds: [jataipeba.id, macaranduba.id, cumaru.id] }, adm());
+  const fB = salvarFornecedor(e, { razaoSocial: 'Florestal Exemplo B S.A.', cnpj: '00000000000102', cidadeUf: 'Cidade B/MT', ctfIbama: '1000002', ctfValidade: somarDias(base, 20), especiesIds: [macaranduba.id, jatoba.id] }, adm());
+  salvarFornecedor(e, { razaoSocial: 'Serraria Exemplo C Ltda.', cnpj: '00000000000103', cidadeUf: 'Cidade C/RO', ctfIbama: '1000003', ctfValidade: somarDias(base, -10), especiesIds: [jataipeba.id] }, adm());
 
   // ---------- Atas e contratos ----------
   const ano = Number(base.slice(0, 4));
@@ -115,7 +117,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     { classe: 2, tamanhoId: t006234.id, minimo: 0, maximo: 60 },
     { classe: 1, tamanhoId: t006219.id, minimo: 20, maximo: 100 }, // fica abaixo do mínimo
     { classe: 1, tamanhoId: t006222.id, minimo: 5, maximo: 60 },
-    { classe: 1, tamanhoId: t006220.id, minimo: 0, maximo: 80 },
+    { classe: 1, tamanhoId: t006220.id, minimo: 20, maximo: 80 }, // abaixo do mínimo só pela cura: não é falta
   ];
 
   // ---------- Passos reutilizados ----------
@@ -166,8 +168,10 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   const c3 = criarContrato(e, { numero: 'AR00311-01', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -130), gestor: 'Gestor Exemplo 2', parcelas: cronograma([[t006234.id, 42]], [[t006234.id, 28]]) }, adm());
   const [ic3] = c3.itens;
 
+  const lancarDestinacao = (rme: string) => { for (const d of e.destinacoes.filter((x) => x.rmeNumero === rme)) marcarDestinacaoLancada(e, d.id, alm()); };
   const r1 = abrir(125, 'Linha 10 · Trecho Santo André (AMV)', 'principal_pesado', t006222.id, 1, 14);
   em(124); iniciarSeparacao(e, r1, alm()); separarSugestao(r1); em(123); entregarRme(e, r1, alm());
+  em(120); lancarDestinacao(r1);
 
   em(40);
   // AR00224-01 e -02 assinados há 40 dias: as parcelas estão dentro do prazo.
@@ -188,8 +192,8 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
 
   // E6 (1ª parcela do AR00311-01, entregue com atraso): um fardo concluído com 2 dormentes não lidos (não localizados);
   // reprovados comunicados e ainda não retirados (retirada atrasada); laudo não emitido (prazo vencido).
-  const e6 = gerar(30, c3.id, 1, [{ itemContratoId: ic3.id, fardos: 3 }]);
-  receberEm(29, e6);
+  const e6 = gerar(33, c3.id, 1, [{ itemContratoId: ic3.id, fardos: 3 }]);
+  receberEm(32, e6);
   inspecionarEGuardar(27, e6.fardosIds[0], a05.id); inspecionarEGuardar(27, e6.fardosIds[1], a05.id);
   em(27, 15);
   const ultimo = e6.fardosIds[2];
@@ -211,9 +215,10 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   // Saídas depois da cura dos dormentes da E2 (tratados 30 dias atrás, liberados há 15).
   const r3 = abrir(14, 'Linha 7 · Trecho Jundiaí (AMV)', 'principal_medio', t006219.id, 1, 10);
   em(14, 15); iniciarSeparacao(e, r3, alm()); separarSugestao(r3); entregarRme(e, r3, alm());
+  em(13, 10); lancarDestinacao(r3);
 
   const r2 = abrir(13, 'Linha 11 · Pátio Engenheiro São Paulo', 'patio', t006234.id, 1, 8);
-  em(13, 15); iniciarSeparacao(e, r2, alm()); separarSugestao(r2); em(12, 8); entregarRme(e, r2, alm());
+  em(13, 15); iniciarSeparacao(e, r2, alm()); separarSugestao(r2); em(12, 8); entregarRme(e, r2, alm());  // destinação final ainda não lançada no DOF (pendência)
 
   // E9 (AR00224-02, AMV 3,20 m): recebida e inspecionada, ainda EM CURA (CCA/CCB: 15 dias do tratamento); reprovado
   // ainda sem comunicação; laudo a emitir no prazo.
@@ -252,6 +257,14 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   const r5 = abrir(4, 'Linha 11 · Trecho Mogi das Cruzes', 'principal_pesado', t006234.id, 1, 20);
   em(3); iniciarSeparacao(e, r5, alm());
   abrir(2, 'Linha 7 · Desvio de Francisco Morato (AMV)', 'desvio', t006219.id, 2, 6);
+
+  // Saldo do DOF informado há 7 dias: igual ao físico, menos a Maçaranduba, 15% acima (alerta do art. 41).
+  em(7, 9);
+  informarSaldoDof(e, {
+    data: somarDias(base, -7),
+    itens: saldoPatio(e).filter((s) => s.fisicoM3 > 0).map((s) => ({ especieId: s.especieId, volumeM3: s.especieId === 'es0002' ? s.fisicoM3 * 1.15 : s.fisicoM3 })),
+    observacao: 'Consulta mensal do saldo no sistema DOF.',
+  }, alm());
 
   // E3 (2ª parcela do AR00224-01): a entrega "a caminho" com IDs fixos e DOF que vence em 3 dias.
   gerar(1, c1.id, 2, [{ itemContratoId: ic1.id, fardos: 2 }, { itemContratoId: ic2.id, fardos: 1 }], 3);

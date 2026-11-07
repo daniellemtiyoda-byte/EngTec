@@ -3,7 +3,7 @@ import type { Entrega, Id, Ocorrencia, PreviaRecebimento, Recebimento } from '..
 import type { DadosRecebimento, FaltaDormentes } from '../contracts';
 import { divergenciaVolume as calcularDivergencia, dormentesDoFardo, entregaView } from './consultas';
 import { exigirReentregaLiberada } from './documentos';
-import { achar, anexo, evento, falha, instante, novoId, proximoNumero, type Ctx, type EntregaReg, type Estado, type FardoReg } from './estado';
+import { achar, anexo, registrar, falha, instante, novoId, proximoNumero, type Ctx, type EntregaReg, type Estado, type FardoReg } from './estado';
 import { movimentarDormentes } from './estoque';
 
 /**
@@ -129,12 +129,12 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
     f.recebidoEm = instante(ctx);
     f.localId = local.id;
     if (faltaPorFardo.get(f.id)) f.faltaDeclarada = faltaPorFardo.get(f.id);
-    f.historico.push(evento(ctx, 'recebido', `Recebido na ${ref}, aguardando inspeção em ${local.codigo}`, ref));
+    registrar(e, ctx, 'fardo', f.id, 'recebido', `Recebido na ${ref}, aguardando inspeção em ${local.codigo}`, ref);
     const ids = dormentesDoFardo(e, f.id).filter((d) => d.situacao === 'emitido').map((d) => d.id);
     movimentarDormentes(e, ids, 'aguardando_inspecao', { evento: { tipo: 'recebido', descricao: `Recebido na ${ref} (fardo ${f.id})`, referencia: ref } }, ctx);
   }
   for (const o of ocorrencias.filter((x) => x.fardoId && lidos.has(x.fardoId))) {
-    e.fardos.find((f) => f.id === o.fardoId)?.historico.push(evento(ctx, 'ocorrencia', `Ocorrência no recebimento: ${o.descricao}`, ref));
+    registrar(e, ctx, 'fardo', o.fardoId!, 'ocorrencia', `Ocorrência no recebimento: ${o.descricao}`, ref);
   }
   entrega.situacao = e.fardos.filter((f) => entrega.fardosIds.includes(f.id)).every((f) => f.recebidoEm) ? 'recebida' : 'recebida_parcial';
 
@@ -145,6 +145,7 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
     ocorrencias, divergenciaVolume, justificativaDivergencia, justificativaAutomatica, localEsperaId: local.id,
   };
   e.recebimentos.push(rec);
+  registrar(e, ctx, 'entrega', entrega.id, 'recebido', `Recebimento provisório: ${aceitos.length} fardo(s) em ${local.codigo}${ocorrencias.length ? `, ${ocorrencias.length} ocorrência(s)` : ''}`, ref);
   return rec;
 }
 
@@ -163,6 +164,8 @@ export function emitirLaudo(e: Estado, entregaId: Id, ctx: Ctx): Entrega {
   const ano = dataSP(ctx.agora()).slice(0, 4);
   en.laudo = { numero: `LT-${ano}-${String(proximoNumero(e, 'numeroLaudo', 1)).padStart(4, '0')}`, emitidoEm: instante(ctx), emitidoPor: ctx.quem, aprovados, reprovados };
   const nf = e.nfs.find((n) => n.id === en.nfId);
-  for (const f of e.fardos.filter((x) => en.fardosIds.includes(x.id))) f.historico.push(evento(ctx, 'ocorrencia', `Laudo Técnico ${en.laudo.numero} emitido`, nf ? `NF ${nf.numero}` : undefined));
+  registrar(e, ctx, 'entrega', en.id, 'laudo', `Laudo Técnico ${en.laudo.numero} emitido: ${aprovados} aprovados, ${reprovados} reprovados`, en.laudo.numero);
+  registrar(e, ctx, 'contrato', en.contratoId, 'laudo', `Laudo Técnico ${en.laudo.numero} da NF ${nf?.numero ?? ''}`, en.laudo.numero);
+  for (const f of e.fardos.filter((x) => en.fardosIds.includes(x.id))) registrar(e, ctx, 'fardo', f.id, 'laudo', `Laudo Técnico ${en.laudo.numero} emitido`, nf ? `NF ${nf.numero}` : undefined);
   return entregaView(e, en, dataSP(ctx.agora()));
 }

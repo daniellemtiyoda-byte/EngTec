@@ -3,7 +3,7 @@ import type { BoletimInspecao, Id, RelatorioTecnico } from '../../types/models';
 import { chaveAcessoValida, mesmoCnpj } from '../../utils/nfeXml';
 import type { ArquivosEntrega, DadosEntrega } from '../contracts';
 import { contratoView } from './consultas';
-import { achar, anexo, evento, falha, instante, novoId, type Ctx, type EntregaReg, type Estado } from './estado';
+import { achar, anexo, registrar, falha, instante, novoId, type Ctx, type EntregaReg, type Estado } from './estado';
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -111,6 +111,9 @@ export function cadastrarEntrega(e: Estado, dados: DadosEntrega, origem: Entrega
   e.entregas.push(entrega);
   for (const f of e.fardos.filter((x) => fardosIds.includes(x.id))) f.entregaId = entregaId;
   if (emissao) emissao.entregaId = entregaId;
+  const desc = `Entrega da NF ${nf.numero} cadastrada (${dados.parcela}ª parcela${dados.reentrega ? ', reentrega' : ''}; ${origem})`;
+  registrar(e, ctx, 'entrega', entregaId, 'criado', desc, `NF ${nf.numero}`);
+  registrar(e, ctx, 'contrato', contrato.id, 'criado', desc, `NF ${nf.numero}`);
   return entrega;
 }
 
@@ -122,9 +125,10 @@ export function declararDof(e: Estado, dofId: Id, ctx: Ctx) {
   const daEntrega = e.entregas.find((en) => en.dofId === d.id);
   if (daEntrega?.situacao === 'a_caminho') falha(409, `A DOF ${d.numero} só pode ser declarada depois do recebimento da entrega.`);
   d.declarado = { quando: instante(ctx), quem: ctx.quem };
+  if (daEntrega) registrar(e, ctx, 'entrega', daEntrega.id, 'declarado', `DOF ${d.numero} declarada no Sinaflor`, `DOF ${d.numero}`);
   const entrega = e.entregas.find((en) => en.dofId === d.id);
   const nf = e.nfs.find((n) => n.id === d.nfId);
   // O registro fica também no histórico dos fardos da entrega, para a ficha mostrar a origem completa.
-  if (entrega) for (const f of e.fardos.filter((x) => x.entregaId === entrega.id)) f.historico.push(evento(ctx, 'ocorrencia', `DOF ${d.numero} declarada no Sinaflor`, nf ? `NF ${nf.numero}` : undefined));
+  if (entrega) for (const f of e.fardos.filter((x) => x.entregaId === entrega.id)) registrar(e, ctx, 'fardo', f.id, 'declarado', `DOF ${d.numero} declarada no Sinaflor`, nf ? `NF ${nf.numero}` : undefined);
   return d;
 }

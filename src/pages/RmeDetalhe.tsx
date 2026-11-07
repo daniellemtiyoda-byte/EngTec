@@ -5,7 +5,7 @@ import { Badge, BadgeDe } from '../components/Badge';
 import { CabecalhoObjeto, FatoChave } from '../components/Cabecalhos';
 import { CodigoLink } from '../components/Codigos';
 import { Aviso, Carregando, Erro, Vazio } from '../components/Estados';
-import { LinhaTempo } from '../components/LinhaTempo';
+import { LinhaTempo, linhaDoEvento } from '../components/LinhaTempo';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { RodapeAcoes } from '../components/RodapeAcoes';
 import { SeparacaoAssistente } from '../components/SeparacaoAssistente';
@@ -42,6 +42,7 @@ export default function RmeDetalhe() {
   const r = useAsync(() => servicos.rme.obter(num), [num]);
   const rme = r.dados;
   // Fardos da separação (local atual, saldo e disponível), para "fardo inteiro" e "na expedição".
+  const historico = useAsync(async () => (rme ? servicos.eventos.listar({ filters: { entidade: 'rme', entidadeId: rme.id }, pageSize: 500 }) : undefined), [rme]);
   const fardos = useAsync(async () => (rme?.separacao ? Promise.all(rme.separacao.map((l) => servicos.fardos.obter(l.fardoId).catch(() => undefined))) : []), [rme]);
   const [separar, setSeparar] = useState(false);
   const [entregar, setEntregar] = useState(false);
@@ -168,7 +169,7 @@ export default function RmeDetalhe() {
             })}
           </ul>
         ))}
-        {aba === 'historico' && <LinhaTempo eventos={[...rme.historico].reverse().map((e) => ({ quando: e.quando, quem: e.quem, titulo: e.descricao, referencia: e.referencia }))} />}
+        {aba === 'historico' && <LinhaTempo eventos={(historico.dados?.items ?? []).map(linhaDoEvento)} />}
       </AbasSecao>
 
       {pequena && acoes && <RodapeAcoes>{acoes}</RodapeAcoes>}

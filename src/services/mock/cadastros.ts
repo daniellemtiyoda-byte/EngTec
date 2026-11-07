@@ -6,7 +6,7 @@ import type {
 } from '../contracts';
 import { ataView, contratoView, fornecedorView, localView } from './consultas';
 import {
-  achar, evento, falha, hoje, instante, novoId, type AtaReg, type ContratoReg, type Ctx, type Estado, type FornecedorReg, type LocalReg, type ParcelaReg, type TamanhoReg,
+  achar, falha, hoje, instante, novoId, registrar, type AtaReg, type ContratoReg, type Ctx, type Estado, type FornecedorReg, type LocalReg, type ParcelaReg, type TamanhoReg,
 } from './estado';
 
 /* Cadastros (seção 9.18 do plano): nada é apagado, só inativado. Atas e contratos (seções 9.3 e 9.4). */
@@ -19,7 +19,7 @@ function exigirCampos(campos: Record<string, string>, mensagem = 'Confira os cam
 
 // ---------- Fornecedor ----------
 
-export function salvarFornecedor(e: Estado, dados: Partial<DadosFornecedor>, id?: Id): FornecedorReg {
+export function salvarFornecedor(e: Estado, dados: Partial<DadosFornecedor>, ctx: Ctx, id?: Id): FornecedorReg {
   const atual = id ? achar(e.fornecedores, (f) => f.id === id, 'Fornecedor') : undefined;
   const v = { ...atual, ...dados } as DadosFornecedor;
   const cnpj = (v.cnpj ?? '').replace(/\D/g, '');
@@ -38,12 +38,13 @@ export function salvarFornecedor(e: Estado, dados: Partial<DadosFornecedor>, id?
     ctfValidade: v.ctfValidade, situacao: atual?.situacao ?? 'ativo', especiesIds: [...new Set(v.especiesIds)], certificados: atual?.certificados ?? [],
   };
   if (atual) Object.assign(atual, reg); else e.fornecedores.push(reg);
+  registrar(e, ctx, 'fornecedor', reg.id, atual ? 'alterado' : 'criado', `Fornecedor ${reg.razaoSocial} ${atual ? 'alterado' : 'cadastrado'}`);
   return atual ?? reg;
 }
 
 // ---------- Espécie, tamanho, tratamento, local ----------
 
-export function salvarEspecie(e: Estado, dados: Partial<DadosEspecie>, id?: Id): Especie {
+export function salvarEspecie(e: Estado, dados: Partial<DadosEspecie>, ctx: Ctx, id?: Id): Especie {
   const atual = id ? achar(e.especies, (x) => x.id === id, 'Espécie') : undefined;
   const v = { ...atual, ...dados } as DadosEspecie;
   const campos: Record<string, string> = {};
@@ -53,10 +54,11 @@ export function salvarEspecie(e: Estado, dados: Partial<DadosEspecie>, id?: Id):
   exigirCampos(campos);
   const reg: Especie = { id: atual?.id ?? novoId(e, 'es'), nomeCientifico: v.nomeCientifico.trim(), nomePopular: v.nomePopular.trim(), ativo: atual?.ativo ?? true };
   if (atual) Object.assign(atual, reg); else e.especies.push(reg);
+  registrar(e, ctx, 'cadastro', reg.id, atual ? 'alterado' : 'criado', `Espécie ${reg.nomePopular} ${atual ? 'alterada' : 'cadastrada'}`);
   return atual ?? reg;
 }
 
-export function salvarTamanho(e: Estado, dados: Partial<DadosTamanho>, id?: Id): TamanhoReg {
+export function salvarTamanho(e: Estado, dados: Partial<DadosTamanho>, ctx: Ctx, id?: Id): TamanhoReg {
   const atual = id ? achar(e.tamanhos, (x) => x.id === id, 'Tamanho') : undefined;
   const v = { ...atual, ...dados } as DadosTamanho;
   const campos: Record<string, string> = {};
@@ -70,10 +72,11 @@ export function salvarTamanho(e: Estado, dados: Partial<DadosTamanho>, id?: Id):
     medidas: v.medidas ?? 'provisorio', ativo: atual?.ativo ?? true,
   };
   if (atual) Object.assign(atual, reg); else e.tamanhos.push(reg);
+  registrar(e, ctx, 'cadastro', reg.id, atual ? 'alterado' : 'criado', `Tamanho ${reg.codigo} ${atual ? 'alterado' : 'cadastrado'}`);
   return atual ?? reg;
 }
 
-export function salvarTratamento(e: Estado, dados: Partial<DadosTratamento>, id?: Id): Tratamento {
+export function salvarTratamento(e: Estado, dados: Partial<DadosTratamento>, ctx: Ctx, id?: Id): Tratamento {
   const atual = id ? achar(e.tratamentos, (x) => x.id === id, 'Tratamento') : undefined;
   const v = { ...atual, ...dados } as DadosTratamento;
   const campos: Record<string, string> = {};
@@ -83,10 +86,11 @@ export function salvarTratamento(e: Estado, dados: Partial<DadosTratamento>, id?
   exigirCampos(campos);
   const reg: Tratamento = { id: atual?.id ?? novoId(e, 'tr'), preservativo: v.preservativo.trim(), empresa: v.empresa.trim(), ativo: atual?.ativo ?? true };
   if (atual) Object.assign(atual, reg); else e.tratamentos.push(reg);
+  registrar(e, ctx, 'cadastro', reg.id, atual ? 'alterado' : 'criado', `Tratamento ${reg.preservativo} / ${reg.empresa} ${atual ? 'alterado' : 'cadastrado'}`);
   return atual ?? reg;
 }
 
-export function salvarEmpresaInspetora(e: Estado, dados: Partial<DadosEmpresaInspetora>, id?: Id): EmpresaInspetora {
+export function salvarEmpresaInspetora(e: Estado, dados: Partial<DadosEmpresaInspetora>, ctx: Ctx, id?: Id): EmpresaInspetora {
   const atual = id ? achar(e.empresasInspetoras, (x) => x.id === id, 'Empresa inspetora') : undefined;
   const v = { ...atual, ...dados } as DadosEmpresaInspetora;
   const cnpj = (v.cnpj ?? '').replace(/\D/g, '');
@@ -98,6 +102,7 @@ export function salvarEmpresaInspetora(e: Estado, dados: Partial<DadosEmpresaIns
   exigirCampos(campos);
   const reg: EmpresaInspetora = { id: atual?.id ?? novoId(e, 'ei'), nome: v.nome.trim(), cnpj: cnpj || undefined, ativo: atual?.ativo ?? true };
   if (atual) Object.assign(atual, reg); else e.empresasInspetoras.push(reg);
+  registrar(e, ctx, 'cadastro', reg.id, atual ? 'alterado' : 'criado', `Empresa inspetora ${reg.nome} ${atual ? 'alterada' : 'cadastrada'}`);
   return atual ?? reg;
 }
 
@@ -105,18 +110,20 @@ export function salvarEmpresaInspetora(e: Estado, dados: Partial<DadosEmpresaIns
  * Inativa ou reativa um cadastro simples (espécie, tamanho, tratamento, empresa inspetora). Nada é apagado; o que
  * está inativo não entra em novos contratos, mas continua nos registros antigos.
  */
-export function alterarAtivo<T extends { id: Id; ativo: boolean }>(lista: T[], id: Id, ativo: boolean, oQue: string): T {
+export function alterarAtivo<T extends { id: Id; ativo: boolean }>(e: Estado, ctx: Ctx, lista: T[], id: Id, ativo: boolean, oQue: string): T {
   const x = achar(lista, (i) => i.id === id, oQue);
   if (x.ativo === ativo) falha(409, `${oQue} já está ${ativo ? 'ativo' : 'inativo'}.`);
   x.ativo = ativo;
+  registrar(e, ctx, oQue === 'Local' ? 'local' : 'cadastro', x.id, ativo ? 'reativado' : 'inativado', `${oQue} ${ativo ? 'reativado' : 'inativado'}`);
   return x;
 }
 
-export function situacaoFornecedor(e: Estado, id: Id, situacao: 'ativo' | 'inativo') {
+export function situacaoFornecedor(e: Estado, id: Id, situacao: 'ativo' | 'inativo', ctx: Ctx) {
   const f = achar(e.fornecedores, (x) => x.id === id, 'Fornecedor');
   if (f.situacao === situacao) falha(409, `O fornecedor já está ${situacao}.`);
   // Reativar não desbloqueia: o bloqueio pelo CTF vencido continua calculado pela validade.
   f.situacao = situacao;
+  registrar(e, ctx, 'fornecedor', f.id, situacao === 'ativo' ? 'reativado' : 'inativado', `Fornecedor ${f.razaoSocial} ${situacao === 'ativo' ? 'reativado' : 'inativado'}`);
   return f;
 }
 
@@ -136,6 +143,7 @@ export function salvarLocal(e: Estado, dados: Partial<DadosLocal>, ctx: Ctx, id?
   exigirCampos(campos);
   const reg: LocalReg = { id: atual?.id ?? novoId(e, 'lo'), codigo, descricao: v.descricao.trim(), tipo: v.tipo, capacidade: v.capacidade, ativo: atual?.ativo ?? true };
   if (atual) Object.assign(atual, reg); else e.locais.push(reg);
+  registrar(e, ctx, 'local', reg.id, atual ? 'alterado' : 'criado', `Local ${reg.codigo} ${atual ? 'alterado' : 'cadastrado'}`);
   return atual ?? reg;
 }
 
@@ -144,12 +152,13 @@ export function inativarLocal(e: Estado, id: Id, ctx: Ctx) {
   if (!l.ativo) falha(409, `O local ${l.codigo} já está inativo.`);
   if (localView(e, l, hoje(ctx)).ocupacao > 0) falha(409, `O local ${l.codigo} tem dormentes: transfira os fardos antes de inativar.`);
   l.ativo = false;
+  registrar(e, ctx, 'local', l.id, 'inativado', `Local ${l.codigo} inativado`);
   return l;
 }
 
 /** Reativar o local: o código continua o mesmo (está no QR impresso). */
-export function reativarLocal(e: Estado, id: Id) {
-  return alterarAtivo(e.locais, id, true, 'Local');
+export function reativarLocal(e: Estado, id: Id, ctx: Ctx) {
+  return alterarAtivo(e, ctx, e.locais, id, true, 'Local');
 }
 
 // ---------- Ata e contrato ----------
@@ -199,6 +208,7 @@ export function criarAta(e: Estado, dados: DadosAta, ctx: Ctx): AtaReg {
     itens: (dados.itens ?? []).map((i) => ({ tamanhoId: i.tamanhoId, quantidade: i.quantidade })),
   };
   e.atas.push(ata);
+  registrar(e, ctx, 'ata', ata.id, 'criado', `Ata ${ata.numero} cadastrada (vigência até ${ata.vigenciaFim})`, ata.numero);
   return ata;
 }
 
@@ -265,6 +275,7 @@ export function criarContrato(e: Estado, dados: DadosContrato, ctx: Ctx): Contra
     parcelas: parcelasReg(dados.parcelas), criadoEm: instante(ctx), criadoPor: ctx.quem,
   };
   e.contratos.push(reg);
+  registrar(e, ctx, 'contrato', reg.id, 'criado', `Contrato criado: ${reg.parcelas.length} parcela(s), ${reg.itens.reduce((t, i) => t + i.quantidade, 0)} dormentes (gestor ${reg.gestor})`, reg.numero);
   return reg;
 }
 
@@ -298,6 +309,7 @@ export function atualizarContrato(e: Estado, numero: string, dados: DadosAtualiz
     }
     for (const item of reg.itens) if (!porTamanho.has(item.tamanhoId)) item.quantidade = 0;
   }
+  registrar(e, ctx, 'contrato', reg.id, 'alterado', dados.parcelas ? 'Cronograma alterado' : 'Gestor alterado', reg.numero);
   return reg;
 }
 
@@ -308,6 +320,7 @@ export function cancelarContrato(e: Estado, numero: string, motivo: string, ctx:
   if (e.fardos.some((f) => f.contratoId === reg.id && f.recebidoEm && !f.conclusaoInspecao)) falha(409, 'Há fardos deste contrato aguardando inspeção: conclua antes de cancelar.');
   reg.situacao = 'cancelado';
   reg.motivoCancelamento = motivo.trim();
-  for (const f of e.fardos.filter((x) => x.contratoId === reg.id && !x.recebidoEm)) f.historico.push(evento(ctx, 'cancelado', `Contrato cancelado: ${motivo.trim()}`));
+  registrar(e, ctx, 'contrato', reg.id, 'cancelado', `Contrato cancelado: ${motivo.trim()}`, reg.numero);
+  for (const f of e.fardos.filter((x) => x.contratoId === reg.id && !x.recebidoEm)) registrar(e, ctx, 'fardo', f.id, 'cancelado', `Contrato cancelado: ${motivo.trim()}`);
   return reg;
 }

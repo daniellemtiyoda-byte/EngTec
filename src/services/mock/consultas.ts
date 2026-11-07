@@ -3,7 +3,7 @@ import {
   nivelPrazo, nivelPrazoUteis, prazoDeclaracao, situacaoParcela, situacaoSaldo, somarAnos, somarDias, somarDiasUteis, volumeM3,
 } from '../../dominio/parametros';
 import type {
-  Ata, Classe, Contrato, DivergenciaVolume, Dof, Dormente, Emissao, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo, Id, InspecaoFardo, ItemContrato,
+  Ata, Classe, Contrato, DivergenciaVolume, EntidadeEvento, Evento, Dof, Dormente, Emissao, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo, Id, InspecaoFardo, ItemContrato,
   ItemDescrito, Local, ParcelaContrato, SaldoItem, SituacaoFardo, Tamanho,
 } from '../../types/models';
 import { achar, type AtaReg, type ContratoReg, type DofReg, type EmissaoReg, type EntregaReg, type Estado, type FardoReg, type FornecedorReg, type LocalReg, type TamanhoReg } from './estado';
@@ -14,6 +14,9 @@ import { achar, type AtaReg, type ContratoReg, type DofReg, type EmissaoReg, typ
  */
 
 export const dormentesDoFardo = (e: Estado, fardoId: Id) => e.dormentes.filter((d) => d.fardoId === fardoId);
+
+/** Linha do tempo de um objeto: os eventos dele, do mais antigo ao mais novo. */
+export const eventosDe = (e: Estado, entidade: EntidadeEvento, id: Id): Evento[] => e.eventos.filter((x) => x.entidade === entidade && x.entidadeId === id);
 
 export function tamanhoView(t: TamanhoReg): Tamanho {
   return { ...t, volumeM3: volumeM3(t.comprimentoCm, t.larguraCm, t.alturaCm) };
@@ -169,7 +172,7 @@ export function dofView(e: Estado, d: DofReg, hoje: string): Dof {
 }
 
 /** Volume real de um dormente pelas medidas da inspeção; sem medidas, o volume do tamanho. */
-function volumeMedido(e: Estado, d: Dormente): number {
+export function volumeMedido(e: Estado, d: Dormente): number {
   if (d.medidas) return volumeM3(d.medidas.comprimentoCm, d.medidas.larguraCm, d.medidas.alturaCm);
   return tamanhoDoItem(e, d.itemContratoId).volumeM3;
 }
@@ -220,12 +223,12 @@ export function entregaView(e: Estado, en: EntregaReg, hoje: string): Entrega {
   const dofReg = achar(e.dofs, (d) => d.id === en.dofId, 'DOF');
   // Laudo: 20 dias úteis contados da entrega (o primeiro recebimento provisório).
   const recebidaEm = e.recebimentos.filter((r) => r.entregaId === en.id).map((r) => r.recebidoEm).sort()[0];
-  const prazoLaudo = recebidaEm ? somarDiasUteis(dataDe(recebidaEm), PRAZO_LAUDO_DIAS_UTEIS) : undefined;
+  const prazoLaudo = recebidaEm ? somarDiasUteis(dataDe(recebidaEm), PRAZO_LAUDO_DIAS_UTEIS, e.parametros.feriados) : undefined;
   const inspecionada = en.situacao === 'recebida' && fardos.every((f) => f.conclusaoInspecao);
   return {
     ...en, nfNumero: nf.numero, fornecedorId: nf.fornecedorId,
     recebidaEm, prazoLaudo,
-    nivelPrazoLaudo: prazoLaudo && !en.laudo ? nivelPrazoUteis(prazoLaudo, hoje, e.parametros.alertaLaudoDias) : undefined,
+    nivelPrazoLaudo: prazoLaudo && !en.laudo ? nivelPrazoUteis(prazoLaudo, hoje, e.parametros.alertaLaudoDias, e.parametros.feriados) : undefined,
     podeEmitirLaudo: inspecionada && !en.laudo,
     divergenciaVolume: recebidos.length ? divergenciaVolume(e, dofReg, recebidos) : [],
     etapa: en.situacao !== 'recebida' ? 'a_caminho' : !inspecionada ? 'aguardando_inspecao' : en.laudo ? 'concluida' : 'aguardando_laudo',
@@ -272,10 +275,11 @@ export function saldoPorItem(e: Estado, hoje: string): SaldoItem[] {
     else if (d.situacao === 'reservado') s.reservado++;
     else if (d.situacao === 'nao_localizado') s.naoLocalizado++;
   }
-  // Item sem nível definido em Configurações fica "ok" (mínimo e máximo 0 = não definido).
+  // Item sem nível definido em Configurações fica "ok" (mínimo e máximo 0 = não definido). O nível compara o disponível
+  // somado ao que está em cura: item que só está abaixo do mínimo por causa da cura não gera falta nem reposição.
   const temNivel = (s: SaldoItem) => e.parametros.niveis.some((n) => n.classe === s.classe && n.tamanhoId === s.tamanhoId);
   return [...mapa.values()].map((s) => ({
-    ...s, especies: s.especies.sort((a, b) => b.emEstoque - a.emEstoque), situacao: temNivel(s) ? situacaoSaldo(s.emEstoque, s.minimo, s.maximo) : 'ok',
+    ...s, especies: s.especies.sort((a, b) => b.emEstoque - a.emEstoque), situacao: temNivel(s) ? situacaoSaldo(s.emEstoque + s.emCura, s.minimo, s.maximo) : 'ok',
   }));
 }
 
@@ -301,6 +305,7 @@ export function fardoDetalhe(e: Estado, id: Id, hoje: string): FardoDetalhe {
     dof: entrega && dofView(e, achar(e.dofs, (d) => d.id === entrega.dofId, 'DOF'), hoje),
     recebimento: e.recebimentos.find((r) => r.fardosLidos.includes(reg.id)),
     movimentacoes: e.movimentacoes.filter((m) => m.fardoId === reg.id),
+    eventos: eventosDe(e, 'fardo', reg.id),
   };
 }
 
@@ -310,7 +315,8 @@ export function fichaDormente(e: Estado, id: Id, hoje: string): FichaDormente {
   const ata = ataView(e, achar(e.atas, (a) => a.id === det.contrato.ataId, 'Ata'), hoje);
   const local = localDoDormente(e, d);
   // Desde quando está no local: a última chegada registrada (recebido, guardado, transferido ou segregado).
-  const chegadas = d.situacao === 'reprovado' ? d.historico.filter((h) => h.tipo === 'segregado') : det.fardo.historico.filter((h) => ['recebido', 'guardado', 'transferido'].includes(h.tipo));
+  const eventos = eventosDe(e, 'dormente', d.id);
+  const chegadas = d.situacao === 'reprovado' ? eventos.filter((h) => h.tipo === 'segregado') : det.eventos.filter((h) => ['recebido', 'guardado', 'transferido'].includes(h.tipo));
   const entrega = e.entregas.find((x) => x.id === det.fardo.entregaId);
   return {
     dormente: d, fardo: det.fardo, local: local && localView(e, local, hoje), localDesde: local ? chegadas[chegadas.length - 1]?.quando : undefined,
@@ -320,6 +326,7 @@ export function fichaDormente(e: Estado, id: Id, hoje: string): FichaDormente {
     rme: d.rmeNumero ? e.rmes.find((r) => r.numero === d.rmeNumero) : undefined,
     empresaInspetora: entrega?.boletim ? e.empresasInspetoras.find((x) => x.id === entrega.boletim!.empresaInspetoraId) : undefined,
     garantiaAte: det.fardo.recebidoEm ? somarAnos(dataDe(det.fardo.recebidoEm), GARANTIA_ANOS) : undefined,
+    eventos,
   };
 }
 

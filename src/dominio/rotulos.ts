@@ -1,6 +1,6 @@
 import type {
   NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEmissao, SituacaoEntrega,
-  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoDestino, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
+  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoDestino, TipoEvento, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
 } from '../types/models';
 
 /**
@@ -139,3 +139,11 @@ export const SITUACAO_PARCELA: Rotulos<SituacaoParcela> = {
   entregue_com_atraso: ['laranja', 'Entregue com atraso'],
 };
 export const rotuloCategoria = (c?: number) => (c ? `Categoria ${c}` : 'Categoria a definir');
+
+/** Sigla da marca de cada evento na linha do tempo. */
+export const MARCA_EVENTO: Record<TipoEvento, string> = {
+  emitido: 'EMI', recebido: 'REC', inspecionado: 'INS', guardado: 'GUA', transferido: 'TRF', reservado: 'RES',
+  baixado: 'SAÍ', segregado: 'SEG', nao_localizado: 'N/L', cancelado: 'CAN', ocorrencia: 'OCO', retirado: 'RET',
+  criado: 'CRI', alterado: 'ALT', inativado: 'INA', reativado: 'REA', declarado: 'DEC', laudo: 'LAU', comunicado: 'COM',
+  lancado: 'DOF', informado: 'INF',
+};

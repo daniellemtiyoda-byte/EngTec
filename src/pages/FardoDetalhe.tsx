@@ -5,7 +5,7 @@ import { BadgeDe } from '../components/Badge';
 import { CabecalhoObjeto, FatoChave } from '../components/Cabecalhos';
 import { Carregando, Erro, Vazio } from '../components/Estados';
 import { IdCodigo } from '../components/IdCodigo';
-import { LinhaTempo } from '../components/LinhaTempo';
+import { LinhaTempo, linhaDoEvento } from '../components/LinhaTempo';
 import { Relacionados } from '../components/Relacionados';
 import { RodapeAcoes } from '../components/RodapeAcoes';
 import { DisponivelFardo, SituacaoFardo } from '../components/SituacaoFardo';
@@ -131,7 +131,7 @@ export default function FardoDetalhe() {
               </table>
             </div>
           ))}
-          {aba === 'historico' && <LinhaTempo eventos={[...f.historico].reverse().map((e) => ({ quando: e.quando, quem: e.quem, titulo: e.descricao, referencia: e.referencia }))} />}
+          {aba === 'historico' && <LinhaTempo eventos={[...r.dados.eventos].reverse().map(linhaDoEvento)} />}
         </AbasSecao>
         <Relacionados itens={[
           { icone: 'contrato', tipo: 'Contrato', valor: <span className="mono">{contrato.numero}</span>, para: `/contratos/${contrato.numero}` },

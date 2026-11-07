@@ -5,7 +5,7 @@ import { chaveComDigito } from '../../utils/nfeXml';
 import type { DadosEmissao } from '../contracts';
 import { contratoView, tamanhoDoItem } from './consultas';
 import { cadastrarEntrega } from './documentos';
-import { achar, evento, falha, novoId, proximoNumero, type Ctx, type EmissaoReg, type Estado } from './estado';
+import { achar, falha, novoId, registrar, proximoNumero, type Ctx, type EmissaoReg, type Estado } from './estado';
 
 /*
  * Simulador do fornecedor (só demonstração): emite fardos e dormentes com IDs sequenciais do contrato, com a NF e a
@@ -76,12 +76,12 @@ export function emitir(e: Estado, dados: DadosEmissao, ctx: Ctx, validadeDofDias
       const fardoId = idFardo(reg.numero, seq);
       const madeira = doFardo(seq);
       fardosIds.push(fardoId);
-      e.fardos.push({ id: fardoId, contratoId: reg.id, itemContratoId: i.itemContratoId, ...madeira, emissaoId, quantidadeInicial: i.dormentesPorFardo, historico: [evento(ctx, 'emitido', 'Fardo emitido pelo fornecedor')] });
+      e.fardos.push({ id: fardoId, contratoId: reg.id, itemContratoId: i.itemContratoId, ...madeira, emissaoId, quantidadeInicial: i.dormentesPorFardo });
+      registrar(e, ctx, 'fardo', fardoId, 'emitido', 'Fardo emitido pelo fornecedor');
       for (let j = 0; j < i.dormentesPorFardo; j++) {
-        e.dormentes.push({
-          id: idDormente(reg.numero, seqDormente++), contratoId: reg.id, itemContratoId: i.itemContratoId, fardoId, ...madeira,
-          situacao: 'emitido', historico: [evento(ctx, 'emitido', `Emitido pelo fornecedor no fardo ${fardoId}`, fardoId)],
-        });
+        const id = idDormente(reg.numero, seqDormente++);
+        e.dormentes.push({ id, contratoId: reg.id, itemContratoId: i.itemContratoId, fardoId, ...madeira, situacao: 'emitido' });
+        registrar(e, ctx, 'dormente', id, 'emitido', `Emitido pelo fornecedor no fardo ${fardoId}`, fardoId);
       }
       volumePorEspecie.set(madeira.especieId, (volumePorEspecie.get(madeira.especieId) ?? 0) + i.dormentesPorFardo * tamanho.volumeM3);
       const k2 = `${tamanho.id}|${madeira.especieId}`;
@@ -113,6 +113,7 @@ export function emitir(e: Estado, dados: DadosEmissao, ctx: Ctx, validadeDofDias
     criadoEm: ctx.agora().toISOString(), criadoPor: ctx.quem,
   };
   e.emissoes.push(emissao);
+  registrar(e, ctx, 'contrato', reg.id, 'emitido', `${fardosIds.length} fardo(s) emitidos pelo fornecedor (NF ${emissao.nf.numero}, ${parcela.numero}ª parcela)`, `NF ${emissao.nf.numero}`);
   // Com documentos: a entrega já nasce cadastrada, como se a CPTM tivesse cadastrado NF e DOF (liga-se pela chave).
   if (dados.comDocumentos) {
     cadastrarEntrega(e, {

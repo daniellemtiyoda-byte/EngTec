@@ -1,7 +1,7 @@
 import { dataSP } from '../../dominio/parametros';
 import type {
-  Anexo, Ata, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
-  Movimentacao, NotaFiscal, ParcelaContrato, Parametros, Recebimento, Rme, Tamanho, Tratamento, Usuario,
+  Anexo, Ata, Contrato, DestinacaoFinal, Dof, Dormente, Emissao, EmpresaInspetora, EntidadeEvento, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
+  Movimentacao, NotaFiscal, ParcelaContrato, Parametros, Recebimento, Rme, SaldoDofInformado, Tamanho, TipoEvento, Tratamento, Usuario,
 } from '../../types/models';
 import { ApiError } from '../http';
 
@@ -47,12 +47,17 @@ export interface Estado {
   inspecoes: Inspecao[];
   movimentacoes: Movimentacao[];
   rmes: Rme[];
+  /** Histórico e auditoria de tudo o que mudou. */
+  eventos: Evento[];
+  /** IBAMA: destinação final das RMEs entregues e saldos informados do DOF. */
+  destinacoes: DestinacaoFinal[];
+  saldosDof: SaldoDofInformado[];
   parametros: Parametros;
   /** Próximo número de cada sequência interna (ids técnicos, números de NF e DOF). */
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 7;
+export const VERSAO_ESTADO = 9;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }
@@ -74,8 +79,12 @@ export function proximoNumero(e: Estado, nome: string, inicio: number): number {
   return n;
 }
 
-export const evento = (ctx: Ctx, tipo: Evento['tipo'], descricao: string, referencia?: string): Evento =>
-  ({ quando: instante(ctx), quem: ctx.quem, tipo, descricao, referencia });
+/** Registra um evento (histórico e auditoria). Toda operação que muda o estado chama esta função. */
+export function registrar(e: Estado, ctx: Ctx, entidade: EntidadeEvento, entidadeId: Id, tipo: TipoEvento, descricao: string, referencia?: string): Evento {
+  const ev: Evento = { id: novoId(e, 'ev'), tipo, entidade, entidadeId, descricao, referencia, quem: ctx.quem, quando: instante(ctx) };
+  e.eventos.push(ev);
+  return ev;
+}
 
 export function anexo(e: Estado, ctx: Ctx, arquivo: File | { name: string } | undefined, tipo: Anexo['tipo']): Anexo | undefined {
   if (!arquivo) return undefined;

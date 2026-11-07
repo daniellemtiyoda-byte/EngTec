@@ -3,7 +3,8 @@ import { classeInferior, classeSugerida } from '../../dominio/parametros';
 import type { Classe, Dormente, Id, ItemRme, Rme, SeparacaoFardo, SugestaoSeparacao, Usuario } from '../../types/models';
 import type { DadosRme, DadosSeparacao } from '../contracts';
 import { dormentesDoFardo, fardoView } from './consultas';
-import { achar, evento, falha, hoje, instante, novoId, type Ctx, type Estado } from './estado';
+import { gerarDestinacoes } from './ibama';
+import { achar, falha, hoje, instante, novoId, registrar, type Ctx, type Estado } from './estado';
 import { devolverDaExpedicao, movimentarDormentes } from './estoque';
 
 /*
@@ -40,9 +41,10 @@ export function abrirRme(e: Estado, dados: DadosRme, solicitante: Usuario, ctx: 
     id: novoId(e, 'rm'), numero: idRme(ano, seq), solicitanteId: solicitante.id, solicitanteNome: solicitante.nome,
     destino: dados.destino.trim(), tipoDestino: dados.tipoDestino, necessidadeEm: dados.necessidadeEm,
     itens: dados.itens.map((i) => ({ tamanhoId: i.tamanhoId, classe: i.classe, categoriaMinima: i.categoriaMinima || undefined, especieId: i.especieId || undefined, quantidade: i.quantidade })),
-    situacao: 'aberta', criadoEm: instante(ctx), historico: [evento(ctx, 'emitido', `RME aberta para ${dados.destino.trim()}`)],
+    situacao: 'aberta', criadoEm: instante(ctx),
   };
   e.rmes.push(rme);
+  registrar(e, ctx, 'rme', rme.id, 'criado', `RME aberta para ${rme.destino}`, rme.numero);
   return rme;
 }
 
@@ -51,7 +53,7 @@ export function iniciarSeparacao(e: Estado, numero: string, ctx: Ctx): Rme {
   if (r.situacao === 'em_separacao') return r;
   if (r.situacao !== 'aberta') falha(409, `A RME ${r.numero} não está aberta.`);
   r.situacao = 'em_separacao';
-  r.historico.push(evento(ctx, 'reservado', 'Separação iniciada'));
+  registrar(e, ctx, 'rme', r.id, 'reservado', 'Separação iniciada');
   return r;
 }
 
@@ -152,7 +154,7 @@ export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[
   }
   r.separacao = linhas;
   r.situacao = 'pronta';
-  r.historico.push(evento(ctx, 'reservado', `Separação concluída: ${usados.size} dormentes reservados${linhas.some((l) => !l.seguiuSugestao) ? ' (com troca de fardo justificada)' : ''}`));
+  registrar(e, ctx, 'rme', r.id, 'reservado', `Separação concluída: ${usados.size} dormentes reservados${linhas.some((l) => !l.seguiuSugestao) ? ' (com troca de fardo justificada)' : ''}`);
   return r;
 }
 
@@ -164,10 +166,11 @@ export function entregarRme(e: Estado, numero: string, ctx: Ctx): Rme {
     const f = achar(e.fardos, (x) => x.id === l.fardoId, 'Fardo');
     movimentarDormentes(e, l.dormentesIds, 'baixado', { rmeNumero: r.numero, evento: { tipo: 'baixado', descricao: `Entregue para ${r.destino}`, referencia: r.numero } }, ctx);
     e.movimentacoes.push({ id: novoId(e, 'mv'), tipo: 'saida', fardoId: f.id, dormentesIds: [...l.dormentesIds], quantidade: l.dormentesIds.length, deLocalId: f.localId, quando: instante(ctx), quem: ctx.quem, referencia: r.numero });
-    f.historico.push(evento(ctx, 'baixado', `${l.dormentesIds.length} dormente(s) entregues para ${r.destino}`, r.numero));
+    registrar(e, ctx, 'fardo', f.id, 'baixado', `${l.dormentesIds.length} dormente(s) entregues para ${r.destino}`, r.numero);
   }
   r.situacao = 'entregue';
-  r.historico.push(evento(ctx, 'baixado', `Entregue para ${r.destino}`));
+  registrar(e, ctx, 'rme', r.id, 'baixado', `Entregue para ${r.destino}`);
+  gerarDestinacoes(e, r.id, ctx);
   return r;
 }
 
@@ -181,6 +184,6 @@ export function cancelarRme(e: Estado, numero: string, motivo: string, ctx: Ctx)
   if (reservados.length) movimentarDormentes(e, reservados, 'em_estoque', { evento: { tipo: 'cancelado', descricao: `Reserva liberada: ${r.numero} cancelada`, referencia: r.numero } }, ctx);
   r.situacao = 'cancelada';
   r.motivoCancelamento = motivo.trim();
-  r.historico.push(evento(ctx, 'cancelado', `Cancelada: ${motivo.trim()}`));
+  registrar(e, ctx, 'rme', r.id, 'cancelado', `Cancelada: ${motivo.trim()}`);
   return r;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   categoriaDoIndice, diasEntre, diferencaVolumePct, foraDaTolerancia, nivelPrazo, prazoDeclaracao,
-  resultadoDoVeredito, situacaoSaldo, somarDias, unidadesDeM3, volumeM3,
+  resultadoDoVeredito, situacaoSaldo, somarDias, unidadesDeM3, volumeM3, somarDiasUteis, diasUteisEntre, FERIADOS_PADRAO,
 } from './parametros';
 
 describe('inspeção (provisório)', () => {
@@ -59,5 +59,20 @@ describe('situação do saldo', () => {
     expect(situacaoSaldo(5, 10, 50)).toBe('falta');
     expect(situacaoSaldo(10, 10, 50)).toBe('ok');
     expect(situacaoSaldo(51, 10, 50)).toBe('excesso');
+  });
+});
+
+describe('dias úteis com feriados', () => {
+  it('pula sábado, domingo e os feriados dos parâmetros', () => {
+    // 2026-11-19 (quinta) + 1 dia útil: 20/11 é feriado (Consciência Negra), então cai na segunda 23/11.
+    expect(somarDiasUteis('2026-11-19', 1)).toBe('2026-11-20');
+    expect(somarDiasUteis('2026-11-19', 1, FERIADOS_PADRAO)).toBe('2026-11-23');
+    expect(diasUteisEntre('2026-11-19', '2026-11-23', FERIADOS_PADRAO)).toBe(1);
+    expect(diasUteisEntre('2026-11-23', '2026-11-19', FERIADOS_PADRAO)).toBe(-1);
+  });
+  it('tem os feriados nacionais, do estado e da cidade de São Paulo de 2026 e 2027', () => {
+    expect(FERIADOS_PADRAO).toHaveLength(26);
+    expect(FERIADOS_PADRAO.find((f) => f.data === '2026-04-03')?.nome).toBe('Sexta-feira Santa');
+    expect(FERIADOS_PADRAO.find((f) => f.data === '2027-05-27')?.nome).toBe('Corpus Christi');
   });
 });

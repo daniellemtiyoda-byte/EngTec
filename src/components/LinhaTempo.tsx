@@ -1,3 +1,5 @@
+import { MARCA_EVENTO } from '../dominio/rotulos';
+import type { Evento } from '../types/models';
 import { CodigoLink } from './Codigos';
 import { Vazio } from './Estados';
 import { dataHora } from '../utils/format';
@@ -34,3 +36,8 @@ export function LinhaTempo({ eventos }: { eventos: EventoLinhaTempo[] }) {
     </ol>
   );
 }
+
+/** Evento do histórico (entidade Evento) na forma da linha do tempo, com a sigla do tipo. */
+export const linhaDoEvento = (ev: Evento): EventoLinhaTempo => ({
+  quando: ev.quando, quem: ev.quem, titulo: ev.descricao, referencia: ev.referencia, marca: MARCA_EVENTO[ev.tipo],
+});

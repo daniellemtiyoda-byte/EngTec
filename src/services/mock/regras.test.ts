@@ -742,4 +742,126 @@ describe('persistência', () => {
     const c = montar('administrador', store);
     await falhaCom(c.s.locais.obterPorCodigo('C-01'), 404);
   });
+  it('estado salvo em formato antigo (mesma versão) é descartado e a demonstração é recriada; as telas carregam', async () => {
+    const casos: ((e: Record<string, any>) => void)[] = [
+      (e) => { for (const f of e.fardos) delete f.dataTratamento; },  // fardo de antes da marcação (Estoque quebrava)
+      (e) => { delete e.eventos; for (const r of e.rmes) r.historico = []; },  // RME de antes da entidade Evento
+      (e) => { delete e.parametros.feriados; },
+      (e) => { e.rmes[0].criadoEm = 'ontem'; },  // data que não monta a tela
+      (e) => { e.versao = 7; },
+    ];
+    for (const estragar of casos) {
+      const store = new Map<string, string>();
+      montar('administrador', store);
+      const salvo = JSON.parse(store.get('holz:demo:estado')!);
+      salvo.locais.push({ ...salvo.locais[0], id: 'lo-antigo', codigo: 'ANTIGO' });  // marca para saber se foi recriado
+      estragar(salvo);
+      store.set('holz:demo:estado', JSON.stringify(salvo));
+      const { s, invariantes } = montar('administrador', store);
+      await falhaCom(s.locais.obterPorCodigo('ANTIGO'), 404);
+      expect((await s.estoque.porItem()).total).toBeGreaterThan(0);
+      expect((await s.estoque.porFardo()).total).toBeGreaterThan(0);
+      expect((await s.rme.listar()).total).toBe(7);
+      expect(invariantes()).toEqual([]);
+    }
+  });
+  it('estado salvo no formato atual é mantido', async () => {
+    const store = new Map<string, string>();
+    montar('administrador', store);
+    const salvo = JSON.parse(store.get('holz:demo:estado')!);
+    salvo.locais.push({ ...salvo.locais[0], id: 'lo-novo', codigo: 'NOVO' });
+    store.set('holz:demo:estado', JSON.stringify(salvo));
+    const { s } = montar('administrador', store);
+    expect((await s.locais.obterPorCodigo('NOVO')).id).toBe('lo-novo');
+  });
+});
+
+describe('eventos (histórico e auditoria)', () => {
+  it('toda operação que muda o estado registra um evento; as linhas do tempo vêm deles', async () => {
+    const { s, como } = montar('administrador');
+    const antes = (await s.eventos.listar({ pageSize: 1 })).total;
+    await s.locais.criar({ codigo: 'C-02', descricao: 'Pátio C2', tipo: 'armazenagem', capacidade: 50 });
+    const ev = (await s.eventos.listar({ pageSize: 1 })).items[0];
+    expect((await s.eventos.listar({ pageSize: 1 })).total).toBe(antes + 1);
+    expect([ev.entidade, ev.tipo, ev.quem]).toEqual(['local', 'criado', usuarioDemo('administrador').nome]);
+
+    como('almoxarife');
+    const rme = (await s.rme.listar({ pageSize: 50 })).items.find((r) => r.situacao === 'aberta')!;
+    await s.rme.cancelar(rme.numero, 'Obra adiada');
+    const daRme = await s.eventos.listar({ filters: { entidade: 'rme', entidadeId: rme.id } });
+    expect(daRme.items[0].tipo).toBe('cancelado');
+    expect(daRme.items[daRme.items.length - 1].tipo).toBe('criado');
+
+    const ficha = await s.dormentes.obter('AR00224-01-000071');
+    expect(ficha.eventos[0].tipo).toBe('emitido');
+    const fardo = await s.fardos.obter('AR00224-01-F006');
+    expect(fardo.eventos.map((x) => x.tipo)).toContain('emitido');
+    const c = await contrato(s, 'AR00224-01');
+    const doContrato = await s.eventos.listar({ filters: { entidade: 'contrato', entidadeId: c.id }, pageSize: 100 });
+    expect(doContrato.items.map((x) => x.tipo)).toEqual(expect.arrayContaining(['criado', 'emitido', 'laudo']));
+  });
+});
+
+describe('feriados e nível de estoque com a cura', () => {
+  it('os dados iniciais trazem os feriados de 2026 e 2027, usados no prazo do laudo', async () => {
+    const { s } = montar('administrador');
+    const p = await s.parametros.obter();
+    const datas = p.feriados.map((f) => f.data);
+    expect(datas).toEqual(expect.arrayContaining(['2026-11-20', '2026-07-09', '2026-01-25', '2026-06-04', '2027-03-26', '2027-05-27', '2027-11-02']));
+    expect(new Set(p.feriados.map((f) => f.abrangencia))).toEqual(new Set(['nacional', 'estadual', 'municipal']));
+    const sem = await s.parametros.atualizar({ feriados: [] });
+    expect(sem.feriados).toEqual([]);
+  });
+  it('compara mínimo e máximo com o disponível mais o que está em cura; só a cura não gera falta', async () => {
+    const { s } = montar('administrador');
+    const emCura = (await s.estoque.porItem({ pageSize: 100 })).items.find((x) => x.emCura > 0)!;
+    expect(emCura.liberacaoCura).toBeTruthy();
+    const p = await s.parametros.obter();
+    const outros = p.niveis.filter((n) => !(n.classe === emCura.classe && n.tamanhoId === emCura.tamanhoId));
+    const minimo = emCura.emEstoque + emCura.emCura;  // abaixo só por causa da cura
+    await s.parametros.atualizar({ niveis: [...outros, { classe: emCura.classe, tamanhoId: emCura.tamanhoId, minimo, maximo: minimo * 3 }] });
+    const ok = (await s.estoque.porItem({ pageSize: 100 })).items.find((x) => x.id === emCura.id)!;
+    expect(ok.situacao).toBe('ok');
+    await s.parametros.atualizar({ niveis: [...outros, { classe: emCura.classe, tamanhoId: emCura.tamanhoId, minimo: minimo + 1, maximo: minimo * 3 }] });
+    const falta = (await s.estoque.porItem({ pageSize: 100 })).items.find((x) => x.id === emCura.id)!;
+    expect(falta.situacao).toBe('falta');
+  });
+});
+
+describe('IBAMA: destinação final e saldo do DOF', () => {
+  it('a RME entregue gera a destinação final por espécie; lançar no DOF é registrado uma vez, com evento', async () => {
+    const { s, como, invariantes } = montar('almoxarife');
+    const pendentes = await s.ibama.destinacoes({ filters: { lancado: 'nao' } });
+    expect(pendentes.total).toBeGreaterThan(0);
+    const pronta = (await s.rme.listar({ pageSize: 50 })).items.find((r) => r.situacao === 'pronta')!;
+    await s.rme.entregar(pronta.numero);
+    const novas = (await s.ibama.destinacoes({ pageSize: 50 })).items.filter((d) => d.rmeNumero === pronta.numero);
+    expect(novas.length).toBeGreaterThan(0);
+    expect(novas.reduce((t, d) => t + d.quantidade, 0)).toBe(pronta.separacao!.reduce((t, l) => t + l.dormentesIds.length, 0));
+    expect(novas.every((d) => d.volumeM3 > 0 && !d.lancadoEm)).toBe(true);
+
+    como('gestor');
+    await falhaCom(s.ibama.marcarLancado(novas[0].id), 403);
+    como('almoxarife');
+    const lancada = await s.ibama.marcarLancado(novas[0].id);
+    expect([lancada.lancadoPor, !!lancada.lancadoEm]).toEqual([usuarioDemo('almoxarife').nome, true]);
+    await falhaCom(s.ibama.marcarLancado(novas[0].id), 409);
+    const ev = await s.eventos.listar({ filters: { entidade: 'rme', entidadeId: pronta.id } });
+    expect(ev.items[0].tipo).toBe('lancado');
+    expect(invariantes()).toEqual([]);
+  });
+  it('saldo do pátio por espécie e tamanho comparado com o último saldo informado; acima de 10% alerta', async () => {
+    const { s } = montar('almoxarife');
+    const saldo = await s.ibama.saldoPatio();
+    const macaranduba = saldo.find((x) => x.especieId === MACARANDUBA)!;
+    expect(macaranduba.acimaTolerancia).toBe(true);
+    expect(saldo.filter((x) => x.acimaTolerancia)).toHaveLength(1);
+    expect(macaranduba.porTamanho.reduce((t, x) => t + x.quantidade, 0)).toBe(macaranduba.quantidade);
+
+    await falhaCom(s.ibama.informarSaldo({ data: '2026-11-07', itens: [] }), 422, 'data');
+    await falhaCom(s.ibama.informarSaldo({ data: '2026-11-06', itens: [{ especieId: JATAIPEBA, volumeM3: 1 }, { especieId: JATAIPEBA, volumeM3: 2 }] }), 422, 'itens.1');
+    await s.ibama.informarSaldo({ data: '2026-11-06', itens: saldo.map((x) => ({ especieId: x.especieId, volumeM3: x.fisicoM3 })) });
+    expect((await s.ibama.saldoPatio()).some((x) => x.acimaTolerancia)).toBe(false);
+    expect((await s.ibama.saldosInformados()).items[0].data).toBe('2026-11-06');
+  });
 });

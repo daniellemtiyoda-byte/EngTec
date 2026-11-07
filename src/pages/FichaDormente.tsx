@@ -13,14 +13,9 @@ import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { ApiError } from '../services/http';
-import type { Evento, FichaDormente as Ficha } from '../types/models';
+import { MARCA_EVENTO } from '../dominio/rotulos';
+import type { FichaDormente as Ficha } from '../types/models';
 import { cm, data, dataHora, mesAno, metros, urlSegura } from '../utils/format';
-
-/** Sigla da marca de cada evento na linha do tempo. */
-const MARCA: Record<Evento['tipo'], string> = {
-  emitido: 'EMI', recebido: 'REC', inspecionado: 'INS', guardado: 'GUA', transferido: 'TRF', reservado: 'RES',
-  baixado: 'SAÍ', segregado: 'SEG', nao_localizado: 'N/L', cancelado: 'CAN', ocorrencia: 'OCO', retirado: 'RET',
-};
 
 /** "ID não encontrado": mostra o código lido e oferece digitar de novo ou ler outro QR. */
 function NaoEncontrado({ id }: { id: string }) {
@@ -72,11 +67,11 @@ export default function FichaDormente() {
   const f: Ficha = r.dados;
   const d = f.dormente;
   // Data da entrega: o evento de baixa do dormente (a RME entregue que o levou).
-  const entregueEm = [...d.historico].reverse().find((h) => h.tipo === 'baixado')?.quando;
+  const entregueEm = [...f.eventos].reverse().find((h) => h.tipo === 'baixado')?.quando;
   const { especie, tamanho, tratamento } = f.item;
   const relatorio = urlSegura(f.inspecao?.relatorioUrl);
-  const eventos: EventoLinhaTempo[] = [...d.historico].reverse().map((ev) => ({
-    quando: ev.quando, quem: ev.quem, titulo: ev.descricao, referencia: ev.referencia, marca: MARCA[ev.tipo], tipo: ev.tipo === 'baixado' ? 'saida' : ev.tipo,
+  const eventos: EventoLinhaTempo[] = [...f.eventos].reverse().map((ev) => ({
+    quando: ev.quando, quem: ev.quem, titulo: ev.descricao, referencia: ev.referencia, marca: MARCA_EVENTO[ev.tipo], tipo: ev.tipo === 'baixado' ? 'saida' : ev.tipo,
   }));
   const operacao = pode('operacao:consultar');
 

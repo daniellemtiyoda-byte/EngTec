@@ -1,5 +1,5 @@
 import type {
-  Alerta, Ata, Categoria, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
+  Alerta, Ata, Categoria, DestinacaoFinal, Evento, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros, RegrasAta, TipoDestino, UsoTamanho,
   Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
@@ -185,6 +185,9 @@ export interface Servicos {
   /** Filtros além dos campos: `periodo` (últimos 7, 30 ou 90 dias) e `localId` (de ou para o local). */
   movimentacoes: ServicoLista<Movimentacao>;
 
+  /** Histórico e auditoria. Filtros `entidade` e `entidadeId`; do mais recente ao mais antigo. */
+  eventos: ServicoLista<Evento>;
+
   rme: ServicoLista<Rme> & {
     obter(numero: string): Promise<Rme>;
     abrir(dados: DadosRme): Promise<Rme>;
@@ -198,10 +201,28 @@ export interface Servicos {
     cancelar(numero: string, motivo: string): Promise<Rme>;
   };
 
+  /** Prestação de contas ao IBAMA (IN Ibama 21/2014). Lançar e informar exigem `dof:declarar`. */
+  ibama: {
+    /** Destinação final das RMEs entregues. Filtros `lancado` ("sim"/"nao"), `especieId`, `de` e `ate` (data da entrega). */
+    destinacoes(q?: ListQuery): Promise<Paginado<DestinacaoFinal>>;
+    marcarLancado(id: Id): Promise<DestinacaoFinal>;
+    /** Saldos informados do DOF, do mais recente ao mais antigo. */
+    saldosInformados(q?: ListQuery): Promise<Paginado<SaldoDofInformado>>;
+    informarSaldo(dados: DadosSaldoDof): Promise<SaldoDofInformado>;
+    /** Saldo do pátio em m³ por espécie e tamanho × último saldo informado. */
+    saldoPatio(): Promise<SaldoPatioEspecie[]>;
+  };
+
   parametros: {
     obter(): Promise<Parametros>;
     atualizar(dados: Partial<Omit<Parametros, 'toleranciaVolumePct'>>): Promise<Parametros>;
     /** Só no mock: volta à história inicial de demonstração. */
     reiniciarDemonstracao(): Promise<void>;
   };
+}
+
+export interface DadosSaldoDof {
+  data: string;
+  itens: { especieId: Id; volumeM3: number }[];
+  observacao?: string;
 }
