@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { RE_FARDO, type CodigoLido } from '../dominio/identificacao';
-import { TIPO_LOCAL } from '../dominio/rotulos';
+import { ordinalClasse, TIPO_LOCAL } from '../dominio/rotulos';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { ApiError, mensagemSegura } from '../services/http';
@@ -118,7 +118,7 @@ export function TransferirFardo({ aberto, cad, fardoId, soExpedicao, aoFechar, a
   const resumoFardo = fardo && (
     <div className="transferir-fardo">
       <span className="mono transferir-id">{fardo.fardo.id}</span>
-      <span>{fardo.item.especie.nomePopular} · {fardo.item.tamanho.codigo} · {numero(fardo.fardo.saldo)} dormentes</span>
+      <span>{fardo.item.tamanho.codigo} · {ordinalClasse(fardo.item.classe)} classe · {fardo.item.especie.nomePopular} · {numero(fardo.fardo.saldo)} dormentes</span>
       <span className="mudo">Está em <strong className="mono">{cad.codigoLocal(atualId)}</strong></span>
     </div>
   );
@@ -177,7 +177,7 @@ export function TransferirFardo({ aberto, cad, fardoId, soExpedicao, aoFechar, a
           <div className="transferir-confirmacao">
             <p className="mudo">Transferir o fardo</p>
             <p className="mono transferir-id">{fardo.fardo.id}</p>
-            <p>{fardo.item.especie.nomePopular} · {fardo.item.tamanho.codigo} · {numero(fardo.fardo.saldo)} dormentes</p>
+            <p>{fardo.item.tamanho.codigo} · {ordinalClasse(fardo.item.classe)} classe · {fardo.item.especie.nomePopular} · {numero(fardo.fardo.saldo)} dormentes</p>
             <p className="transferir-rota">
               <span className="mono">{cad.codigoLocal(atualId)}</span>
               <Icone nome="seta-direita" />

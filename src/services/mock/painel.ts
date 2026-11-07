@@ -1,10 +1,19 @@
 import { DIAS_AVISO_CTF, diasEntre } from '../../dominio/parametros';
+import { ordinalClasse } from '../../dominio/rotulos';
 import type { Permissao } from '../../dominio/permissoes';
-import type { Alerta, Indicadores, Pendencia, Usuario } from '../../types/models';
-import { dofView, fardoView, fornecedorView, saldoPorItem } from './consultas';
+import type { Alerta, Indicadores, Pendencia, SaldoItem, Usuario } from '../../types/models';
+import { ataView, contratoView, dofView, entregaView, fardoView, fornecedorView, saldoPorItem } from './consultas';
 import type { Estado } from './estado';
 
 /* Painel (seção 9.2 do plano): números, "Para fazer agora" por permissão e alertas. Cada um leva à lista filtrada. */
+
+/** Saldo de um tamanho nas atas vigentes (reposição: quanto ainda dá para contratar sem nova ata). */
+export function saldoNasAtasVigentes(e: Estado, tamanhoId: string, dia: string) {
+  return e.atas.map((a) => ataView(e, a, dia)).filter((a) => a.vigente)
+    .map((a) => ({ ata: a.numero, saldo: a.itens.find((i) => i.tamanhoId === tamanhoId)?.saldo ?? 0 })).filter((x) => x.saldo > 0);
+}
+
+const nomeItem = (e: Estado, s: SaldoItem) => `${e.tamanhos.find((x) => x.id === s.tamanhoId)?.codigo ?? s.tamanhoId} · ${ordinalClasse(s.classe)} classe`;
 
 export function indicadores(e: Estado, dia: string): Indicadores {
   const saldo = saldoPorItem(e);
@@ -18,6 +27,9 @@ export function indicadores(e: Estado, dia: string): Indicadores {
     dofsADeclarar: e.dofs.filter((d) => !d.declarado).length,
     rmesAbertas: e.rmes.filter((r) => r.situacao === 'aberta').length,
     naoLocalizados: e.dormentes.filter((d) => d.situacao === 'nao_localizado').length,
+    parcelasAtrasadas: e.contratos.reduce((t, c) => t + contratoView(e, c, dia).parcelasAtrasadas, 0),
+    laudosAVencer: e.entregas.map((x) => entregaView(e, x, dia)).filter((x) => x.nivelPrazoLaudo && x.nivelPrazoLaudo !== 'ok').length,
+    reprovadosAguardandoRetirada: e.dormentes.filter((d) => d.situacao === 'reprovado').length,
   };
 }
 
@@ -45,7 +57,7 @@ export function pendencias(e: Estado, u: Usuario, dia: string): Pendencia[] {
     const saldo = saldoPorItem(e);
     add({ id: 'falta-excesso', titulo: 'Itens em falta ou excesso', quantidade: saldo.filter((s) => s.situacao !== 'ok').length, nivel: 'atencao', link: '/estoque', acao: 'Ver estoque' });
     add({ id: 'parados', titulo: 'Fardos acima do limite de dias', quantidade: fardos.filter((f) => f.acimaLimiteDias).length, nivel: 'atencao', link: '/estoque?visao=fardo&acimaLimiteDias=true', acao: 'Ver fardos' });
-    add({ id: 'nao-localizados', titulo: 'Dormentes não localizados', quantidade: e.dormentes.filter((d) => d.situacao === 'nao_localizado').length, nivel: 'critico', link: '/inspecao?aba=nao-localizados', acao: 'Ver dormentes' });
+    add({ id: 'nao-localizados', titulo: 'Dormentes não localizados', quantidade: e.dormentes.filter((d) => d.situacao === 'nao_localizado').length, nivel: 'critico', link: '/inspecao?aba=nao_localizados', acao: 'Ver dormentes' });
   }
   if (pode('rme:abrir')) {
     add({ id: 'minhas-rmes', titulo: 'Minhas RMEs em andamento', quantidade: e.rmes.filter((r) => r.solicitanteId === u.id && r.situacao !== 'entregue' && r.situacao !== 'cancelada').length, nivel: 'info', link: '/saidas', acao: 'Acompanhar' });
@@ -65,17 +77,27 @@ export function alertas(e: Estado, dia: string): Alerta[] {
     lista.push({ id: `dof-${d.id}`, nivel: d.nivelPrazo === 'atencao' ? 'atencao' : 'critico', titulo: `DOF ${d.numero} a declarar`, descricao: `Prazo de declaração no Sinaflor ${quando}.`, link: `/documentos?aba=dofs&q=${d.numero}` });
   }
   for (const s of saldoPorItem(e).filter((x) => x.situacao !== 'ok')) {
-    const esp = e.especies.find((x) => x.id === s.especieId);
-    const tam = e.tamanhos.find((x) => x.id === s.tamanhoId);
-    const nome = `${esp?.nomePopular ?? s.especieId} · ${tam?.codigo ?? s.tamanhoId}`;
+    const nome = nomeItem(e, s);
+    // Reposição: com o item abaixo do mínimo, o saldo nas atas vigentes e o atalho para um novo contrato.
+    const atas = saldoNasAtasVigentes(e, s.tamanhoId, dia);
+    const saldoAta = atas.length ? ` Saldo na ata vigente: ${atas.map((a) => `${a.saldo} (${a.ata})`).join(', ')}.` : ' Sem saldo em ata vigente.';
     lista.push(s.situacao === 'falta'
-      ? { id: `falta-${s.especieId}-${s.tamanhoId}`, nivel: 'critico', titulo: `Falta: ${nome}`, descricao: `${s.emEstoque} em estoque, abaixo do mínimo de ${s.minimo}.`, link: '/estoque' }
-      : { id: `excesso-${s.especieId}-${s.tamanhoId}`, nivel: 'atencao', titulo: `Excesso: ${nome}`, descricao: `${s.emEstoque} em estoque, acima do máximo de ${s.maximo}.`, link: '/estoque' });
+      ? { id: `falta-${s.id}`, nivel: 'critico', titulo: `Falta: ${nome}`, descricao: `${s.emEstoque} em estoque, abaixo do mínimo de ${s.minimo}.${saldoAta}`, link: atas.length ? '/contratos?novo=1' : '/estoque' }
+      : { id: `excesso-${s.id}`, nivel: 'atencao', titulo: `Excesso: ${nome}`, descricao: `${s.emEstoque} em estoque, acima do máximo de ${s.maximo}.`, link: '/estoque' });
   }
+  for (const c of e.contratos.map((x) => contratoView(e, x, dia)).filter((x) => x.parcelasAtrasadas > 0)) {
+    const p = c.parcelas.filter((x) => x.situacao === 'atrasada');
+    lista.push({ id: `parcela-${c.id}`, nivel: 'critico', titulo: `Contrato ${c.numero}: ${p.length} parcela(s) atrasada(s)`, descricao: p.map((x) => `${x.numero}ª: ${x.recebidos} de ${x.quantidade}, prazo ${x.fim}`).join('; '), link: `/contratos/${c.numero}` });
+  }
+  for (const en of e.entregas.map((x) => entregaView(e, x, dia)).filter((x) => x.nivelPrazoLaudo && x.nivelPrazoLaudo !== 'ok')) {
+    lista.push({ id: `laudo-${en.id}`, nivel: en.nivelPrazoLaudo === 'atencao' ? 'atencao' : 'critico', titulo: `Laudo da NF ${en.nfNumero}`, descricao: `Prazo do Laudo Técnico: ${en.prazoLaudo}${en.nivelPrazoLaudo === 'vencido' ? ' (vencido)' : ''}.`, link: `/recebimentos?etapa=${en.etapa}` });
+  }
+  const aRetirar = e.dormentes.filter((d) => d.situacao === 'reprovado').length;
+  if (aRetirar) lista.push({ id: 'reprovados', nivel: 'atencao', titulo: `${aRetirar} reprovado(s) aguardando retirada`, descricao: 'Comunique o fornecedor e registre a retirada na Inspeção.', link: '/inspecao?aba=reprovados' });
   const parados = e.fardos.map((f) => fardoView(e, f, dia)).filter((f) => f.acimaLimiteDias);
   if (parados.length) lista.push({ id: 'parados', nivel: 'atencao', titulo: `${parados.length} fardo(s) acima de ${e.parametros.limiteDiasEstoque} dias em estoque`, descricao: parados.map((f) => f.id).join(', '), link: '/estoque?visao=fardo&acimaLimiteDias=true' });
   const naoLoc = e.dormentes.filter((d) => d.situacao === 'nao_localizado').length;
-  if (naoLoc) lista.push({ id: 'nao-localizados', nivel: 'critico', titulo: `${naoLoc} dormente(s) não localizado(s)`, descricao: 'Não lidos na conclusão da inspeção; inspecione se forem encontrados.', link: '/inspecao?aba=nao-localizados' });
+  if (naoLoc) lista.push({ id: 'nao-localizados', nivel: 'critico', titulo: `${naoLoc} dormente(s) não localizado(s)`, descricao: 'Não lidos na conclusão da inspeção; inspecione se forem encontrados.', link: '/inspecao?aba=nao_localizados' });
   for (const f of e.fornecedores.filter((x) => x.situacao === 'ativo')) {
     const v = fornecedorView(f, dia);
     const dias = diasEntre(dia, f.ctfValidade);

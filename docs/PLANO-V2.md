@@ -173,22 +173,32 @@ Formatos de ata e contrato são provisórios (ver perguntas em aberto); toda val
 interface Fornecedor { id; razaoSocial; cnpj; cidadeUf; ctfIbama: string; ctfValidade: string;
   situacao: 'ativo' | 'inativo' /* manual */; bloqueado: boolean /* calculado: CTF vencido pela validade */;
   especiesIds: string[]; certificados: Anexo[] }
-interface Especie { id; nomeCientifico; nomePopular; classe?: string; ativo: boolean }
-interface Tamanho { id; codigo; comprimentoCm; larguraCm; alturaCm; volumeM3 /* calculado */; medidas: 'provisorio' | 'confirmado' }
-interface Tratamento { id; preservativo: string /* CCA */; empresa: string /* Granoski */ }
-interface EmpresaInspetora { id; nome /* UFV */; cnpj?: string; ativo: boolean }
+interface Especie { id; nomeCientifico; nomePopular; ativo: boolean }   // a classe não é da espécie: é do fardo e do dormente
+// Tamanho = item de compra da CPTM, pelo código de material (006234 = 2,80 m). Todos com 240 × 170 mm.
+interface Tamanho { id; codigo /* 6 dígitos */; uso: 'via_corrente' | 'amv'; comprimentoCm; larguraCm; alturaCm; volumeM3 /* calculado */; medidas: 'provisorio' | 'confirmado' }
+interface Tratamento { id; preservativo: string /* CCA */; empresa: string }
+interface EmpresaInspetora { id; nome /* IPT, UFV (acreditadas pelo INMETRO) */; cnpj?: string; ativo: boolean }   // vem do Boletim de Inspeção
 interface Local { id; codigo /* A03; ID do QR = LOC-A03 */; descricao; tipo: 'armazenagem' | 'inspecao' | 'segregacao' | 'expedicao'; capacidade: number /* dormentes */; ocupacao /* calculada */; ativo: boolean }
-interface NivelEstoque { especieId; tamanhoId; minimo: number; maximo: number }   // em Configurações
+interface NivelEstoque { classe: 1 | 2; tamanhoId; minimo: number; maximo: number }   // em Configurações (por classe e tamanho)
 interface Anexo { id; nome; tipo: 'pdf' | 'xml' | 'imagem'; url; enviadoEm; enviadoPor }
 ```
 
 ### 5.3 Suprimento
 
 ```ts
-interface Ata { id; numero /* AR00224 */; fornecedorId; vigenciaInicio; vigenciaFim }
-interface Contrato { id; numero /* AR00224-01 */; ataId /* o fornecedor vem da ata, não é gravado de novo */; empresaInspetoraId /* cadastro de empresas inspetoras */; ano: number;
-  situacao: 'vigente' | 'concluido' | 'cancelado'; itens: ItemContrato[]; criadoEm; criadoPor }
-interface ItemContrato { id; especieId; tamanhoId; tratamentoId; quantidade: number /* unidades */;
+// Conforme os documentos reais da CPTM (Ata AR00224 e contratos AR00224-01, -02 e -03): não existe AF; cada pedido é um contrato sob a ata.
+interface RegrasAta { pedidoMinimo /* 6.000 */; maxParcelas /* 6 */; parcelaMinima /* 3.000 */; parcelaMaxima /* 6.000 */;
+  prazosParcelas: [de, ate][] /* dias da assinatura: [0,90], [91,120], [121,150], [151,180], [181,210], [211,240] */ }
+interface Ata { id; numero /* AR00224 */; fornecedorId; vigenciaInicio; vigenciaFim /* padrão: 12 meses */; regras: RegrasAta /* padrão REGRAS_ATA_PADRAO */;
+  itens: { tamanhoId; quantidade /* registrada */; contratado; saldo /* calculados */ }[]; vigente /* calculado */ }
+interface Contrato { id; numero /* AR00224-01 */; ataId /* o fornecedor vem da ata */; ano: number; dataAssinatura; gestor;
+  situacao: 'vigente' | 'concluido' | 'cancelado'; itens: ItemContrato[]; parcelas: ParcelaContrato[]; criadoEm; criadoPor;
+  parcelasAtrasadas /* calculado */; recebimentoDefinitivoEm? /* calculado: 15 dias após o laudo da última entrega */ }
+interface ParcelaContrato { numero; itens: { tamanhoId; quantidade }[];
+  // calculados: janela pela assinatura e pelas regras da ata; recebidos nas entregas da parcela; situação
+  quantidade; inicio; fim; recebidos; entregueEm?; situacao: 'a_entregar' | 'atrasada' | 'entregue' | 'entregue_com_atraso'; diasAtraso }
+// Item do contrato = tamanho. O contrato não define espécie, classe nem tratamento.
+interface ItemContrato { id; tamanhoId; quantidade: number /* unidades, soma das parcelas */;
   // calculados pelo serviço:
   emitidos: number; recebidos: number; aprovados: number; reprovados: number;
   saldoAEmitir: number /* = quantidade - (emitidos - reprovados) */ }
@@ -196,21 +206,25 @@ interface ItemContrato { id; especieId; tamanhoId; tratamentoId; quantidade: num
 
 O contrato é cumprido por dormentes **aprovados**: o fornecedor pode emitir reposição dos reprovados, e o limite de emissão é `emitidos - reprovados <= quantidade`.
 
+**Regras da ata (validadas no serviço).** Total do contrato no mínimo o pedido mínimo; de 1 ao máximo de parcelas; cada parcela, somando os tamanhos, entre a mínima e a máxima; com quantidades registradas na ata, cada tamanho dentro do saldo dela; assinatura dentro da vigência; fornecedor liberado. A parcela fica **atrasada** quando passa do fim da janela sem que os recebidos alcancem a quantidade; **entregue com atraso** quando alcançam depois. Toda entrega (NF e DOF, Simulador) é vinculada a uma parcela.
+
 ### 5.4 Fardo e dormente (dois níveis)
 
 ```ts
 type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao' | 'em_estoque' | 'baixado';
 // O fardo aberto (algum dormente já saiu numa RME) continua em estoque: `aberto: boolean` é calculado e aparece como
 // selo secundário "Aberto" ao lado de "Em estoque".
-interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId; entregaId?: string /* definida ao entrar numa entrega */; quantidadeInicial: number;
+interface Fardo { id /* AR00224-01-F012 */; contratoId; itemContratoId /* = tamanho */; entregaId?: string /* definida ao entrar numa entrega */; quantidadeInicial: number;
+  especieId; classe: 1 | 2; tratamentoId /* informados pelo fornecedor: Boletim de Inspeção e plaquinha */;
+  reprovacao?: { dormentesIds; comunicarAte /* 5 dias úteis */; retirarAte /* 15 dias úteis */; comunicadoEm?; retiradoEm? };
   saldo: number /* calculado: saldo físico = dormentes em_estoque + reservado */;
   disponivel: number /* calculado: dormentes em_estoque (livres para nova saída) */;
   localId?: string; situacao: SituacaoFardo;
   conclusaoInspecao?: { quando; quem; justificativa? /* obrigatória com não localizados */; naoLocalizados: string[] };
   recebidoEm?: string; idadeDias?: number /* calculado */; historico: Evento[] }
 
-type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'nao_localizado';
-interface Dormente { id /* AR00224-01-000357 */; contratoId; itemContratoId; fardoId: string;
+type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'retirado' | 'nao_localizado';
+interface Dormente { id /* AR00224-01-000357 */; contratoId; itemContratoId; fardoId: string; especieId; classe; tratamentoId /* do próprio dormente */;
   situacao: SituacaoDormente; categoria?: number; medidas?: { comprimentoCm; larguraCm; alturaCm };
   inspecaoId?: string; rmeNumero?: string; historico: Evento[] }
 
@@ -263,16 +277,23 @@ interface Inspecao { id; dormenteId; fardoId; resultado: 'aprovado' | 'reprovado
 
 Regras **provisórias**, a confirmar com o time da inspeção (ficam em `dominio/parametros.ts` e nos parâmetros, nunca espalhadas): veredito APROVADO → `aprovado`; ATENÇÃO e REJEITADO → `reprovado`. Categoria pelo índice: ≥ 80 → 1, ≥ 50 → 2, abaixo → 3 (limites `limitesCategoria`). Vale a inspeção mais recente do dormente.
 
+**Documentos e recebimento em duas fases.** Além de NF (XML) e DOF, a entrega aceita o **Boletim de Inspeção** (número, data, empresa inspetora acreditada pelo INMETRO e, por tamanho, espécies e quantidades aprovadas) e o **Relatório Técnico** do lote, como anexos. O recebimento é **provisório** na chegada (leitura dos fardos e canhoto da NF assinado, foto opcional); o **Laudo Técnico** de aprovação é emitido depois da inspeção de toda a entrega, com prazo de **20 dias úteis** da entrega; o **recebimento definitivo** do contrato acontece 15 dias após o laudo da última entrega. Etapas da entrega: a caminho → aguardando inspeção → **aguardando laudo** → concluída.
+
+**Reprovados.** Ao concluir a inspeção do fardo, o sistema registra a comunicação ao fornecedor (a enviar em até 5 dias úteis) e o prazo de retirada (15 dias úteis); retirados, os dormentes ficam **"retirado pelo fornecedor"** (movimentação `retirada`). Uma **reentrega** (reposição de reprovados, marcada no cadastro da entrega) só é aceita depois da retirada dos reprovados do contrato.
+
+**Garantia.** 5 anos a partir da entrega (recebimento do fardo), mostrada na ficha do dormente.
+
 ### 5.6 Estoque e saída
 
 ```ts
-interface SaldoItem { especieId; tamanhoId; emEstoque /* disponível */; aguardandoInspecao; reservado; naoLocalizado; minimo; maximo;
-  situacao: 'falta' | 'ok' | 'excesso' /* calculado */ }
+// Item de estoque = classe + tamanho; a espécie é detalhe.
+interface SaldoItem { id /* classe|tamanho */; classe; tamanhoId; uso; emEstoque /* disponível */; aguardandoInspecao; reservado; naoLocalizado; minimo; maximo;
+  situacao: 'falta' | 'ok' | 'excesso' /* calculado */; especies: { especieId; emEstoque }[] }
 interface Movimentacao { id; tipo: 'guarda' | 'transferencia' | 'segregacao' | 'saida'; fardoId; dormentesIds?: string[];
   deLocalId?; paraLocalId?; quando; quem; referencia?: string }
 type SituacaoRme = 'aberta' | 'em_separacao' | 'pronta' | 'entregue' | 'cancelada';
 interface Rme { id; numero /* RME-2026-0012 */; solicitanteId; destino: string /* obra ou trecho */; necessidadeEm: string;
-  itens: { especieId; tamanhoId; quantidade }[]; separacao?: { fardoId; dormentesIds: string[]; seguiuSugestao: boolean; justificativa? }[];
+  itens: { tamanhoId; classe /* obrigatórios */; categoriaMinima? /* padrão: qualquer aprovado */; especieId?; quantidade }[]; separacao?: { fardoId; dormentesIds: string[]; seguiuSugestao: boolean; justificativa? }[];
   situacao: SituacaoRme; historico: Evento[] }
 ```
 
@@ -419,9 +440,12 @@ Até a Etapa 10, login simulado: o nome do usuário escolhe o perfil (`administr
 
 ### 9.2 Painel (`/`) · padrão Painel
 - **Taxa de reprovação na inspeção da CPTM por empresa inspetora**: reprovados sobre inspecionados dos dormentes de cada contrato, agrupados pela empresa inspetora do contrato (mostra se a inspeção do fornecedor antes da entrega está funcionando). Para administrador e gestor.
-- **Indicadores** (clicáveis): Em estoque (dormentes) · Aguardando inspeção · Itens abaixo do mínimo · Fardos acima do limite de dias · DOFs a declarar · RMEs abertas.
+- **Indicadores** (clicáveis): Em estoque (dormentes) · Aguardando inspeção · Itens abaixo do mínimo · Fardos acima do limite de dias · DOFs a declarar · RMEs abertas · **Parcelas atrasadas** · **Laudos perto do prazo e vencidos** · **Reprovados aguardando retirada**.
+- **Pontualidade por fornecedor**: parcelas entregues no prazo × com atraso × atrasadas.
+- **Via corrente × AMV**: estoque e indicadores separados pelo uso do tamanho.
+- **Reposição**: item (classe + tamanho) abaixo do mínimo mostra o saldo na ata vigente e o atalho **Novo contrato** (`/contratos?novo=1`).
 - **Para fazer agora** por perfil: almoxarife (entregas a receber, fardos a inspecionar, fardos a guardar, RMEs a separar e entregar, DOFs a declarar); gestor (itens em falta ou excesso, fardos parados, taxa de reprovação alta, dormentes não localizados); requisitante (suas RMEs e situação); administrador (contratos perto do fim, fornecedores com CTF vencendo).
-- **Estoque por item**: gráfico de barras horizontais por espécie + tamanho, com marcas de mínimo e máximo (cor só reforça o rótulo falta/ok/excesso).
+- **Estoque por item**: gráfico de barras horizontais por classe + tamanho, com marcas de mínimo e máximo (cor só reforça o rótulo falta/ok/excesso).
 - **Entregas dos contratos**: `BarraProgresso` por contrato vigente.
 - **Alertas**: lista curta com link.
 - Aceite: cada número do Painel abre a lista filtrada correspondente.
@@ -741,14 +765,16 @@ Cada etapa: build sem erros, testes passando (a partir da Etapa 2), `CHANGELOG.m
 ---
 
 ### Melhorias futuras registradas
+- **RME por jogo de dormentes de AMV**: pedir o conjunto completo de um travessão de determinada geometria (os tamanhos de 3,00 a 5,40 m nas quantidades do jogo), em vez de tamanho por tamanho.
 - **Movimentação física parcial**: levar para a expedição só os dormentes separados de um fardo (sem o fardo inteiro), com rastreio do local de cada dormente. Hoje a separação parcial fica no local do fardo até a entrega.
 
 ## 15. Dados de demonstração (`mock/data.ts`)
 
 Montar uma história coerente, gerada pelas regras do mock, para que todas as telas tenham conteúdo realista. Nomes de fornecedores fictícios.
 
-- 3 fornecedores (um com CTF válido, um com CTF vencendo em 20 dias e um com CTF vencido, bloqueado automaticamente), 4 espécies, 2 tamanhos (2,00 m e 2,80 m, medidas provisórias), 2 tratamentos, 8 locais (5 armazenagem, 1 inspeção, 1 segregação, 1 expedição).
-- 2 atas e 3 contratos vigentes, um concluído.
+- 3 fornecedores (um com CTF válido, um com CTF vencendo em 20 dias e um com CTF vencido, bloqueado automaticamente), 4 espécies, os **12 tamanhos reais** da CPTM (006234 a 006231, 240 × 170 mm; 2,80 m via corrente, 3,00 a 5,40 m AMV), 2 tratamentos, empresas inspetoras IPT e UFV, 8 locais (5 armazenagem, 1 inspeção, 1 segregação, 1 expedição). Pessoas (gestores) com nomes fictícios.
+- Ata AR00224 com as regras dos documentos (contratos AR00224-01, -02 e -03; o -01 com as duas parcelas atrasadas, porque os poucos fardos da demonstração não completam 3.000 dormentes) e ata AR00311 (fictícia) com regras reduzidas, para mostrar um contrato pequeno concluído com laudos, reposição de reprovados e recebimento definitivo.
+- Espécie, classe e tratamento por fardo, atribuídos pelo Simulador; Boletim de Inspeção e Relatório Técnico em todas as entregas; laudos emitidos, a emitir no prazo e vencido; reprovados retirados, com comunicação atrasada e com retirada atrasada.
 - Entregas em todas as fases: **1 a caminho com IDs fixos** (contrato, fardos e dormentes documentados em `data.ts` e no `CLAUDE.md`, para imprimir as etiquetas com antecedência e para computador e celular partirem do mesmo estado), 1 recebida em parte (um fardo ainda em trânsito), 1 recebida aguardando inspeção, 1 em inspeção pela metade, várias concluídas.
 - ~200 dormentes com situações variadas; ~5% reprovados (com uma reposição emitida); 2 dormentes não localizados num fardo concluído com justificativa; 1 fardo acima do limite de dias; 1 item abaixo do mínimo e 1 acima do máximo.
 - DOFs: 1 vencido sem declaração, 1 vencendo em 1 dia, 1 em 3 dias, os demais declarados.
@@ -787,3 +813,5 @@ Executado na Etapa 11, já com o Supabase, para computador e celular compartilha
 | ATENÇÃO do Inspector | Conta como reprovado (a confirmar com o time da inspeção) |
 | Categorias e limites do índice | 1, 2 e 3, com limites 80 e 50 (a confirmar com o time da inspeção) |
 | Nome popular de *Dialium guianense* | "Jataipeba" (a confirmar com a CPTM) |
+| Padrão da plaquinha de identificação e lista de espécies aceitas por classe | Obter a Especificação Técnica CPTM **AD1956-4**; no protótipo, o fornecedor informa espécie e classe por fardo e qualquer espécie que ele fornece é aceita |
+| Feriados no cálculo de dias úteis (laudo, comunicação e retirada de reprovados) | Só sábados e domingos ficam de fora (a CPTM pode fornecer o calendário) |

@@ -5,6 +5,22 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Alterado
+- 2026-11-07: **Modelo de compra conforme os documentos reais da CPTM** (Ata AR00224 e contratos AR00224-01, -02 e -03). Escopo: exclusivamente dormentes de madeira.
+  - **Por quê:** o protótipo usava um contrato simplificado (espécie, tamanho e tratamento por item, sem cronograma); os documentos reais mostram ata com regras, contrato com parcelas e prazos, item = tamanho pelo código de material, espécie e classe informadas pelo fornecedor e recebimento em duas fases.
+  - **Ata e contrato:** não existe AF; cada pedido é um contrato sob a ata. A ata tem vigência de 12 meses e regras como parâmetros (padrão: pedido mínimo de 6.000, até 6 parcelas de 3.000 a 6.000, prazos de 90 a 240 dias da assinatura) e quantidades registradas por tamanho (saldo). O contrato tem data de assinatura, gestor e cronograma por parcela e tamanho; o serviço valida as regras e o saldo da ata, calcula a janela de cada parcela e marca as atrasadas. Toda entrega é vinculada a uma parcela.
+  - **Itens reais:** os 12 tamanhos da CPTM pelo código de material (006234 a 006231, 240 × 170 mm), com o uso **via corrente** (2,80 m) ou **AMV** (3,00 a 5,40 m). O contrato não define espécie nem tratamento.
+  - **Espécie, classe (NBR 7511) e tratamento** passam a ser do fardo e de cada dormente; o Simulador os atribui de forma determinística. A espécie perde a classe.
+  - **Estoque e níveis por classe e tamanho**, com a espécie como detalhe; filtro por uso. **RME por tamanho e classe**, com categoria mínima e espécie opcionais; a sugestão e a separação respeitam isso.
+  - **Documentos da entrega:** Boletim de Inspeção (empresa inspetora, que sai do contrato, e aprovados por tamanho e espécie) e Relatório Técnico, como anexos.
+  - **Recebimento em duas fases:** provisório (canhoto da NF) e **Laudo Técnico** depois da inspeção, com prazo de 20 dias úteis; nova etapa "Aguardando laudo"; **recebimento definitivo** do contrato 15 dias após o laudo da última entrega.
+  - **Reprovados:** comunicação ao fornecedor (5 dias úteis) e retirada (15 dias úteis), com a nova situação **"retirado pelo fornecedor"** e a aba "Reprovados a retirar" na Inspeção; a **reentrega** (reposição) só é aceita depois da retirada.
+  - **Garantia** de 5 anos a partir da entrega na ficha do dormente. Painel (Etapa 9) já preparado no serviço: parcelas atrasadas, laudos perto do prazo, reprovados aguardando retirada e a reposição (saldo na ata vigente e "Novo contrato").
+  - **Dados de demonstração** refeitos com os itens reais e pessoas fictícias; mantidos os IDs fixos da entrega a caminho (AR00224-01-F006 a F008, dormentes 000071 a 000112). A ata fictícia AR00311 usa regras reduzidas para mostrar um contrato pequeno concluído. Estado do mock na versão 6.
+  - Testes: 87 (regras da ata e do cronograma, saldo da ata, vigência de 12 meses, empresa inspetora do boletim, laudo, comunicação e retirada, reentrega bloqueada até a retirada, garantia, RME por classe e categoria, estoque por classe, uso e espécie). Verificado no Chrome headless em 360 e 1280 px: tamanhos, contratos e parcelas, novo contrato, estoque, aguardando laudo, recebimento com laudo, reprovados, nova RME, ficha, cadastro de NF e DOF e simulador.
+  - Docs: `docs/PLANO-V2.md` (5.2 a 5.6, 9.2, 15, 17 e melhorias futuras: RME por jogo de AMV), `docs/ESPECIFICACAO-FUNCIONAL.md` (escopo, modelo de dados, regras de compra e entrada, pergunta em aberto sobre a AD1956-4; sai "devolução dos reprovados" das melhorias futuras), `CLAUDE.md`.
+  - Arquivos principais: `src/types/models.ts`, `src/services/contracts.ts`, `src/dominio/{parametros,rotulos,opcoes}.ts`, `src/services/mock/*`, `src/components/{ContratoModal,EntregaAssistente,RecebimentoAssistente,NovaRme,SeparacaoAssistente,TransferirFardo}.tsx`, `src/pages/{Contratos,ContratoDetalhe,Estoque,Inspecao,RecebimentoDetalhe,Recebimentos,Simulador,Tamanhos,Especies,FichaDormente,FardoDetalhe,Rmes,RmeDetalhe,InspecaoFardo,EtiquetasImpressao}.tsx`, `src/hooks/useCadastros.ts`.
+
 ### Adicionado
 - 2026-11-07: **Etapa 8 da v2: Requisições (RME).**
   - **Por quê:** fechar a vida do dormente: a obra pede, o almoxarifado separa lendo os QR e entrega, e a ficha mostra para onde o dormente foi.

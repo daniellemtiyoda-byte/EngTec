@@ -1,12 +1,12 @@
 import { RE_ATA, RE_CODIGO_LOCAL, RE_CONTRATO } from '../../dominio/identificacao';
-import { unidadesDeM3, volumeM3 } from '../../dominio/parametros';
-import type { Ata, EmpresaInspetora, Especie, Id, Tratamento } from '../../types/models';
+import { REGRAS_ATA_PADRAO, VIGENCIA_ATA_MESES, somarDias, somarMeses } from '../../dominio/parametros';
+import type { EmpresaInspetora, Especie, Id, RegrasAta, Tratamento } from '../../types/models';
 import type {
-  DadosAta, DadosAtualizacaoContrato, DadosContrato, DadosEmpresaInspetora, DadosEspecie, DadosFornecedor, DadosItemContrato, DadosLocal, DadosTamanho, DadosTratamento,
+  DadosAta, DadosAtualizacaoContrato, DadosContrato, DadosEmpresaInspetora, DadosEspecie, DadosFornecedor, DadosLocal, DadosParcela, DadosTamanho, DadosTratamento,
 } from '../contracts';
-import { contratoView, fornecedorView, localView } from './consultas';
+import { ataView, contratoView, fornecedorView, localView } from './consultas';
 import {
-  achar, evento, falha, hoje, instante, novoId, type ContratoReg, type Ctx, type Estado, type FornecedorReg, type ItemContratoReg, type LocalReg, type TamanhoReg,
+  achar, evento, falha, hoje, instante, novoId, type AtaReg, type ContratoReg, type Ctx, type Estado, type FornecedorReg, type LocalReg, type ParcelaReg, type TamanhoReg,
 } from './estado';
 
 /* Cadastros (seção 9.18 do plano): nada é apagado, só inativado. Atas e contratos (seções 9.3 e 9.4). */
@@ -51,7 +51,7 @@ export function salvarEspecie(e: Estado, dados: Partial<DadosEspecie>, id?: Id):
   else if (e.especies.some((x) => x.id !== id && igual(x.nomeCientifico, v.nomeCientifico))) campos.nomeCientifico = 'Espécie já cadastrada.';
   if (!v.nomePopular?.trim()) campos.nomePopular = 'Informe o nome popular.';
   exigirCampos(campos);
-  const reg: Especie = { id: atual?.id ?? novoId(e, 'es'), nomeCientifico: v.nomeCientifico.trim(), nomePopular: v.nomePopular.trim(), classe: v.classe?.trim() || undefined, ativo: atual?.ativo ?? true };
+  const reg: Especie = { id: atual?.id ?? novoId(e, 'es'), nomeCientifico: v.nomeCientifico.trim(), nomePopular: v.nomePopular.trim(), ativo: atual?.ativo ?? true };
   if (atual) Object.assign(atual, reg); else e.especies.push(reg);
   return atual ?? reg;
 }
@@ -60,12 +60,13 @@ export function salvarTamanho(e: Estado, dados: Partial<DadosTamanho>, id?: Id):
   const atual = id ? achar(e.tamanhos, (x) => x.id === id, 'Tamanho') : undefined;
   const v = { ...atual, ...dados } as DadosTamanho;
   const campos: Record<string, string> = {};
-  if (!v.codigo?.trim()) campos.codigo = 'Informe o código.';
+  if (!/^\d{6}$/.test(v.codigo?.trim() ?? '')) campos.codigo = 'Código de material CPTM com 6 dígitos (ex. 006234).';
   else if (e.tamanhos.some((x) => x.id !== id && igual(x.codigo, v.codigo))) campos.codigo = 'Código já utilizado.';
   for (const k of ['comprimentoCm', 'larguraCm', 'alturaCm'] as const) if (!(v[k] > 0)) campos[k] = 'Medida em cm, maior que zero.';
+  if (v.uso !== 'via_corrente' && v.uso !== 'amv') campos.uso = 'Escolha o uso: via corrente ou AMV.';
   exigirCampos(campos);
   const reg: TamanhoReg = {
-    id: atual?.id ?? novoId(e, 'ta'), codigo: v.codigo.trim(), comprimentoCm: v.comprimentoCm, larguraCm: v.larguraCm, alturaCm: v.alturaCm,
+    id: atual?.id ?? novoId(e, 'ta'), codigo: v.codigo.trim(), uso: v.uso, comprimentoCm: v.comprimentoCm, larguraCm: v.larguraCm, alturaCm: v.alturaCm,
     medidas: v.medidas ?? 'provisorio', ativo: atual?.ativo ?? true,
   };
   if (atual) Object.assign(atual, reg); else e.tamanhos.push(reg);
@@ -153,12 +154,6 @@ export function reativarLocal(e: Estado, id: Id) {
 
 // ---------- Ata e contrato ----------
 
-function exigirEmpresaAtiva(e: Estado, id: Id | undefined, campos: Record<string, string>) {
-  const emp = e.empresasInspetoras.find((x) => x.id === id);
-  if (!emp) campos.empresaInspetoraId = 'Escolha a empresa inspetora.';
-  else if (!emp.ativo) campos.empresaInspetoraId = `A empresa ${emp.nome} está inativa.`;
-}
-
 function exigirFornecedorLiberado(e: Estado, fornecedorId: Id, ctx: Ctx, campo: string) {
   const reg = e.fornecedores.find((f) => f.id === fornecedorId);
   if (!reg) falha(422, 'Escolha o fornecedor.', { [campo]: 'Fornecedor não encontrado.' });
@@ -168,42 +163,85 @@ function exigirFornecedorLiberado(e: Estado, fornecedorId: Id, ctx: Ctx, campo: 
   return f;
 }
 
-export function criarAta(e: Estado, dados: DadosAta, ctx: Ctx): Ata {
+/** Regras da ata: as padrão (documentos da CPTM) com o que vier informado por cima, validadas. */
+function regrasDaAta(r: Partial<RegrasAta> | undefined, campos: Record<string, string>): RegrasAta {
+  const regras: RegrasAta = { ...REGRAS_ATA_PADRAO, ...r, prazosParcelas: r?.prazosParcelas ?? REGRAS_ATA_PADRAO.prazosParcelas.map((p) => [...p] as [number, number]) };
+  const inteiro = (n: number) => Number.isInteger(n) && n > 0;
+  if (!inteiro(regras.pedidoMinimo)) campos['regras.pedidoMinimo'] = 'Pedido mínimo em dormentes, maior que zero.';
+  if (!inteiro(regras.maxParcelas) || regras.maxParcelas > regras.prazosParcelas.length) campos['regras.maxParcelas'] = `De 1 a ${regras.prazosParcelas.length} parcelas.`;
+  if (!inteiro(regras.parcelaMinima)) campos['regras.parcelaMinima'] = 'Parcela mínima em dormentes, maior que zero.';
+  if (!inteiro(regras.parcelaMaxima) || regras.parcelaMaxima < regras.parcelaMinima) campos['regras.parcelaMaxima'] = 'A parcela máxima não pode ser menor que a mínima.';
+  return regras;
+}
+
+/** Ata de registro de preços: fornecedor liberado, vigência de 12 meses (padrão), regras e quantidades registradas por tamanho. */
+export function criarAta(e: Estado, dados: DadosAta, ctx: Ctx): AtaReg {
   const numero = (dados.numero ?? '').trim().toUpperCase();
   const campos: Record<string, string> = {};
   if (!RE_ATA.test(numero)) campos.numero = 'Número no formato AA00000 (ex. AR00224).';
   else if (e.atas.some((a) => a.numero === numero)) campos.numero = 'Ata já cadastrada.';
   if (!DATA.test(dados.vigenciaInicio ?? '')) campos.vigenciaInicio = 'Informe o início da vigência.';
-  if (!DATA.test(dados.vigenciaFim ?? '')) campos.vigenciaFim = 'Informe o fim da vigência.';
-  else if (dados.vigenciaFim < dados.vigenciaInicio) campos.vigenciaFim = 'O fim vem depois do início.';
+  const vigenciaFim = dados.vigenciaFim || (DATA.test(dados.vigenciaInicio ?? '') ? somarDias(somarMeses(dados.vigenciaInicio, VIGENCIA_ATA_MESES), -1) : '');
+  if (!DATA.test(vigenciaFim)) campos.vigenciaFim = 'Informe o fim da vigência.';
+  else if (vigenciaFim < dados.vigenciaInicio) campos.vigenciaFim = 'O fim vem depois do início.';
+  const regras = regrasDaAta(dados.regras, campos);
+  const vistos = new Set<Id>();
+  (dados.itens ?? []).forEach((i, n) => {
+    if (!e.tamanhos.some((t) => t.id === i.tamanhoId && t.ativo)) campos[`itens.${n}`] = 'Escolha um tamanho ativo.';
+    else if (vistos.has(i.tamanhoId)) campos[`itens.${n}`] = 'Tamanho repetido.';
+    else if (!Number.isInteger(i.quantidade) || i.quantidade <= 0) campos[`itens.${n}`] = 'Quantidade registrada em unidades, maior que zero.';
+    vistos.add(i.tamanhoId);
+  });
   exigirCampos(campos);
   exigirFornecedorLiberado(e, dados.fornecedorId, ctx, 'fornecedorId');
-  const ata: Ata = { id: novoId(e, 'at'), numero, fornecedorId: dados.fornecedorId, vigenciaInicio: dados.vigenciaInicio, vigenciaFim: dados.vigenciaFim };
+  const ata: AtaReg = {
+    id: novoId(e, 'at'), numero, fornecedorId: dados.fornecedorId, vigenciaInicio: dados.vigenciaInicio, vigenciaFim, regras,
+    itens: (dados.itens ?? []).map((i) => ({ tamanhoId: i.tamanhoId, quantidade: i.quantidade })),
+  };
   e.atas.push(ata);
   return ata;
 }
 
-/** Valida os itens do contrato e converte m³ em unidades (pelo volume do tamanho, arredondando para baixo). */
-function itensDoContrato(e: Estado, itens: DadosItemContrato[], especiesDoFornecedor: Id[], campos: Record<string, string>): Omit<ItemContratoReg, 'id'>[] {
-  if (!itens?.length) campos.itens = 'Informe ao menos um item.';
-  const vistos = new Set<string>();
-  return (itens ?? []).map((i, n) => {
-    const t = e.tamanhos.find((x) => x.id === i.tamanhoId && x.ativo);
-    let quantidade = i.quantidade;
-    if (!e.especies.some((x) => x.id === i.especieId && x.ativo)) campos[`itens.${n}`] = 'Escolha uma espécie ativa.';
-    else if (!especiesDoFornecedor.includes(i.especieId)) campos[`itens.${n}`] = 'O fornecedor da ata não fornece esta espécie.';
-    else if (!t) campos[`itens.${n}`] = 'Escolha um tamanho ativo.';
-    else if (!e.tratamentos.some((x) => x.id === i.tratamentoId && x.ativo)) campos[`itens.${n}`] = 'Escolha um tratamento ativo.';
-    else {
-      if (i.unidade === 'm3') quantidade = unidadesDeM3(i.quantidade, volumeM3(t.comprimentoCm, t.larguraCm, t.alturaCm));
-      const k = `${i.especieId}|${i.tamanhoId}|${i.tratamentoId}`;
-      if (vistos.has(k)) campos[`itens.${n}`] = 'Item repetido.';
-      else if (!Number.isInteger(quantidade) || quantidade <= 0) campos[`itens.${n}`] = i.unidade === 'm3' ? 'O volume não chega a uma unidade.' : 'Quantidade em unidades, maior que zero.';
-      vistos.add(k);
-    }
-    return { especieId: i.especieId, tamanhoId: i.tamanhoId, tratamentoId: i.tratamentoId, quantidade };
+/**
+ * Valida o cronograma pelas regras da ata: total do contrato no mínimo o pedido mínimo, até o máximo de parcelas, cada
+ * parcela (somando os itens) entre a mínima e a máxima, tamanhos ativos e, com quantidades registradas na ata, dentro
+ * do saldo de cada tamanho. Devolve os itens do contrato (a soma das parcelas por tamanho).
+ */
+function validarCronograma(e: Estado, ata: AtaReg, parcelas: DadosParcela[], campos: Record<string, string>, ctx: Ctx, contratoAtual?: ContratoReg) {
+  const r = ata.regras;
+  if (!parcelas?.length) campos.parcelas = 'Informe ao menos uma parcela.';
+  else if (parcelas.length > r.maxParcelas) campos.parcelas = `A ata permite até ${r.maxParcelas} parcelas.`;
+  const porTamanho = new Map<Id, number>();
+  (parcelas ?? []).forEach((p, n) => {
+    const vistos = new Set<Id>();
+    let soma = 0;
+    p.itens.forEach((i, k) => {
+      if (!e.tamanhos.some((t) => t.id === i.tamanhoId && (t.ativo || contratoAtual?.itens.some((x) => x.tamanhoId === i.tamanhoId)))) campos[`parcelas.${n}.${k}`] = 'Escolha um tamanho ativo.';
+      else if (vistos.has(i.tamanhoId)) campos[`parcelas.${n}.${k}`] = 'Tamanho repetido na parcela.';
+      else if (!Number.isInteger(i.quantidade) || i.quantidade < 0) campos[`parcelas.${n}.${k}`] = 'Quantidade em unidades.';
+      vistos.add(i.tamanhoId);
+      soma += i.quantidade > 0 ? i.quantidade : 0;
+      porTamanho.set(i.tamanhoId, (porTamanho.get(i.tamanhoId) ?? 0) + (i.quantidade > 0 ? i.quantidade : 0));
+    });
+    if (soma < r.parcelaMinima || soma > r.parcelaMaxima) campos[`parcelas.${n}`] = `A ${n + 1}ª parcela soma ${soma}: cada parcela tem de ${r.parcelaMinima} a ${r.parcelaMaxima} dormentes.`;
   });
+  const total = [...porTamanho.values()].reduce((t, q) => t + q, 0);
+  if (parcelas?.length && total < r.pedidoMinimo) campos.parcelas = `O contrato soma ${total} dormentes: o pedido mínimo da ata é ${r.pedidoMinimo}.`;
+  if (ata.itens.length) {
+    const v = ataView(e, ata, hoje(ctx));
+    for (const [tamanhoId, q] of porTamanho) {
+      const item = v.itens.find((i) => i.tamanhoId === tamanhoId);
+      const jaNoContrato = contratoAtual?.itens.find((i) => i.tamanhoId === tamanhoId)?.quantidade ?? 0;
+      const codigo = e.tamanhos.find((t) => t.id === tamanhoId)?.codigo ?? tamanhoId;
+      if (!item) campos.parcelas = `O tamanho ${codigo} não está registrado na ata ${ata.numero}.`;
+      else if (q > item.saldo + jaNoContrato) campos.parcelas = `O tamanho ${codigo} passa do saldo da ata (${item.saldo + jaNoContrato}).`;
+    }
+  }
+  return porTamanho;
 }
+
+const parcelasReg = (parcelas: DadosParcela[]): ParcelaReg[] =>
+  parcelas.map((p, n) => ({ numero: n + 1, itens: p.itens.filter((i) => i.quantidade > 0).map((i) => ({ tamanhoId: i.tamanhoId, quantidade: i.quantidade })) }));
 
 export function criarContrato(e: Estado, dados: DadosContrato, ctx: Ctx): ContratoReg {
   const numero = (dados.numero ?? '').trim().toUpperCase();
@@ -213,42 +251,53 @@ export function criarContrato(e: Estado, dados: DadosContrato, ctx: Ctx): Contra
   if (!RE_CONTRATO.test(numero)) campos.numero = 'Número no formato AA00000-00 (ex. AR00224-01).';
   else if (ata && !numero.startsWith(`${ata.numero}-`)) campos.numero = `O contrato começa pelo número da ata (${ata.numero}-).`;
   else if (e.contratos.some((c) => c.numero === numero)) campos.numero = 'Contrato já cadastrado.';
-  exigirEmpresaAtiva(e, dados.empresaInspetoraId, campos);
   if (!Number.isInteger(dados.ano) || dados.ano < 2000) campos.ano = 'Informe o ano.';
+  if (!DATA.test(dados.dataAssinatura ?? '')) campos.dataAssinatura = 'Informe a data de assinatura.';
+  else if (ata && (dados.dataAssinatura < ata.vigenciaInicio || dados.dataAssinatura > ata.vigenciaFim)) campos.dataAssinatura = `A ata ${ata.numero} vale de ${ata.vigenciaInicio} a ${ata.vigenciaFim}.`;
+  if (!dados.gestor?.trim()) campos.gestor = 'Informe o gestor do contrato.';
   exigirCampos(campos);
-  const fornecedor = exigirFornecedorLiberado(e, ata!.fornecedorId, ctx, 'ataId');
-  const itens = itensDoContrato(e, dados.itens, fornecedor.especiesIds, campos);
-  exigirCampos(campos);
+  exigirFornecedorLiberado(e, ata!.fornecedorId, ctx, 'ataId');
+  const porTamanho = validarCronograma(e, ata!, dados.parcelas, campos, ctx);
+  exigirCampos(campos, 'Confira o cronograma: as regras da ata não foram atendidas.');
   const reg: ContratoReg = {
-    id: novoId(e, 'ct'), numero, ataId: ata!.id, empresaInspetoraId: dados.empresaInspetoraId, ano: dados.ano, situacao: 'vigente',
-    itens: itens.map((i) => ({ ...i, id: novoId(e, 'ic') })), criadoEm: instante(ctx), criadoPor: ctx.quem,
+    id: novoId(e, 'ct'), numero, ataId: ata!.id, ano: dados.ano, dataAssinatura: dados.dataAssinatura, gestor: dados.gestor.trim(), situacao: 'vigente',
+    itens: [...porTamanho].filter(([, q]) => q > 0).map(([tamanhoId, quantidade]) => ({ id: novoId(e, 'ic'), tamanhoId, quantidade })),
+    parcelas: parcelasReg(dados.parcelas), criadoEm: instante(ctx), criadoPor: ctx.quem,
   };
   e.contratos.push(reg);
   return reg;
 }
 
-export function atualizarContrato(e: Estado, numero: string, dados: DadosAtualizacaoContrato): ContratoReg {
+/** Novo gestor ou novo cronograma (mesmas regras da ata); nenhum item abaixo do já emitido, descontados os reprovados. */
+export function atualizarContrato(e: Estado, numero: string, dados: DadosAtualizacaoContrato, ctx: Ctx): ContratoReg {
   const reg = achar(e.contratos, (c) => c.numero === numero, `Contrato ${numero}`);
   if (reg.situacao === 'cancelado') falha(409, `O contrato ${numero} está cancelado.`);
-  const v = contratoView(e, reg);
   const campos: Record<string, string> = {};
-  if (dados.empresaInspetoraId !== undefined && dados.empresaInspetoraId !== reg.empresaInspetoraId) exigirEmpresaAtiva(e, dados.empresaInspetoraId, campos);
-  if (dados.itens) {
-    const fornecedor = achar(e.fornecedores, (f) => f.id === v.fornecedorId, 'Fornecedor');
-    const novos = dados.itens.filter((i) => !i.id);
-    const convertidos = itensDoContrato(e, novos, fornecedor.especiesIds, campos);
-    // Item existente só muda a quantidade, e nunca abaixo do que já foi emitido (descontados os reprovados).
-    dados.itens.filter((i) => i.id).forEach((i, n) => {
-      const atual = v.itens.find((x) => x.id === i.id);
-      if (!atual) campos[`itens.existente.${n}`] = 'Item não pertence ao contrato.';
-      else if (!Number.isInteger(i.quantidade) || i.quantidade < atual.emitidos - atual.reprovados) campos[`itens.existente.${n}`] = `A quantidade não pode ficar abaixo do já emitido (${atual.emitidos - atual.reprovados}).`;
-    });
-    exigirCampos(campos);
-    for (const i of dados.itens.filter((x) => x.id)) achar(reg.itens, (x) => x.id === i.id, 'Item').quantidade = i.quantidade;
-    reg.itens.push(...convertidos.map((i) => ({ ...i, id: novoId(e, 'ic') })));
+  if (dados.gestor !== undefined && !dados.gestor.trim()) campos.gestor = 'Informe o gestor do contrato.';
+  let porTamanho: Map<Id, number> | undefined;
+  if (dados.parcelas) {
+    const ata = achar(e.atas, (a) => a.id === reg.ataId, 'Ata');
+    porTamanho = validarCronograma(e, ata, dados.parcelas, campos, ctx, reg);
+    const v = contratoView(e, reg, hoje(ctx));
+    for (const item of v.itens) {
+      const q = porTamanho.get(item.tamanhoId) ?? 0;
+      const codigo = e.tamanhos.find((t) => t.id === item.tamanhoId)?.codigo ?? item.tamanhoId;
+      if (q < item.emitidos - item.reprovados) campos.parcelas = `O tamanho ${codigo} não pode ficar abaixo do já emitido (${item.emitidos - item.reprovados}).`;
+    }
+    // Entregas já vinculadas a uma parcela que deixaria de existir.
+    const ultima = dados.parcelas.length;
+    if (e.entregas.some((x) => x.contratoId === reg.id && x.parcela > ultima)) campos.parcelas = 'Há entregas em parcelas que deixariam de existir.';
   }
-  exigirCampos(campos);
-  if (dados.empresaInspetoraId !== undefined) reg.empresaInspetoraId = dados.empresaInspetoraId;
+  exigirCampos(campos, 'Confira o cronograma: as regras da ata não foram atendidas.');
+  if (dados.gestor !== undefined) reg.gestor = dados.gestor.trim();
+  if (dados.parcelas && porTamanho) {
+    reg.parcelas = parcelasReg(dados.parcelas);
+    for (const [tamanhoId, quantidade] of porTamanho) {
+      const item = reg.itens.find((i) => i.tamanhoId === tamanhoId);
+      if (item) item.quantidade = quantidade; else if (quantidade > 0) reg.itens.push({ id: novoId(e, 'ic'), tamanhoId, quantidade });
+    }
+    for (const item of reg.itens) if (!porTamanho.has(item.tamanhoId)) item.quantidade = 0;
+  }
   return reg;
 }
 

@@ -1,6 +1,6 @@
 import type {
   Alerta, Ata, Categoria, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
-  Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros,
+  Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros, RegrasAta, UsoTamanho,
   Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
 } from '../types/models';
@@ -27,26 +27,37 @@ export interface ServicoCadastro<T, N> extends ServicoLista<T> {
 // ---------- Entradas das operações ----------
 
 export interface DadosFornecedor { razaoSocial: string; cnpj: string; cidadeUf: string; ctfIbama: string; ctfValidade: string; especiesIds: Id[] }
-export interface DadosEspecie { nomeCientifico: string; nomePopular: string; classe?: string }
-export interface DadosTamanho { codigo: string; comprimentoCm: number; larguraCm: number; alturaCm: number; medidas: 'provisorio' | 'confirmado' }
+export interface DadosEspecie { nomeCientifico: string; nomePopular: string }
+/** `codigo`: código de material CPTM (6 dígitos). */
+export interface DadosTamanho { codigo: string; comprimentoCm: number; larguraCm: number; alturaCm: number; uso: UsoTamanho; medidas: 'provisorio' | 'confirmado' }
 export interface DadosTratamento { preservativo: string; empresa: string }
 export interface DadosEmpresaInspetora { nome: string; cnpj?: string }
 export interface DadosLocal { codigo: string; descricao: string; tipo: Local['tipo']; capacidade: number }
 
-export interface DadosAta { numero: string; fornecedorId: Id; vigenciaInicio: string; vigenciaFim: string }
-export interface DadosItemContrato { especieId: Id; tamanhoId: Id; tratamentoId: Id; quantidade: number; unidade: 'un' | 'm3' }
-export interface DadosContrato { numero: string; ataId: Id; empresaInspetoraId: Id; ano: number; itens: DadosItemContrato[] }
-/** Item existente (com `id`) só muda de quantidade; sem `id`, é item novo. */
-export interface DadosAtualizacaoContrato { empresaInspetoraId?: Id; itens?: (DadosItemContrato & { id?: Id })[] }
+/** Sem `vigenciaFim`, a vigência é de 12 meses; sem `regras`, as padrão (REGRAS_ATA_PADRAO); `itens`: quantidades registradas por tamanho. */
+export interface DadosAta { numero: string; fornecedorId: Id; vigenciaInicio: string; vigenciaFim?: string; regras?: Partial<RegrasAta>; itens?: { tamanhoId: Id; quantidade: number }[] }
+/** Parcela do cronograma: quantidade por tamanho. Os itens do contrato são a soma das parcelas. */
+export interface DadosParcela { itens: { tamanhoId: Id; quantidade: number }[] }
+export interface DadosContrato { numero: string; ataId: Id; ano: number; dataAssinatura: string; gestor: string; parcelas: DadosParcela[] }
+/** Novo cronograma: nenhum item pode ficar abaixo do já emitido (descontados os reprovados). */
+export interface DadosAtualizacaoContrato { gestor?: string; parcelas?: DadosParcela[] }
 
 /** `comDocumentos`: com NF e DOF já cadastradas (entrega a caminho); sem, só os fardos (a CPTM cadastra NF e DOF pelo XML). */
-export interface DadosEmissao { contratoId: Id; comDocumentos: boolean; itens: { itemContratoId: Id; fardos: number; dormentesPorFardo: number }[] }
+/** `reentrega`: reposição de reprovados (só aceita depois da retirada deles). */
+export interface DadosEmissao { contratoId: Id; parcela: number; reentrega?: boolean; comDocumentos: boolean; itens: { itemContratoId: Id; fardos: number; dormentesPorFardo: number }[] }
 
 export interface DadosNf { numero: string; serie: string; chaveAcesso: string; contratoId: Id; emissao: string; itens: { itemContratoId: Id; quantidade: number; volumeM3: number }[] }
 export interface DadosDof { numero: string; validade: string; volumes: { especieId: Id; volumeM3: number }[] }
-/** `origem: 'recebimento'`: cadastro feito na hora do recebimento (exceção). */
-export interface DadosEntrega { nf: DadosNf; dof: DadosDof; fardosIds?: Id[]; origem?: 'cadastro' | 'recebimento' }
-export interface ArquivosEntrega { xml?: File; pdf?: File }
+export interface DadosBoletim { numero: string; data: string; empresaInspetoraId: Id; itens: { tamanhoId: Id; especieId: Id; quantidade: number }[] }
+export interface DadosRelatorioTecnico { numero: string; data: string }
+/** `origem: 'recebimento'`: cadastro feito na hora do recebimento (exceção). `parcela`: do cronograma do contrato. */
+export interface DadosEntrega {
+  nf: DadosNf; dof: DadosDof; parcela: number; fardosIds?: Id[]; origem?: 'cadastro' | 'recebimento';
+  /** Reposição de reprovados: só é aceita depois da retirada dos reprovados do contrato. */
+  reentrega?: boolean;
+  boletim?: DadosBoletim; relatorioTecnico?: DadosRelatorioTecnico;
+}
+export interface ArquivosEntrega { xml?: File; pdf?: File; boletim?: File; relatorio?: File }
 
 /** Falta declarada: `fardoId` e `quantidade` (dormentes que faltavam no fardo) obrigatórios. */
 export interface DadosOcorrencia { tipo: TipoOcorrencia; descricao: string; fardoId?: Id; quantidade?: number; fotos: File[] }
@@ -60,6 +71,8 @@ export interface DadosRecebimento {
   localEsperaId: Id;
   /** Obrigatória se alguma espécie passar da tolerância de volume. */
   justificativaDivergencia?: string;
+  /** Foto do canhoto da NF assinado (recebimento provisório; opcional). */
+  canhoto?: File;
 }
 
 /** Resultado vindo do Inspector (veredito + índice) ou lançado à mão (resultado + categoria). */
@@ -125,6 +138,8 @@ export interface Servicos {
     /** Prévia da revisão: aceitos, desconhecidos, faltas, divergência de volume e justificativa automática. Não grava nada. */
     previa(entregaId: Id, fardosLidos: Id[], faltas?: FaltaDormentes[]): Promise<PreviaRecebimento>;
     receber(entregaId: Id, dados: DadosRecebimento): Promise<Recebimento>;
+    /** Laudo Técnico de aprovação: toda a entrega recebida e inspecionada (prazo de 20 dias úteis da entrega). */
+    emitirLaudo(entregaId: Id): Promise<Entrega>;
   };
 
   inspecao: {
@@ -138,6 +153,11 @@ export interface Servicos {
     simularFardo(fardoId: Id): Promise<InspecaoFardo>;
     /** Guarda os aprovados no local, segrega os reprovados; dormentes não lidos ficam "não localizado" (justificativa obrigatória). */
     concluir(fardoId: Id, dados: { localId: Id; justificativa?: string }): Promise<Fardo>;
+    /** Fardos com reprovados ainda não retirados (comunicação e retirada pelo fornecedor). */
+    reprovados(q?: ListQuery): Promise<Paginado<Fardo>>;
+    registrarComunicacao(fardoId: Id): Promise<Fardo>;
+    /** Os reprovados do fardo passam a "retirado pelo fornecedor" e saem da segregação. */
+    registrarRetirada(fardoId: Id): Promise<Fardo>;
   };
 
   /** `filters.noLocal`: fardos que estão no local (sem os baixados). */
@@ -152,7 +172,7 @@ export interface Servicos {
   };
 
   estoque: {
-    /** Saldo por espécie e tamanho; filtros `especieId`, `tamanhoId` e `situacao`; a busca olha os nomes. */
+    /** Saldo por classe e tamanho; filtros `classe`, `tamanhoId`, `uso` e `situacao`; a busca olha o código e as espécies. */
     porItem(q?: ListQuery): Promise<Paginado<SaldoItem>>;
     /**
      * Fardos em estoque (com saldo; os baixados saem). `aberto` ("true"/"false") separa completos e abertos. Filtros

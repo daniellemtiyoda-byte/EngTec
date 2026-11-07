@@ -38,7 +38,7 @@ export default function Rmes() {
     { chave: 'numero', titulo: 'RME', ordenavel: true, render: (r) => <CodigoLink codigo={r.numero} /> },
     { chave: 'solicitanteNome', titulo: 'Solicitante', opcional: true, render: (r) => r.solicitanteNome },
     { chave: 'destino', titulo: 'Destino', quebrar: true, render: (r) => r.destino },
-    { chave: 'itens', titulo: 'Itens', quebrar: true, render: (r) => r.itens.map((i) => `${cad.descreverItem(i)} (${numero(i.quantidade)})`).join('; ') },
+    { chave: 'itens', titulo: 'Itens', quebrar: true, render: (r) => r.itens.map((i) => `${cad.descreverItemRme(i)} (${numero(i.quantidade)})`).join('; ') },
     { chave: 'necessidadeEm', titulo: 'Necessidade em', ordenavel: true, render: (r) => data(r.necessidadeEm) },
     { chave: 'situacao', titulo: 'Situação', render: (r) => <BadgeDe mapa={SITUACAO_RME} valor={r.situacao} /> },
   ];

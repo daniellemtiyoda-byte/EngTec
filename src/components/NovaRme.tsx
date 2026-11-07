@@ -3,21 +3,24 @@ import { useAsync } from '../hooks/useAsync';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { ApiError, mensagemSegura } from '../services/http';
-import type { Rme } from '../types/models';
+import type { Categoria, Classe, Rme } from '../types/models';
+import { CATEGORIAS } from '../dominio/opcoes';
+import { USO_TAMANHO } from '../dominio/rotulos';
 import { dataSP, somarDias } from '../dominio/parametros';
 import { numero, paraNumero } from '../utils/format';
 import { Contador } from './Contador';
 import { Modal } from './Modal';
 
-interface Linha { chave: number; item: string; quantidade: string }
+/** `item`: `<classe>|<tamanhoId>` (o item de estoque); categoria e espécie opcionais. */
+interface Linha { chave: number; item: string; categoria: string; especieId: string; quantidade: string }
 let seq = 1;
 
 interface Props { aberto: boolean; cad: Cadastros; aoFechar: () => void; aoCriar: (r: Rme) => void }
 
 /**
- * Nova RME (seção 9.17 do plano), pelo requisitante: destino (obra ou trecho), data de necessidade e itens (espécie +
- * tamanho com o disponível visível). Pedir mais que o disponível é permitido, com aviso: a separação só fecha quando
- * houver estoque para a quantidade inteira.
+ * Nova RME (seção 9.17 do plano), pelo requisitante: destino (obra ou trecho), data de necessidade e itens por tamanho
+ * e classe (obrigatórios), com o disponível visível; categoria mínima (padrão: qualquer aprovado) e espécie opcionais.
+ * Pedir mais que o disponível é permitido, com aviso: a separação só fecha quando houver estoque para a quantidade inteira.
  */
 export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
   const saldo = useAsync(() => (aberto ? servicos.estoque.porItem({ pageSize: 500 }) : Promise.resolve(undefined)), [aberto]);
@@ -32,10 +35,11 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
 
   useEffect(() => {
     if (!aberto) return;
-    setDestino(''); setNecessidadeEm(somarDias(hoje, 7)); setLinhas([{ chave: seq++, item: '', quantidade: '' }]); setErros({}); setErroGeral(undefined);
+    setDestino(''); setNecessidadeEm(somarDias(hoje, 7)); setLinhas([nova()]); setErros({}); setErroGeral(undefined);
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const mudar = (chave: number, campo: 'item' | 'quantidade', v: string) => setLinhas((l) => l.map((x) => (x.chave === chave ? { ...x, [campo]: v } : x)));
+  const nova = (): Linha => ({ chave: seq++, item: '', categoria: '', especieId: '', quantidade: '' });
+  const mudar = (chave: number, campo: 'item' | 'categoria' | 'especieId' | 'quantidade', v: string) => setLinhas((l) => l.map((x) => (x.chave === chave ? { ...x, [campo]: v } : x)));
 
   async function enviar() {
     const e: Record<string, string> = {};
@@ -44,8 +48,8 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
     else if (necessidadeEm < hoje) e.necessidadeEm = 'A data de necessidade já passou.';
     const usados = new Set<string>();
     linhas.forEach((l, n) => {
-      if (!l.item) e[`itens.${n}`] = 'Escolha a espécie e o tamanho.';
-      else if (usados.has(l.item)) e[`itens.${n}`] = 'Item repetido: some as quantidades numa linha.';
+      if (!l.item) e[`itens.${n}`] = 'Escolha o tamanho e a classe.';
+      else if (usados.has(l.item)) e[`itens.${n}`] = 'Tamanho e classe repetidos: some as quantidades numa linha.';
       else if (!(paraNumero(l.quantidade, true) > 0)) e[`itens.${n}`] = 'Quantidade em unidades, maior que zero.';
       usados.add(l.item);
     });
@@ -56,7 +60,13 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
     try {
       const r = await servicos.rme.abrir({
         destino: destino.trim(), necessidadeEm,
-        itens: linhas.map((l) => { const [especieId, tamanhoId] = l.item.split('|'); return { especieId, tamanhoId, quantidade: paraNumero(l.quantidade, true) }; }),
+        itens: linhas.map((l) => {
+          const [classe, tamanhoId] = l.item.split('|');
+          return {
+            tamanhoId, classe: Number(classe) as Classe, quantidade: paraNumero(l.quantidade, true),
+            categoriaMinima: l.categoria ? (Number(l.categoria) as Categoria) : undefined, especieId: l.especieId || undefined,
+          };
+        }),
       });
       aoCriar(r);
     } catch (err) {
@@ -98,11 +108,27 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
             return (
               <li key={l.chave}>
                 <div className="campo">
-                  <label htmlFor={`rme-item-${l.chave}`}>Espécie e tamanho</label>
+                  <label htmlFor={`rme-item-${l.chave}`}>Tamanho e classe</label>
                   <select id={`rme-item-${l.chave}`} value={l.item} onChange={(e) => mudar(l.chave, 'item', e.target.value)}>
                     <option value="">Selecione…</option>
-                    {itens.map((x) => <option key={x.id} value={x.id}>{cad.descreverItem(x)} · {numero(x.emEstoque)} disponíveis</option>)}
+                    {itens.map((x) => <option key={x.id} value={x.id}>{cad.descreverItem(x)} · {USO_TAMANHO[x.uso][1]} · {numero(x.emEstoque)} disponíveis</option>)}
                   </select>
+                </div>
+                <div className="linha-campos-2">
+                  <div className="campo">
+                    <label htmlFor={`rme-cat-${l.chave}`}>Categoria mínima</label>
+                    <select id={`rme-cat-${l.chave}`} value={l.categoria} onChange={(e) => mudar(l.chave, 'categoria', e.target.value)}>
+                      <option value="">Qualquer aprovado</option>
+                      {CATEGORIAS.map((c) => <option key={c} value={c}>{c === 1 ? 'Só categoria 1' : `Até a categoria ${c}`}</option>)}
+                    </select>
+                  </div>
+                  <div className="campo">
+                    <label htmlFor={`rme-esp-${l.chave}`}>Espécie</label>
+                    <select id={`rme-esp-${l.chave}`} value={l.especieId} onChange={(e) => mudar(l.chave, 'especieId', e.target.value)}>
+                      <option value="">Qualquer espécie</option>
+                      {(s?.especies ?? []).map((x) => <option key={x.especieId} value={x.especieId}>{cad.nomeEspecie(x.especieId)} · {numero(x.emEstoque)} disponíveis</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div className="campo">
                   <span className="rotulo-campo">Quantidade</span>
@@ -115,7 +141,7 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
             );
           })}
         </ul>
-        <button type="button" className="btn btn-sec btn-peq" onClick={() => setLinhas((x) => [...x, { chave: seq++, item: '', quantidade: '' }])}>+ Item</button>
+        <button type="button" className="btn btn-sec btn-peq" onClick={() => setLinhas((x) => [...x, nova()])}>+ Item</button>
       </fieldset>
     </Modal>
   );

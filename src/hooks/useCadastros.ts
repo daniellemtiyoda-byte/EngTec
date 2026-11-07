@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { servicos } from '../services';
 import type { Ata, EmpresaInspetora, Especie, Fornecedor, Id, Local, Tamanho, Tratamento } from '../types/models';
 import { useAsync } from './useAsync';
+import { ordinalClasse } from '../dominio/rotulos';
+import { metros } from '../utils/format';
 
 const TODOS = { pageSize: 1000 };
 
@@ -30,6 +32,7 @@ export function useCadastros() {
     const empresas = mapa<EmpresaInspetora>(d?.empresas);
     const nomeEspecie = (id: Id) => especies.get(id)?.nomePopular ?? '—';
     const codigoTamanho = (id: Id) => tamanhos.get(id)?.codigo ?? '—';
+    const descreverTamanho = (id: Id) => { const t = tamanhos.get(id); return t ? `${t.codigo} · ${metros(t.comprimentoCm / 100)}` : '—'; };
     const nomeTratamento = (id: Id) => { const t = tratamentos.get(id); return t ? `${t.preservativo} / ${t.empresa}` : '—'; };
     return {
       ...r, listas: d,
@@ -39,8 +42,13 @@ export function useCadastros() {
       numeroAta: (id: Id) => atas.get(id)?.numero ?? '—',
       nomeEmpresa: (id: Id) => empresas.get(id)?.nome ?? '—',
       codigoLocal: (id?: Id) => (id ? locais.get(id)?.codigo ?? '—' : '—'),
-      /** "Jataipeba · T280" (espécie e tamanho de um item). */
-      descreverItem: (i: { especieId: Id; tamanhoId: Id }) => `${nomeEspecie(i.especieId)} · ${codigoTamanho(i.tamanhoId)}`,
+      /** "006234 · 2,80 m" (o item de compra). */
+      descreverTamanho,
+      /** "006234 · 2,80 m · 1ª classe" (item de contrato, de estoque ou de RME). */
+      descreverItem: (i: { tamanhoId: Id; classe?: number }) => `${descreverTamanho(i.tamanhoId)}${i.classe ? ` · ${ordinalClasse(i.classe)} classe` : ''}`,
+      /** Item de RME: tamanho e classe, e a categoria mínima e a espécie quando pedidas. */
+      descreverItemRme: (i: { tamanhoId: Id; classe: number; categoriaMinima?: number; especieId?: Id }) =>
+        `${descreverTamanho(i.tamanhoId)} · ${ordinalClasse(i.classe)} classe${i.categoriaMinima ? ` · categoria até ${i.categoriaMinima}` : ''}${i.especieId ? ` · ${nomeEspecie(i.especieId)}` : ''}`,
     };
   }, [r.dados, r.carregando, r.erro]); // eslint-disable-line react-hooks/exhaustive-deps
 }

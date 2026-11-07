@@ -16,6 +16,7 @@ import { numero } from '../utils/format';
 const ABAS = [
   { valor: 'a_caminho', rotulo: 'A caminho' },
   { valor: 'aguardando_inspecao', rotulo: 'Aguardando inspeção' },
+  { valor: 'aguardando_laudo', rotulo: 'Aguardando laudo' },
   { valor: 'concluida', rotulo: 'Concluídos' },
   { valor: 'com_ocorrencia', rotulo: 'Com ocorrência' },
 ];

@@ -9,8 +9,8 @@ import { useToast } from '../components/Toast';
 import { DisponivelFardo, SituacaoFardo } from '../components/SituacaoFardo';
 import { TransferirFardo } from '../components/TransferirFardo';
 import { useAuth } from '../contexts/AuthContext';
-import { SITUACAO_SALDO_OPCOES } from '../dominio/opcoes';
-import { SITUACAO_SALDO } from '../dominio/rotulos';
+import { CLASSE_OPCOES, SITUACAO_SALDO_OPCOES, USO_TAMANHO_OPCOES } from '../dominio/opcoes';
+import { ordinalClasse, SITUACAO_SALDO, USO_TAMANHO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
@@ -43,15 +43,15 @@ export default function Estoque() {
   const operacao = pode('operacao:consultar');
   const visaoAtual: Visao = operacao ? visao : 'item';
 
-  const especies = (cad.listas?.especies ?? []).map((e) => ({ valor: e.id, rotulo: e.nomePopular }));
-  const tamanhos = (cad.listas?.tamanhos ?? []).map((t) => ({ valor: t.id, rotulo: t.codigo }));
+  const tamanhos = (cad.listas?.tamanhos ?? []).map((t) => ({ valor: t.id, rotulo: cad.descreverTamanho(t.id) }));
   const locais = (cad.listas?.locais ?? []).filter((l) => l.tipo === 'armazenagem' || l.tipo === 'expedicao').map((l) => ({ valor: l.id, rotulo: l.codigo }));
 
   const abas: Aba<Visao>[] = operacao ? [{ valor: 'item', rotulo: 'Por item' }, { valor: 'fardo', rotulo: 'Por fardo' }] : [{ valor: 'item', rotulo: 'Por item' }];
 
   const colunasItem: Coluna<SaldoItem>[] = [
-    { chave: 'especieId', titulo: 'Espécie', render: (s) => cad.nomeEspecie(s.especieId) },
-    { chave: 'tamanhoId', titulo: 'Tamanho', render: (s) => cad.codigoTamanho(s.tamanhoId) },
+    { chave: 'tamanhoId', titulo: 'Tamanho', render: (s) => cad.descreverTamanho(s.tamanhoId) },
+    { chave: 'classe', titulo: 'Classe', render: (s) => `${ordinalClasse(s.classe)}` },
+    { chave: 'uso', titulo: 'Uso', opcional: true, render: (s) => <BadgeDe mapa={USO_TAMANHO} valor={s.uso} /> },
     { chave: 'emEstoque', titulo: 'Em estoque', alinhar: 'right', ordenavel: true, render: (s) => <strong>{numero(s.emEstoque)}</strong> },
     { chave: 'aguardandoInspecao', titulo: 'Aguardando inspeção', alinhar: 'right', ordenavel: true, render: (s) => numero(s.aguardandoInspecao) },
     { chave: 'reservado', titulo: 'Reservado', alinhar: 'right', ordenavel: true, render: (s) => numero(s.reservado) },
@@ -59,11 +59,16 @@ export default function Estoque() {
     { chave: 'minimo', titulo: 'Mínimo', alinhar: 'right', render: (s) => (s.minimo || s.maximo ? numero(s.minimo) : '—') },
     { chave: 'maximo', titulo: 'Máximo', alinhar: 'right', render: (s) => (s.minimo || s.maximo ? numero(s.maximo) : '—') },
     { chave: 'situacao', titulo: 'Situação', render: (s) => <BadgeDe mapa={SITUACAO_SALDO} valor={s.situacao} /> },
+    {
+      chave: 'especies', titulo: 'Espécies (disponível)', quebrar: true, opcional: true,
+      render: (s) => (s.especies.length ? s.especies.map((x) => `${cad.nomeEspecie(x.especieId)} ${numero(x.emEstoque)}`).join(' · ') : '—'),
+    },
   ];
 
   const colunasFardo: Coluna<Fardo>[] = [
     { chave: 'id', titulo: 'Fardo', render: (f) => <CodigoLink codigo={f.id} /> },
-    { chave: 'itemContratoId', titulo: 'Item', render: (f) => { const i = itens.get(f.itemContratoId); return i ? cad.descreverItem(i) : '—'; } },
+    { chave: 'itemContratoId', titulo: 'Item', render: (f) => { const i = itens.get(f.itemContratoId); return i ? cad.descreverItem({ tamanhoId: i.tamanhoId, classe: f.classe }) : '—'; } },
+    { chave: 'especieId', titulo: 'Espécie', render: (f) => cad.nomeEspecie(f.especieId) },
     { chave: 'contratoId', titulo: 'Contrato', opcional: true, render: (f) => { const n = itens.get(f.itemContratoId)?.contrato; return n ? <Link className="mono" to={`/contratos/${n}`}>{n}</Link> : '—'; } },
     { chave: 'localId', titulo: 'Local', render: (f) => { const c = cad.codigoLocal(f.localId); return c !== '—' ? <Link className="mono" to={`/locais/${c}`}>{c}</Link> : c; } },
     { chave: 'saldo', titulo: 'Saldo', alinhar: 'right', ordenavel: true, render: (f) => `${numero(f.saldo)}/${numero(f.quantidadeInicial)}` },
@@ -79,31 +84,33 @@ export default function Estoque() {
     <>
       <CabecalhoPagina
         titulo="Estoque"
-        subtitulo="Saldo por espécie e tamanho e os fardos guardados. Falta e excesso comparam o disponível com o mínimo e o máximo de Configurações."
+        subtitulo="Saldo por classe e tamanho (via corrente e AMV) e os fardos guardados. Falta e excesso comparam o disponível com o mínimo e o máximo de Configurações."
         acoes={movimentar && <button className="btn btn-pri" onClick={() => setTransferir({})}>Transferir fardo</button>}
       />
       <AbasSecao abas={abas} ativa={visaoAtual} aoEscolher={setVisao} rotulo="Visão do estoque">
         {visaoAtual === 'item' && (
           <ListPage<SaldoItem>
             key="item" titulo="Saldo por item" subnivel colunas={colunasItem} recarregar={rec}
-            descricao="Em estoque é o disponível para nova saída; os reservados ainda estão nos fardos."
+            descricao="Por classe (NBR 7511) e tamanho, com a espécie como detalhe. Em estoque é o disponível para nova saída; os reservados ainda estão nos fardos."
             filtros={[
-              { chave: 'especieId', rotulo: 'Espécie', opcoes: especies },
+              { chave: 'uso', rotulo: 'Uso', opcoes: USO_TAMANHO_OPCOES },
               { chave: 'tamanhoId', rotulo: 'Tamanho', opcoes: tamanhos },
+              { chave: 'classe', rotulo: 'Classe', opcoes: CLASSE_OPCOES },
               { chave: 'situacao', rotulo: 'Situação', opcoes: SITUACAO_SALDO_OPCOES },
             ]}
             listar={(q) => servicos.estoque.porItem(q)}
-            acoesLinha={operacao ? [{ rotulo: 'Ver fardos', principal: true, aoClicar: (s) => setParams({ visao: 'fardo', especieId: s.especieId, tamanhoId: s.tamanhoId }) }] : undefined}
+            acoesLinha={operacao ? [{ rotulo: 'Ver fardos', principal: true, aoClicar: (s) => setParams({ visao: 'fardo', tamanhoId: s.tamanhoId, classe: String(s.classe) }) }] : undefined}
           />
         )}
         {visaoAtual === 'fardo' && (
           <ListPage<Fardo>
             key="fardo" titulo="Fardos em estoque" subnivel colunas={colunasFardo} recarregar={rec}
-            descricao={`Fardos em estoque, do mais antigo ao mais novo; aberto é o fardo de que já saíram dormentes numa RME. Acima de ${numero(parametros.dados?.limiteDiasEstoque ?? 120)} dias o fardo fica em alerta. Pesquise pelo ID do fardo ou pelo contrato.`}
+            descricao={`Fardos em estoque, do mais antigo ao mais novo; aberto é o fardo de que já saíram dormentes numa RME. Acima de ${numero(parametros.dados?.limiteDiasEstoque ?? 120)} dias o fardo fica em alerta. Pesquise pelo ID do fardo, pelo contrato ou pela espécie.`}
             abasSituacao={{ chave: 'aberto', rotulo: 'Fardos completos ou abertos', abas: [{ valor: '', rotulo: 'Todos' }, { valor: 'false', rotulo: 'Completos' }, { valor: 'true', rotulo: 'Abertos' }] }}
             filtros={[
-              { chave: 'especieId', rotulo: 'Espécie', opcoes: especies },
+              { chave: 'uso', rotulo: 'Uso', opcoes: USO_TAMANHO_OPCOES },
               { chave: 'tamanhoId', rotulo: 'Tamanho', opcoes: tamanhos },
+              { chave: 'classe', rotulo: 'Classe', opcoes: CLASSE_OPCOES },
               { chave: 'localId', rotulo: 'Local', opcoes: locais },
               { chave: 'acimaLimite', rotulo: 'Idade', opcoes: [{ valor: 'sim', rotulo: 'Acima do limite de dias' }] },
             ]}

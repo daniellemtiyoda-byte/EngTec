@@ -1,8 +1,9 @@
-import { justificativaPorFalta } from '../../dominio/parametros';
-import type { Id, Ocorrencia, PreviaRecebimento, Recebimento } from '../../types/models';
+import { dataSP, justificativaPorFalta } from '../../dominio/parametros';
+import type { Entrega, Id, Ocorrencia, PreviaRecebimento, Recebimento } from '../../types/models';
 import type { DadosRecebimento, FaltaDormentes } from '../contracts';
-import { divergenciaVolume as calcularDivergencia, dormentesDoFardo } from './consultas';
-import { achar, anexo, evento, falha, instante, novoId, type Ctx, type EntregaReg, type Estado, type FardoReg } from './estado';
+import { divergenciaVolume as calcularDivergencia, dormentesDoFardo, entregaView } from './consultas';
+import { exigirReentregaLiberada } from './documentos';
+import { achar, anexo, evento, falha, instante, novoId, proximoNumero, type Ctx, type EntregaReg, type Estado, type FardoReg } from './estado';
 import { movimentarDormentes } from './estoque';
 
 /**
@@ -74,6 +75,8 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
   const dof = achar(e.dofs, (d) => d.id === entrega.dofId, 'DOF');
   const local = e.locais.find((l) => l.id === dados.localEsperaId);
   if (!local || !local.ativo || local.tipo !== 'inspecao') falha(422, 'Escolha o local de espera da inspeção.', { localEsperaId: 'Escolha um local ativo do tipo inspeção.' });
+  // Reentrega (reposição) só depois da retirada dos reprovados do contrato.
+  if (entrega.reentrega) exigirReentregaLiberada(e, entrega.contratoId);
 
   const { esperados, aceitos, desconhecidos, faltantes, faltaPorFardo, divergencia: divergenciaVolume, justificativaAutomatica: automatica, exigeJustificativa } =
     analisarRecebimento(e, entrega, dados.fardosLidos, faltasDasOcorrencias(dados.ocorrencias));
@@ -137,9 +140,29 @@ export function receber(e: Estado, entregaId: Id, dados: DadosRecebimento, ctx: 
 
   const rec: Recebimento = {
     id: recebimentoId, entregaId: entrega.id, nfId: nf.id, dofId: dof.id, recebidoEm: instante(ctx), recebidoPor: ctx.quem,
+    canhoto: anexo(e, ctx, dados.canhoto, 'imagem'),
     fardosEsperados: esperados.map((f) => f.id), fardosLidos: aceitos.map((f) => f.id), conforme: ocorrencias.length === 0,
     ocorrencias, divergenciaVolume, justificativaDivergencia, justificativaAutomatica, localEsperaId: local.id,
   };
   e.recebimentos.push(rec);
   return rec;
+}
+
+/**
+ * Laudo Técnico de aprovação (recebimento em duas fases): emitido depois que toda a entrega foi recebida e
+ * inspecionada, com o total de aprovados e reprovados. Prazo: 20 dias úteis da entrega (alerta, não bloqueio).
+ */
+export function emitirLaudo(e: Estado, entregaId: Id, ctx: Ctx): Entrega {
+  const en = achar(e.entregas, (x) => x.id === entregaId, 'Entrega');
+  const v = entregaView(e, en, dataSP(ctx.agora()));
+  if (en.laudo) falha(409, `O laudo desta entrega já foi emitido (${en.laudo.numero}).`);
+  if (!v.podeEmitirLaudo) falha(409, 'O laudo só é emitido depois que todos os fardos da entrega foram recebidos e inspecionados.');
+  const ds = e.dormentes.filter((d) => en.fardosIds.includes(d.fardoId));
+  const reprovados = ds.filter((d) => d.situacao === 'reprovado' || d.situacao === 'retirado').length;
+  const aprovados = ds.filter((d) => ['em_estoque', 'reservado', 'baixado'].includes(d.situacao)).length;
+  const ano = dataSP(ctx.agora()).slice(0, 4);
+  en.laudo = { numero: `LT-${ano}-${String(proximoNumero(e, 'numeroLaudo', 1)).padStart(4, '0')}`, emitidoEm: instante(ctx), emitidoPor: ctx.quem, aprovados, reprovados };
+  const nf = e.nfs.find((n) => n.id === en.nfId);
+  for (const f of e.fardos.filter((x) => en.fardosIds.includes(x.id))) f.historico.push(evento(ctx, 'ocorrencia', `Laudo Técnico ${en.laudo.numero} emitido`, nf ? `NF ${nf.numero}` : undefined));
+  return entregaView(e, en, dataSP(ctx.agora()));
 }

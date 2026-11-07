@@ -1,9 +1,9 @@
 import { sequenciaDe } from '../../dominio/identificacao';
-import { categoriaDoIndice, resultadoDoVeredito } from '../../dominio/parametros';
+import { PRAZO_COMUNICACAO_REPROVADOS_DIAS_UTEIS, PRAZO_RETIRADA_REPROVADOS_DIAS_UTEIS, categoriaDoIndice, resultadoDoVeredito, somarDiasUteis } from '../../dominio/parametros';
 import type { Categoria, Id, Inspecao, ResultadoInspecao, VereditoInspector } from '../../types/models';
 import type { DadosInspecao } from '../contracts';
-import { dormentesDoFardo, itemDescrito, justificativaDaFalta } from './consultas';
-import { achar, evento, falha, instante, novoId, type Ctx, type Estado } from './estado';
+import { dormentesDoFardo, justificativaDaFalta, tamanhoDoItem } from './consultas';
+import { achar, evento, falha, hoje, instante, novoId, type Ctx, type Estado, type FardoReg } from './estado';
 import { localDeSegregacao, movimentarDormentes } from './estoque';
 
 /*
@@ -68,6 +68,48 @@ function segregar(e: Estado, fardoId: Id, ids: Id[], deLocalId: Id | undefined, 
   const seg = localDeSegregacao(e, ctx);
   movimentarDormentes(e, ids, 'reprovado', { localId: seg.id, evento: { tipo: 'segregado', descricao: `Reprovado na inspeção, segregado em ${seg.codigo}` } }, ctx);
   e.movimentacoes.push({ id: novoId(e, 'mv'), tipo: 'segregacao', fardoId, dormentesIds: ids, quantidade: ids.length, deLocalId, paraLocalId: seg.id, quando: instante(ctx), quem: ctx.quem });
+  registrarReprovacao(e, achar(e.fardos, (f) => f.id === fardoId, 'Fardo'), ids, ctx);
+}
+
+/**
+ * Reprovados do fardo: o sistema registra a comunicação ao fornecedor (a enviar em até 5 dias úteis) e o prazo de
+ * retirada (15 dias úteis). Reprovado encontrado depois entra na mesma reprovação, se ela ainda não foi retirada.
+ */
+function registrarReprovacao(e: Estado, f: FardoReg, ids: Id[], ctx: Ctx) {
+  if (f.reprovacao && !f.reprovacao.retiradoEm) { f.reprovacao.dormentesIds.push(...ids); return; }
+  const dia = hoje(ctx);
+  f.reprovacao = {
+    dormentesIds: [...ids], comunicarAte: somarDiasUteis(dia, PRAZO_COMUNICACAO_REPROVADOS_DIAS_UTEIS), retirarAte: somarDiasUteis(dia, PRAZO_RETIRADA_REPROVADOS_DIAS_UTEIS),
+  };
+  f.historico.push(evento(ctx, 'ocorrencia', `${ids.length} reprovado(s): comunicar o fornecedor até ${f.reprovacao.comunicarAte}; retirada até ${f.reprovacao.retirarAte}`));
+}
+
+/** Registra que o fornecedor foi comunicado dos reprovados do fardo. */
+export function registrarComunicacao(e: Estado, fardoId: Id, ctx: Ctx) {
+  const f = achar(e.fardos, (x) => x.id === fardoId, 'Fardo');
+  if (!f.reprovacao) falha(409, `O fardo ${f.id} não tem reprovados.`);
+  if (f.reprovacao.comunicadoEm) falha(409, 'A comunicação ao fornecedor já foi registrada.');
+  f.reprovacao.comunicadoEm = instante(ctx);
+  f.reprovacao.comunicadoPor = ctx.quem;
+  f.historico.push(evento(ctx, 'ocorrencia', `Fornecedor comunicado dos ${f.reprovacao.dormentesIds.length} reprovado(s)`));
+  return f;
+}
+
+/** Retirada pelo fornecedor: os reprovados saem da segregação e ficam "retirado pelo fornecedor". */
+export function registrarRetirada(e: Estado, fardoId: Id, ctx: Ctx) {
+  const f = achar(e.fardos, (x) => x.id === fardoId, 'Fardo');
+  const r = f.reprovacao;
+  if (!r) falha(409, `O fardo ${f.id} não tem reprovados.`);
+  if (r.retiradoEm) falha(409, 'A retirada já foi registrada.');
+  if (!r.comunicadoEm) falha(409, 'Registre antes a comunicação ao fornecedor.');
+  const ids = r.dormentesIds.filter((id) => e.dormentes.find((d) => d.id === id)?.situacao === 'reprovado');
+  const seg = e.dormentes.find((d) => d.id === ids[0])?.localId;
+  movimentarDormentes(e, ids, 'retirado', { evento: { tipo: 'retirado', descricao: 'Retirado pelo fornecedor (reprovado na inspeção)' } }, ctx);
+  e.movimentacoes.push({ id: novoId(e, 'mv'), tipo: 'retirada', fardoId: f.id, dormentesIds: ids, quantidade: ids.length, deLocalId: seg, quando: instante(ctx), quem: ctx.quem });
+  r.retiradoEm = instante(ctx);
+  r.retiradoPor = ctx.quem;
+  f.historico.push(evento(ctx, 'ocorrencia', `${ids.length} reprovado(s) retirado(s) pelo fornecedor`));
+  return f;
 }
 
 function exigirEmInspecao(e: Estado, fardoId: Id) {
@@ -83,7 +125,7 @@ function exigirEmInspecao(e: Estado, fardoId: Id) {
  */
 export function simularFardo(e: Estado, fardoId: Id, ctx: Ctx) {
   const f = exigirEmInspecao(e, fardoId);
-  const t = itemDescrito(e, f.itemContratoId).tamanho;
+  const t = tamanhoDoItem(e, f.itemContratoId);
   for (const d of dormentesDoFardo(e, f.id).filter((x) => x.situacao === 'aguardando_inspecao' && !x.inspecaoId)) {
     const seq = sequenciaDe(d.id) ?? 0;
     const reprovado = seq % 20 === 7;

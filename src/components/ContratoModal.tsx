@@ -1,20 +1,19 @@
 import { useEffect, useId, useState } from 'react';
 import { RE_ATA, RE_CONTRATO } from '../dominio/identificacao';
-import { UNIDADE_ITEM_OPCOES } from '../dominio/opcoes';
-import { unidadesDeM3 } from '../dominio/parametros';
+import { REGRAS_ATA_PADRAO, VIGENCIA_ATA_MESES, dataSP, janelaParcela, somarDias, somarMeses } from '../dominio/parametros';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import type { DadosItemContrato } from '../services/contracts';
+import type { DadosParcela } from '../services/contracts';
 import { ApiError, mensagemSegura } from '../services/http';
-import type { Contrato } from '../types/models';
-import { m3, numero, paraNumero } from '../utils/format';
+import type { Contrato, RegrasAta } from '../types/models';
+import { data, numero, paraNumero } from '../utils/format';
 import { Modal } from './Modal';
 
-interface LinhaItem { chave: number; id?: string; especieId: string; tamanhoId: string; tratamentoId: string; quantidade: string; unidade: 'un' | 'm3'; minimo?: number }
+interface LinhaParcela { chave: number; itens: { chave: number; tamanhoId: string; quantidade: string }[] }
 
 interface Props {
   aberto: boolean;
-  /** Ausente: novo contrato. Presente: edição (empresa inspetora, quantidades e itens novos). */
+  /** Ausente: novo contrato. Presente: edição (gestor e cronograma). */
   contrato?: Contrato;
   cad: Cadastros;
   aoFechar: () => void;
@@ -22,63 +21,67 @@ interface Props {
 }
 
 let proximaChave = 1;
-const linhaVazia = (): LinhaItem => ({ chave: proximaChave++, especieId: '', tamanhoId: '', tratamentoId: '', quantidade: '', unidade: 'un' });
+const itemVazio = () => ({ chave: proximaChave++, tamanhoId: '', quantidade: '' });
+const parcelaVazia = (): LinhaParcela => ({ chave: proximaChave++, itens: [itemVazio()] });
 
 /**
- * Novo contrato e edição (seção 9.3 do plano). O fornecedor vem da ata (escolhida ou criada aqui) e só aparecem as
- * espécies que ele fornece; fornecedor inativo ou com CTF vencido não entra. Item em m³ é convertido em unidades pelo
- * volume do tamanho, arredondando para baixo: a tela mostra a conversão e o serviço grava em unidades.
+ * Novo contrato e edição (seção 9.3 do plano), conforme os documentos da CPTM: não existe AF, cada pedido é um contrato
+ * sob a ata. A ata (escolhida ou criada aqui) traz o fornecedor, a vigência de 12 meses e as regras (pedido mínimo,
+ * número e tamanho das parcelas, prazos). O contrato tem data de assinatura, gestor e o cronograma: as parcelas, cada
+ * uma com a quantidade por tamanho (código de material CPTM). Os itens do contrato são a soma das parcelas; a tela
+ * mostra a janela de cada parcela e o total, e o serviço valida as regras da ata.
  */
 export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Props) {
   const formId = useId();
   const editando = !!contrato;
+  const hoje = dataSP(new Date());
   const [modoAta, setModoAta] = useState<'existente' | 'nova'>('existente');
   const [ataId, setAtaId] = useState('');
-  const [novaAta, setNovaAta] = useState({ numero: '', fornecedorId: '', vigenciaInicio: '', vigenciaFim: '' });
+  const [novaAta, setNovaAta] = useState({ numero: '', fornecedorId: '', vigenciaInicio: '' });
   const [numeroContrato, setNumero] = useState('');
-  const [empresaInspetoraId, setEmpresa] = useState('');
   const [ano, setAno] = useState(String(new Date().getFullYear()));
-  const [itens, setItens] = useState<LinhaItem[]>([linhaVazia()]);
+  const [dataAssinatura, setAssinatura] = useState(hoje);
+  const [gestor, setGestor] = useState('');
+  const [parcelas, setParcelas] = useState<LinhaParcela[]>([parcelaVazia()]);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string>();
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     if (!aberto) return;
-    setErros({}); setErroGeral(undefined); setModoAta('existente'); setNovaAta({ numero: '', fornecedorId: '', vigenciaInicio: '', vigenciaFim: '' });
+    setErros({}); setErroGeral(undefined); setModoAta('existente'); setNovaAta({ numero: '', fornecedorId: '', vigenciaInicio: hoje });
     if (contrato) {
-      setAtaId(contrato.ataId); setNumero(contrato.numero); setEmpresa(contrato.empresaInspetoraId); setAno(String(contrato.ano));
-      setItens(contrato.itens.map((i) => ({
-        chave: proximaChave++, id: i.id, especieId: i.especieId, tamanhoId: i.tamanhoId, tratamentoId: i.tratamentoId,
-        quantidade: String(i.quantidade), unidade: 'un', minimo: i.emitidos - i.reprovados,
-      })));
+      setAtaId(contrato.ataId); setNumero(contrato.numero); setAno(String(contrato.ano)); setAssinatura(contrato.dataAssinatura); setGestor(contrato.gestor);
+      setParcelas(contrato.parcelas.map((p) => ({ chave: proximaChave++, itens: p.itens.map((i) => ({ chave: proximaChave++, tamanhoId: i.tamanhoId, quantidade: String(i.quantidade) })) })));
     } else {
-      setAtaId(''); setNumero(''); setEmpresa(''); setAno(String(new Date().getFullYear())); setItens([linhaVazia()]);
+      setAtaId(''); setNumero(''); setAno(String(new Date().getFullYear())); setAssinatura(hoje); setGestor(''); setParcelas([parcelaVazia()]);
     }
-  }, [aberto, contrato]);
+  }, [aberto, contrato]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const listas = cad.listas;
   const liberado = (fornecedorId: string) => { const f = cad.fornecedores.get(fornecedorId); return !!f && f.situacao === 'ativo' && !f.bloqueado; };
-  const fornecedorId = modoAta === 'nova' ? novaAta.fornecedorId : cad.atas.get(ataId)?.fornecedorId ?? '';
+  const ata = modoAta === 'existente' ? cad.atas.get(ataId) : undefined;
+  const regras: RegrasAta = ata?.regras ?? REGRAS_ATA_PADRAO;
+  const fornecedorId = modoAta === 'nova' ? novaAta.fornecedorId : ata?.fornecedorId ?? '';
   const fornecedor = cad.fornecedores.get(fornecedorId);
-  const numeroAta = modoAta === 'nova' ? novaAta.numero.trim().toUpperCase() : cad.atas.get(ataId)?.numero ?? '';
-  const especiesDoFornecedor = (listas?.especies ?? []).filter((e) => e.ativo && fornecedor?.especiesIds.includes(e.id));
+  const numeroAta = modoAta === 'nova' ? novaAta.numero.trim().toUpperCase() : ata?.numero ?? '';
+  const fimNovaAta = novaAta.vigenciaInicio ? somarDias(somarMeses(novaAta.vigenciaInicio, VIGENCIA_ATA_MESES), -1) : '';
+  // Tamanhos: com ata existente que registra quantidades, os dela; senão, todos os ativos.
+  const tamanhos = (listas?.tamanhos ?? []).filter((t) => (t.ativo || contrato?.itens.some((i) => i.tamanhoId === t.id)) && (!ata?.itens.length || ata.itens.some((i) => i.tamanhoId === t.id)));
+  const saldoAta = (tamanhoId: string) => {
+    const i = ata?.itens.find((x) => x.tamanhoId === tamanhoId);
+    return i ? i.saldo + (contrato?.itens.find((x) => x.tamanhoId === tamanhoId)?.quantidade ?? 0) : undefined;
+  };
 
   // Ao escolher a ata, o número do contrato já começa com o dela.
   useEffect(() => {
     if (!editando && numeroAta && (!numeroContrato || !numeroContrato.startsWith(`${numeroAta}-`))) setNumero(`${numeroAta}-`);
   }, [numeroAta]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const mudarItem = (chave: number, campo: keyof LinhaItem, valor: string) => setItens((l) => l.map((i) => (i.chave === chave ? { ...i, [campo]: valor } : i)));
-
-  /** Prévia da conversão de m³ (o serviço grava o resultado em unidades). */
-  function conversao(i: LinhaItem): string | undefined {
-    if (i.unidade !== 'm3') return undefined;
-    const t = cad.tamanhos.get(i.tamanhoId);
-    const v = paraNumero(i.quantidade);
-    if (!t || !(v > 0)) return 'Escolha o tamanho e informe o volume: o sistema converte em unidades.';
-    return `${m3(v)} ÷ ${m3(t.volumeM3)} por dormente = ${numero(unidadesDeM3(v, t.volumeM3))} dormentes (arredondado para baixo).`;
-  }
+  const somaParcela = (p: LinhaParcela) => p.itens.reduce((t, i) => t + (paraNumero(i.quantidade, true) || 0), 0);
+  const total = parcelas.reduce((t, p) => t + somaParcela(p), 0);
+  const mudarItem = (pc: number, ic: number, campo: 'tamanhoId' | 'quantidade', valor: string) =>
+    setParcelas((l) => l.map((p) => (p.chave !== pc ? p : { ...p, itens: p.itens.map((i) => (i.chave === ic ? { ...i, [campo]: valor } : i)) })));
 
   function validar(): Record<string, string> {
     const e: Record<string, string> = {};
@@ -87,29 +90,29 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
       if (modoAta === 'nova') {
         if (!RE_ATA.test(numeroAta)) e['ata.numero'] = 'Número no formato AA00000 (ex. AR00224).';
         if (!novaAta.fornecedorId) e['ata.fornecedorId'] = 'Escolha o fornecedor.';
-        if (!novaAta.vigenciaInicio) e['ata.vigenciaInicio'] = 'Informe o início.';
-        if (!novaAta.vigenciaFim) e['ata.vigenciaFim'] = 'Informe o fim.';
-        else if (novaAta.vigenciaInicio && novaAta.vigenciaFim < novaAta.vigenciaInicio) e['ata.vigenciaFim'] = 'O fim vem depois do início.';
+        if (!novaAta.vigenciaInicio) e['ata.vigenciaInicio'] = 'Informe o início da vigência.';
       }
       const n = numeroContrato.trim().toUpperCase();
       if (!RE_CONTRATO.test(n)) e.numero = 'Número no formato AA00000-00 (ex. AR00224-01).';
       else if (numeroAta && !n.startsWith(`${numeroAta}-`)) e.numero = `O contrato começa pelo número da ata (${numeroAta}-).`;
       if (!/^\d{4}$/.test(ano)) e.ano = 'Informe o ano.';
+      if (!dataAssinatura) e.dataAssinatura = 'Informe a data de assinatura.';
     }
-    if (!empresaInspetoraId) e.empresaInspetoraId = 'Escolha a empresa inspetora.';
-    itens.forEach((i, n) => {
-      const q = paraNumero(i.quantidade, i.unidade === 'un');
-      if (!i.especieId || !i.tamanhoId || !i.tratamentoId) e[`itens.${n}`] = 'Escolha espécie, tamanho e tratamento.';
-      else if (!(q > 0)) e[`itens.${n}`] = i.unidade === 'un' ? 'Quantidade em unidades, maior que zero.' : 'Volume em m³, maior que zero.';
-      else if (i.minimo !== undefined && q < i.minimo) e[`itens.${n}`] = `Não pode ficar abaixo do já emitido (${i.minimo}).`;
+    if (!gestor.trim()) e.gestor = 'Informe o gestor do contrato.';
+    parcelas.forEach((p, n) => {
+      p.itens.forEach((i, k) => {
+        if (!i.tamanhoId) e[`parcelas.${n}.${k}`] = 'Escolha o tamanho.';
+        else if (!(paraNumero(i.quantidade, true) > 0)) e[`parcelas.${n}.${k}`] = 'Quantidade em unidades, maior que zero.';
+      });
+      const soma = somaParcela(p);
+      if (soma < regras.parcelaMinima || soma > regras.parcelaMaxima) e[`parcelas.${n}`] = `A parcela soma ${numero(soma)}: cada parcela tem de ${numero(regras.parcelaMinima)} a ${numero(regras.parcelaMaxima)} dormentes.`;
     });
-    if (!itens.length) e.itens = 'Inclua ao menos um item.';
+    if (parcelas.length > regras.maxParcelas) e.parcelas = `A ata permite até ${regras.maxParcelas} parcelas.`;
+    else if (total < regras.pedidoMinimo) e.parcelas = `O contrato soma ${numero(total)} dormentes: o pedido mínimo da ata é ${numero(regras.pedidoMinimo)}.`;
     return e;
   }
 
-  const paraItem = (i: LinhaItem): DadosItemContrato & { id?: string } => ({
-    id: i.id, especieId: i.especieId, tamanhoId: i.tamanhoId, tratamentoId: i.tratamentoId, quantidade: paraNumero(i.quantidade, i.unidade === 'un'), unidade: i.unidade,
-  });
+  const paraParcelas = (): DadosParcela[] => parcelas.map((p) => ({ itens: p.itens.map((i) => ({ tamanhoId: i.tamanhoId, quantidade: paraNumero(i.quantidade, true) })) }));
 
   async function enviar(ev: React.FormEvent) {
     ev.preventDefault();
@@ -121,7 +124,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
     try {
       let salvo: Contrato;
       if (contrato) {
-        salvo = await servicos.contratos.atualizar(contrato.numero, { empresaInspetoraId, itens: itens.map(paraItem) });
+        salvo = await servicos.contratos.atualizar(contrato.numero, { gestor: gestor.trim(), parcelas: paraParcelas() });
       } else {
         let idAta = ataId;
         if (modoAta === 'nova') {
@@ -134,7 +137,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
           }
           setModoAta('existente'); setAtaId(idAta); cad.recarregar();
         }
-        salvo = await servicos.contratos.criar({ numero: numeroContrato.trim().toUpperCase(), ataId: idAta, empresaInspetoraId, ano: Number(ano), itens: itens.map(paraItem) });
+        salvo = await servicos.contratos.criar({ numero: numeroContrato.trim().toUpperCase(), ataId: idAta, ano: Number(ano), dataAssinatura, gestor: gestor.trim(), parcelas: paraParcelas() });
       }
       aoSalvar(salvo);
     } catch (err) {
@@ -147,6 +150,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
 
   const erro = (k: string) => erros[k] && <span className="erro-campo" id={`${formId}-${k}-erro`}>{erros[k]}</span>;
   const invalido = (k: string) => ({ 'aria-invalid': !!erros[k], 'aria-describedby': erros[k] ? `${formId}-${k}-erro` : undefined });
+  const prazos = regras.prazosParcelas;
 
   return (
     <Modal
@@ -175,8 +179,9 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
                   <select id={`${formId}-ataId`} value={ataId} onChange={(e) => setAtaId(e.target.value)} {...invalido('ataId')}>
                     <option value="">Selecione…</option>
                     {(listas?.atas ?? []).map((a) => (
-                      <option key={a.id} value={a.id} disabled={!liberado(a.fornecedorId)}>
-                        {a.numero} · {cad.nomeFornecedor(a.fornecedorId)}{!liberado(a.fornecedorId) ? ' (fornecedor bloqueado ou inativo)' : ''}
+                      <option key={a.id} value={a.id} disabled={!liberado(a.fornecedorId) || !a.vigente}>
+                        {a.numero} · {cad.nomeFornecedor(a.fornecedorId)} · até {data(a.vigenciaFim)}
+                        {!liberado(a.fornecedorId) ? ' (fornecedor bloqueado ou inativo)' : !a.vigente ? ' (fora da vigência)' : ''}
                       </option>
                     ))}
                   </select>
@@ -201,18 +206,18 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
                   <div className="campo">
                     <label htmlFor={`${formId}-ata-ini`}>Início da vigência<span className="obrig" aria-hidden="true"> *</span></label>
                     <input id={`${formId}-ata-ini`} type="date" value={novaAta.vigenciaInicio} onChange={(e) => setNovaAta((a) => ({ ...a, vigenciaInicio: e.target.value }))} {...invalido('ata.vigenciaInicio')} />
+                    {fimNovaAta && <span className="ajuda">Vigência de {VIGENCIA_ATA_MESES} meses: até {data(fimNovaAta)}.</span>}
                     {erro('ata.vigenciaInicio')}
-                  </div>
-                  <div className="campo">
-                    <label htmlFor={`${formId}-ata-fim`}>Fim da vigência<span className="obrig" aria-hidden="true"> *</span></label>
-                    <input id={`${formId}-ata-fim`} type="date" value={novaAta.vigenciaFim} onChange={(e) => setNovaAta((a) => ({ ...a, vigenciaFim: e.target.value }))} {...invalido('ata.vigenciaFim')} />
-                    {erro('ata.vigenciaFim')}
                   </div>
                 </div>
               )}
               {fornecedor && <p className="mudo">Fornecedor do contrato (vem da ata): <strong>{fornecedor.razaoSocial}</strong></p>}
             </>
           )}
+          <p className="ajuda">
+            Regras da ata: pedido mínimo de {numero(regras.pedidoMinimo)} dormentes; até {regras.maxParcelas} parcelas de {numero(regras.parcelaMinima)} a {numero(regras.parcelaMaxima)},
+            com prazos contados da assinatura ({prazos.map(([de, ate], n) => `${n + 1}ª: ${n === 0 ? `até ${ate}` : `${de} a ${ate}`} dias`).join('; ')}).
+          </p>
         </fieldset>
 
         <fieldset className="secao-formulario">
@@ -224,13 +229,15 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
               {erro('numero')}
             </div>
             <div className="campo">
-              <label htmlFor={`${formId}-empresa`}>Empresa inspetora<span className="obrig" aria-hidden="true"> *</span></label>
-              <select id={`${formId}-empresa`} value={empresaInspetoraId} onChange={(e) => setEmpresa(e.target.value)} {...invalido('empresaInspetoraId')}>
-                <option value="">Selecione…</option>
-                {(listas?.empresas ?? []).filter((x) => x.ativo || x.id === contrato?.empresaInspetoraId).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
-              </select>
-              <span className="ajuda">Do cadastro de empresas inspetoras (só as ativas).</span>
-              {erro('empresaInspetoraId')}
+              <label htmlFor={`${formId}-ass`}>Data de assinatura<span className="obrig" aria-hidden="true"> *</span></label>
+              <input id={`${formId}-ass`} type="date" value={dataAssinatura} disabled={editando} onChange={(e) => setAssinatura(e.target.value)} {...invalido('dataAssinatura')} />
+              <span className="ajuda">Os prazos das parcelas contam a partir dela.</span>
+              {erro('dataAssinatura')}
+            </div>
+            <div className="campo">
+              <label htmlFor={`${formId}-gestor`}>Gestor do contrato<span className="obrig" aria-hidden="true"> *</span></label>
+              <input id={`${formId}-gestor`} value={gestor} maxLength={80} onChange={(e) => setGestor(e.target.value)} {...invalido('gestor')} />
+              {erro('gestor')}
             </div>
             <div className="campo">
               <label htmlFor={`${formId}-ano`}>Ano<span className="obrig" aria-hidden="true"> *</span></label>
@@ -241,61 +248,55 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
         </fieldset>
 
         <fieldset className="secao-formulario">
-          <legend>Itens</legend>
-          {!fornecedor && !editando && <p className="mudo">Escolha a ata para ver as espécies que o fornecedor fornece.</p>}
-          {erro('itens')}
-          <div className="itens-contrato">
-            {itens.map((i, n) => {
-              const k = `itens.${n}`;
-              const existente = !!i.id;
+          <legend>Cronograma por parcela</legend>
+          <p className="mudo">O item do contrato é o tamanho (código de material CPTM). Espécie, classe e tratamento vêm do fornecedor em cada fardo.</p>
+          {erro('parcelas')}
+          <div className="parcelas-contrato">
+            {parcelas.map((p, n) => {
+              const janela = dataAssinatura ? janelaParcela(dataAssinatura, regras, n + 1) : undefined;
+              const soma = somaParcela(p);
+              const fora = soma < regras.parcelaMinima || soma > regras.parcelaMaxima;
               return (
-                <div key={i.chave} className="item-contrato" role="group" aria-label={`Item ${n + 1}`}>
-                  <div className="campo">
-                    <label htmlFor={`${formId}-${i.chave}-esp`}>Espécie</label>
-                    <select id={`${formId}-${i.chave}-esp`} value={i.especieId} disabled={existente} onChange={(e) => mudarItem(i.chave, 'especieId', e.target.value)} {...invalido(k)}>
-                      <option value="">Selecione…</option>
-                      {(existente ? (listas?.especies ?? []) : especiesDoFornecedor).map((e) => <option key={e.id} value={e.id}>{e.nomePopular}</option>)}
-                    </select>
+                <div key={p.chave} className="parcela-contrato" role="group" aria-label={`Parcela ${n + 1}`}>
+                  <div className="parcela-topo">
+                    <strong>{n + 1}ª parcela</strong>
+                    {janela && <span className="mudo">entrega de {data(janela.inicio)} a {data(janela.fim)}</span>}
+                    <span className={fora ? 'texto-critico' : 'mudo'}>{numero(soma)} dormentes</span>
+                    {parcelas.length > 1 && <button type="button" className="btn btn-link" onClick={() => setParcelas((l) => l.filter((x) => x.chave !== p.chave))}>Remover parcela</button>}
                   </div>
-                  <div className="campo">
-                    <label htmlFor={`${formId}-${i.chave}-tam`}>Tamanho</label>
-                    <select id={`${formId}-${i.chave}-tam`} value={i.tamanhoId} disabled={existente} onChange={(e) => mudarItem(i.chave, 'tamanhoId', e.target.value)}>
-                      <option value="">Selecione…</option>
-                      {(listas?.tamanhos ?? []).filter((t) => t.ativo || existente).map((t) => <option key={t.id} value={t.id}>{t.codigo}</option>)}
-                    </select>
-                  </div>
-                  <div className="campo">
-                    <label htmlFor={`${formId}-${i.chave}-tra`}>Tratamento</label>
-                    <select id={`${formId}-${i.chave}-tra`} value={i.tratamentoId} disabled={existente} onChange={(e) => mudarItem(i.chave, 'tratamentoId', e.target.value)}>
-                      <option value="">Selecione…</option>
-                      {(listas?.tratamentos ?? []).filter((t) => t.ativo || existente).map((t) => <option key={t.id} value={t.id}>{t.preservativo} / {t.empresa}</option>)}
-                    </select>
-                  </div>
-                  <div className="campo">
-                    <label htmlFor={`${formId}-${i.chave}-qtd`}>{i.unidade === 'm3' ? 'Volume (m³)' : 'Quantidade'}</label>
-                    <input id={`${formId}-${i.chave}-qtd`} value={i.quantidade} inputMode="decimal" maxLength={12} onChange={(e) => mudarItem(i.chave, 'quantidade', e.target.value)} />
-                  </div>
-                  <div className="campo">
-                    <label htmlFor={`${formId}-${i.chave}-un`}>Unidade</label>
-                    <select id={`${formId}-${i.chave}-un`} value={i.unidade} disabled={existente} onChange={(e) => mudarItem(i.chave, 'unidade', e.target.value)}>
-                      {UNIDADE_ITEM_OPCOES.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
-                    </select>
-                  </div>
-                  {existente ? <span /> : (
-                    <button type="button" className="btn btn-sec btn-peq" disabled={itens.length === 1} onClick={() => setItens((l) => l.filter((x) => x.chave !== i.chave))} aria-label={`Remover item ${n + 1}`}>Remover</button>
-                  )}
-                  {(conversao(i) || i.minimo !== undefined || erros[k]) && (
-                    <p className="conversao ajuda">
-                      {conversao(i)}
-                      {i.minimo !== undefined && `Já emitidos (descontados os reprovados): ${numero(i.minimo)}; a quantidade não pode ficar abaixo disso.`}
-                      {erros[k] && <span className="erro-campo" id={`${formId}-${k}-erro`}> {erros[k]}</span>}
-                    </p>
-                  )}
+                  {p.itens.map((i, k) => (
+                    <div key={i.chave} className="parcela-item">
+                      <div className="campo">
+                        <label htmlFor={`${formId}-${i.chave}-tam`}>Tamanho</label>
+                        <select id={`${formId}-${i.chave}-tam`} value={i.tamanhoId} onChange={(e) => mudarItem(p.chave, i.chave, 'tamanhoId', e.target.value)} {...invalido(`parcelas.${n}.${k}`)}>
+                          <option value="">Selecione…</option>
+                          {tamanhos.map((t) => {
+                            const saldo = saldoAta(t.id);
+                            return <option key={t.id} value={t.id}>{cad.descreverTamanho(t.id)}{saldo !== undefined ? ` · saldo na ata ${numero(saldo)}` : ''}</option>;
+                          })}
+                        </select>
+                      </div>
+                      <div className="campo">
+                        <label htmlFor={`${formId}-${i.chave}-qtd`}>Quantidade</label>
+                        <input id={`${formId}-${i.chave}-qtd`} value={i.quantidade} inputMode="numeric" maxLength={6} onChange={(e) => mudarItem(p.chave, i.chave, 'quantidade', e.target.value)} />
+                      </div>
+                      {p.itens.length > 1 && (
+                        <button type="button" className="btn btn-sec btn-peq" onClick={() => setParcelas((l) => l.map((x) => (x.chave !== p.chave ? x : { ...x, itens: x.itens.filter((y) => y.chave !== i.chave) })))} aria-label={`Remover tamanho da ${n + 1}ª parcela`}>Remover</button>
+                      )}
+                      {erro(`parcelas.${n}.${k}`)}
+                    </div>
+                  ))}
+                  <button type="button" className="btn btn-sec btn-peq" onClick={() => setParcelas((l) => l.map((x) => (x.chave !== p.chave ? x : { ...x, itens: [...x.itens, itemVazio()] })))}>+ Tamanho</button>
+                  {erro(`parcelas.${n}`)}
                 </div>
               );
             })}
           </div>
-          <button type="button" className="btn btn-sec btn-peq" onClick={() => setItens((l) => [...l, linhaVazia()])}>+ Item</button>
+          <div className="parcela-rodape">
+            <button type="button" className="btn btn-sec btn-peq" disabled={parcelas.length >= regras.maxParcelas} onClick={() => setParcelas((l) => [...l, parcelaVazia()])}>+ Parcela</button>
+            <span className={total < regras.pedidoMinimo ? 'texto-critico' : 'mudo'}>Total do contrato: <strong>{numero(total)}</strong> dormentes (mínimo {numero(regras.pedidoMinimo)})</span>
+          </div>
+          {editando && <p className="ajuda">Nenhum tamanho pode ficar abaixo do que já foi emitido, descontados os reprovados.</p>}
         </fieldset>
       </form>
     </Modal>

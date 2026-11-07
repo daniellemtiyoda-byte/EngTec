@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { BadgeDe } from '../components/Badge';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Badge, BadgeDe } from '../components/Badge';
 import { ContratoModal } from '../components/ContratoModal';
 import { IdCodigo } from '../components/IdCodigo';
 import { BarraProgresso } from '../components/Indicadores';
@@ -13,7 +13,7 @@ import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import type { Contrato } from '../types/models';
-import { data } from '../utils/format';
+import { data, numero } from '../utils/format';
 
 /** Totais de cada aba (situação) para os contadores. */
 const contar = () => Promise.all(SITUACAO_CONTRATO_OPCOES.map((o) => servicos.contratos.listar({ pageSize: 1, filters: { situacao: o.valor } }).then((r) => r.total)));
@@ -30,12 +30,18 @@ export default function Contratos() {
   const cad = useCadastros();
   const totais = useAsync(contar, []);
   const [novo, setNovo] = useState(false);
+  const [params, setParams] = useSearchParams();
+  // Atalho de reposição do Painel (?novo=1): abre o novo contrato.
+  useEffect(() => {
+    if (params.get('novo') && pode('contratos:editar')) setNovo(true);
+    if (params.get('novo')) setParams((p) => { p.delete('novo'); return p; }, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const colunas: Coluna<Contrato>[] = [
     { chave: 'numero', titulo: 'Contrato', ordenavel: true, render: (c) => <IdCodigo id={c.numero} para={`/contratos/${c.numero}`} /> },
     { chave: 'ataId', titulo: 'Ata', render: (c) => <span className="mono">{cad.numeroAta(c.ataId)}</span> },
     { chave: 'fornecedorId', titulo: 'Fornecedor', quebrar: true, render: (c) => <Link to={`/fornecedores/${c.fornecedorId}`}>{cad.nomeFornecedor(c.fornecedorId)}</Link> },
-    { chave: 'itens', titulo: 'Itens', quebrar: true, render: (c) => c.itens.map(cad.descreverItem).join('; ') },
+    { chave: 'itens', titulo: 'Itens', quebrar: true, render: (c) => c.itens.filter((i) => i.quantidade > 0).map((i) => `${cad.descreverTamanho(i.tamanhoId)} (${numero(i.quantidade)})`).join('; ') },
     {
       chave: 'entregue', titulo: 'Entregue', render: (c) => {
         const t = totaisDoContrato(c);
@@ -44,7 +50,12 @@ export default function Contratos() {
     },
     { chave: 'vigencia', titulo: 'Vigência', opcional: true, render: (c) => { const a = cad.atas.get(c.ataId); return a ? `${data(a.vigenciaInicio)} a ${data(a.vigenciaFim)}` : '—'; } },
     { chave: 'situacao', titulo: 'Situação', render: (c) => <BadgeDe mapa={SITUACAO_CONTRATO} valor={c.situacao} /> },
-    { chave: 'empresaInspetoraId', titulo: 'Empresa inspetora', opcional: true, render: (c) => cad.nomeEmpresa(c.empresaInspetoraId) },
+    {
+      chave: 'parcelas', titulo: 'Parcelas', render: (c) => (c.parcelasAtrasadas
+        ? <Badge tom="vermelho">{c.parcelasAtrasadas} de {c.parcelas.length} atrasada(s)</Badge>
+        : `${c.parcelas.filter((p) => p.situacao === 'entregue' || p.situacao === 'entregue_com_atraso').length} de ${c.parcelas.length} entregues`),
+    },
+    { chave: 'gestor', titulo: 'Gestor', opcional: true, render: (c) => c.gestor },
     { chave: 'ano', titulo: 'Ano', opcional: true, ordenavel: true },
   ];
 
@@ -60,8 +71,9 @@ export default function Contratos() {
         colunas={colunas}
         filtros={[
           { chave: 'fornecedorId', rotulo: 'Fornecedor', opcoes: (cad.listas?.fornecedores ?? []).map((f) => ({ valor: f.id, rotulo: f.razaoSocial })) },
-          { chave: 'especieId', rotulo: 'Espécie', opcoes: (cad.listas?.especies ?? []).map((e) => ({ valor: e.id, rotulo: e.nomePopular })) },
+          { chave: 'tamanhoId', rotulo: 'Tamanho', opcoes: (cad.listas?.tamanhos ?? []).map((t) => ({ valor: t.id, rotulo: cad.descreverTamanho(t.id) })) },
           { chave: 'ano', rotulo: 'Ano', opcoes: anos.map((a) => ({ valor: a, rotulo: a })) },
+          { chave: 'atrasada', rotulo: 'Cronograma', opcoes: [{ valor: 'sim', rotulo: 'Com parcela atrasada' }] },
         ]}
         acoesLinha={[{ rotulo: 'Abrir', principal: true, aoClicar: (c) => nav(`/contratos/${c.numero}`) }]}
       />

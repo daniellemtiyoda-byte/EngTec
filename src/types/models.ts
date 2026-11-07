@@ -42,7 +42,7 @@ export interface Anexo { id: Id; nome: string; tipo: 'pdf' | 'xml' | 'imagem'; u
 
 export type TipoEvento =
   | 'emitido' | 'recebido' | 'inspecionado' | 'guardado' | 'transferido' | 'reservado' | 'baixado'
-  | 'segregado' | 'nao_localizado' | 'cancelado' | 'ocorrencia';
+  | 'segregado' | 'nao_localizado' | 'cancelado' | 'ocorrencia' | 'retirado';
 
 /** Evento do histórico de um objeto: quem, quando, o que e o documento de referência. */
 export interface Evento { quando: string; quem: string; tipo: TipoEvento; descricao: string; referencia?: string }
@@ -65,11 +65,21 @@ export interface Fornecedor {
   certificados: Anexo[];
 }
 
-export interface Especie { id: Id; nomeCientifico: string; nomePopular: string; classe?: string; ativo: boolean }
+/** Espécie de madeira. A classe (NBR 7511) não é da espécie: vem do fardo e de cada dormente, informada pelo fornecedor. */
+export interface Especie { id: Id; nomeCientifico: string; nomePopular: string; ativo: boolean }
 
+/** Classe do dormente conforme a NBR 7511 (1ª ou 2ª), informada pelo fornecedor no Boletim de Inspeção e na plaquinha. */
+export type Classe = 1 | 2;
+
+/** Via corrente: 2,80 m, padrão da bitola larga (1,60 m). AMV: 3,00 m a 5,40 m, dormentes especiais de aparelho de mudança de via. */
+export type UsoTamanho = 'via_corrente' | 'amv';
+
+/** Tamanho = item de compra da CPTM, identificado pelo código de material (ex. 006234 = 2,80 m). */
 export interface Tamanho {
   id: Id;
+  /** Código de material CPTM (6 dígitos). */
   codigo: string;
+  uso: UsoTamanho;
   comprimentoCm: number;
   larguraCm: number;
   alturaCm: number;
@@ -81,7 +91,7 @@ export interface Tamanho {
 
 export interface Tratamento { id: Id; preservativo: string; empresa: string; ativo: boolean }
 
-/** Empresa contratada pelo fornecedor para inspecionar o material antes da entrega (ex. UFV). */
+/** Empresa acreditada pelo INMETRO que inspeciona o material antes da entrega (ex. IPT, UFV); vem do Boletim de Inspeção. */
 export interface EmpresaInspetora { id: Id; nome: string; cnpj?: string; ativo: boolean }
 
 export type TipoLocal = 'armazenagem' | 'inspecao' | 'segregacao' | 'expedicao';
@@ -101,21 +111,41 @@ export interface Local {
   ativo: boolean;
 }
 
-/** Mínimo e máximo de estoque disponível por espécie + tamanho (editado em Configurações). */
-export interface NivelEstoque { especieId: Id; tamanhoId: Id; minimo: number; maximo: number }
+/** Mínimo e máximo de estoque disponível por classe + tamanho (editado em Configurações). */
+export interface NivelEstoque { classe: Classe; tamanhoId: Id; minimo: number; maximo: number }
 
 // ---------- Suprimento ----------
 
-export interface Ata { id: Id; numero: string; fornecedorId: Id; vigenciaInicio: string; vigenciaFim: string }
+/**
+ * Regras da ata (parâmetros, com os valores dos documentos da CPTM como padrão): pedido mínimo por contrato, número
+ * máximo de parcelas, tamanho de cada parcela (somando os itens) e a janela de cada parcela, em dias contados da
+ * assinatura do contrato ([de, até]; a 1ª vai de 0 a 90).
+ */
+export interface RegrasAta { pedidoMinimo: number; maxParcelas: number; parcelaMinima: number; parcelaMaxima: number; prazosParcelas: [number, number][] }
+
+/** Quantidade registrada na ata por tamanho; contratado e saldo são calculados pelos contratos não cancelados. */
+export interface ItemAta { tamanhoId: Id; quantidade: number; contratado: number; saldo: number }
+
+/** Ata de registro de preços: fornecedor, vigência (12 meses), regras e as quantidades registradas. Não existe AF: cada pedido é um contrato. */
+export interface Ata {
+  id: Id;
+  numero: string;
+  fornecedorId: Id;
+  vigenciaInicio: string;
+  vigenciaFim: string;
+  regras: RegrasAta;
+  itens: ItemAta[];
+  // calculado:
+  vigente: boolean;
+}
 
 export type SituacaoContrato = 'vigente' | 'concluido' | 'cancelado';
 
+/** Item do contrato = tamanho (código de material CPTM). O contrato não define espécie, classe nem tratamento. */
 export interface ItemContrato {
   id: Id;
-  especieId: Id;
   tamanhoId: Id;
-  tratamentoId: Id;
-  /** Em unidades. */
+  /** Em unidades (soma das parcelas). */
   quantidade: number;
   // calculados:
   emitidos: number;
@@ -126,20 +156,47 @@ export interface ItemContrato {
   saldoAEmitir: number;
 }
 
+export type SituacaoParcela = 'a_entregar' | 'atrasada' | 'entregue' | 'entregue_com_atraso';
+
+/** Parcela do cronograma do contrato: quantidade por tamanho; prazo e situação calculados pela assinatura e pelas regras da ata. */
+export interface ParcelaContrato {
+  numero: number;
+  itens: { tamanhoId: Id; quantidade: number }[];
+  // calculados:
+  quantidade: number;
+  /** Janela de entrega (AAAA-MM-DD), pela data de assinatura e pelas regras da ata. */
+  inicio: string;
+  fim: string;
+  /** Dormentes recebidos nas entregas desta parcela (sem a falta declarada). */
+  recebidos: number;
+  /** Quando os recebidos alcançaram a quantidade da parcela. */
+  entregueEm?: string;
+  situacao: SituacaoParcela;
+  /** Dias de atraso: até hoje (a entregar) ou até a entrega completa. */
+  diasAtraso: number;
+}
+
 export interface Contrato {
   id: Id;
   numero: string;
   ataId: Id;
   /** Calculado: o fornecedor da ata (não é gravado de novo no contrato). */
   fornecedorId: Id;
-  empresaInspetoraId: Id;
   ano: number;
+  dataAssinatura: string;
+  /** Gestor do contrato na CPTM (na demonstração, nomes fictícios). */
+  gestor: string;
+  parcelas: ParcelaContrato[];
   /** Gravado: vigente ou cancelado. "Concluído" é calculado (todos os itens aprovados e nada pendente na entrada). */
   situacao: SituacaoContrato;
   motivoCancelamento?: string;
   itens: ItemContrato[];
   criadoEm: string;
   criadoPor: string;
+  // calculados:
+  parcelasAtrasadas: number;
+  /** 15 dias após o laudo da última entrega, quando o contrato está concluído. */
+  recebimentoDefinitivoEm?: string;
 }
 
 // ---------- Fardo e dormente ----------
@@ -149,10 +206,29 @@ export type SituacaoFardo = 'em_transito' | 'aguardando_inspecao' | 'em_inspecao
 
 export interface ConclusaoInspecao { quando: string; quem: string; justificativa?: string; naoLocalizados: Id[] }
 
+/**
+ * Reprovados do fardo: ao concluir a inspeção o sistema registra a comunicação ao fornecedor (até 5 dias úteis) e o
+ * prazo de retirada (15 dias úteis). Retirados, os dormentes ficam "retirado pelo fornecedor".
+ */
+export interface ReprovacaoFardo {
+  dormentesIds: Id[];
+  comunicarAte: string;
+  retirarAte: string;
+  comunicadoEm?: string;
+  comunicadoPor?: string;
+  retiradoEm?: string;
+  retiradoPor?: string;
+}
+
 export interface Fardo {
   id: Id;
   contratoId: Id;
+  /** Item do contrato = tamanho. */
   itemContratoId: Id;
+  /** Espécie, classe e tratamento informados pelo fornecedor (Boletim de Inspeção e plaquinha). */
+  especieId: Id;
+  classe: Classe;
+  tratamentoId: Id;
   /** Definida quando o fardo entra numa entrega (cadastro de NF e DOF ou leitura no recebimento). */
   entregaId?: Id;
   /** Emissão do fornecedor que gerou o fardo (no protótipo, o Simulador). */
@@ -163,6 +239,7 @@ export interface Fardo {
   localId?: Id;
   recebidoEm?: string;
   conclusaoInspecao?: ConclusaoInspecao;
+  reprovacao?: ReprovacaoFardo;
   historico: Evento[];
   // calculados:
   /** Saldo físico: dormentes em estoque + reservados (ainda estão no fardo). */
@@ -179,7 +256,7 @@ export interface Fardo {
   progressoInspecao?: { inspecionados: number; total: number };
 }
 
-export type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'nao_localizado';
+export type SituacaoDormente = 'emitido' | 'aguardando_inspecao' | 'em_estoque' | 'reservado' | 'baixado' | 'reprovado' | 'retirado' | 'nao_localizado';
 export type Categoria = 1 | 2 | 3;
 export interface Medidas { comprimentoCm: number; larguraCm: number; alturaCm: number }
 
@@ -187,6 +264,10 @@ export interface Dormente {
   id: Id;
   contratoId: Id;
   itemContratoId: Id;
+  /** Do próprio dormente (o fornecedor informa por peça; no protótipo, igual ao do fardo). */
+  especieId: Id;
+  classe: Classe;
+  tratamentoId: Id;
   /** Fardo de origem; o reprovado continua apontando para ele. */
   fardoId: Id;
   situacao: SituacaoDormente;
@@ -248,6 +329,19 @@ export interface Dof {
 
 export type SituacaoEntrega = 'a_caminho' | 'recebida_parcial' | 'recebida';
 
+/** Boletim de Inspeção do fornecedor: empresa inspetora (acreditada pelo INMETRO) e, por tamanho, espécies e quantidades aprovadas. */
+export interface BoletimInspecao {
+  numero: string;
+  data: string;
+  empresaInspetoraId: Id;
+  itens: { tamanhoId: Id; especieId: Id; quantidade: number }[];
+  arquivo?: Anexo;
+}
+/** Relatório Técnico do lote, anexado à entrega. */
+export interface RelatorioTecnico { numero: string; data: string; arquivo?: Anexo }
+/** Laudo Técnico de aprovação, emitido pela CPTM depois da inspeção (prazo: 20 dias úteis da entrega). */
+export interface LaudoTecnico { numero: string; emitidoEm: string; emitidoPor: string; aprovados: number; reprovados: number }
+
 /** O que o fornecedor envia de uma vez: uma NF, uma DOF e os fardos. Nasce "a caminho" no cadastro de NF e DOF. */
 export interface Entrega {
   id: Id;
@@ -256,11 +350,25 @@ export interface Entrega {
   dofId: Id;
   /** Fardos esperados (podem ser indicados no cadastro ou entrar na leitura do recebimento). */
   fardosIds: Id[];
+  /** Parcela do cronograma do contrato a que a entrega pertence. */
+  parcela: number;
+  /** Reentrega: reposição de reprovados; só é aceita depois da retirada dos reprovados do contrato. */
+  reentrega: boolean;
   situacao: SituacaoEntrega;
   origem: 'cadastro' | 'simulador' | 'recebimento';
+  boletim?: BoletimInspecao;
+  relatorioTecnico?: RelatorioTecnico;
+  laudo?: LaudoTecnico;
   criadoEm: string;
   criadoPor: string;
   // calculados:
+  /** Recebimento provisório (o primeiro), que conta o prazo do laudo. */
+  recebidaEm?: string;
+  /** 20 dias úteis contados da entrega (recebimento provisório). */
+  prazoLaudo?: string;
+  nivelPrazoLaudo?: NivelPrazo;
+  /** Toda a entrega recebida e inspecionada, ainda sem laudo. */
+  podeEmitirLaudo: boolean;
   nfNumero: string;
   fornecedorId: Id;
   fardosRecebidos: Id[];
@@ -276,7 +384,7 @@ export interface Entrega {
   recebimentosIds: Id[];
 }
 
-export type EtapaEntrega = 'a_caminho' | 'aguardando_inspecao' | 'concluida';
+export type EtapaEntrega = 'a_caminho' | 'aguardando_inspecao' | 'aguardando_laudo' | 'concluida';
 
 /** Prévia do recebimento, antes de confirmar: o que o serviço vai aceitar, recusar e calcular com os fardos lidos. */
 export interface PreviaRecebimento {
@@ -313,9 +421,11 @@ export interface DivergenciaVolume {
   acimaTolerancia: boolean;
 }
 
+/** Recebimento provisório: chegada, leitura dos fardos e o canhoto da NF assinado (foto opcional). O definitivo vem com o laudo. */
 export interface Recebimento {
   id: Id;
   entregaId: Id;
+  canhoto?: Anexo;
   nfId: Id;
   dofId: Id;
   recebidoEm: string;
@@ -355,11 +465,13 @@ export interface Inspecao {
 
 export type SituacaoSaldo = 'falta' | 'ok' | 'excesso';
 
+/** Saldo por classe + tamanho (o item de estoque); a espécie é detalhe (`especies`). */
 export interface SaldoItem {
-  /** Calculado: `<especieId>|<tamanhoId>` (uma linha por espécie e tamanho). */
+  /** Calculado: `<classe>|<tamanhoId>`. */
   id: string;
-  especieId: Id;
+  classe: Classe;
   tamanhoId: Id;
+  uso: UsoTamanho;
   /** Disponível (em estoque, sem reserva). */
   emEstoque: number;
   aguardandoInspecao: number;
@@ -368,9 +480,11 @@ export interface SaldoItem {
   minimo: number;
   maximo: number;
   situacao: SituacaoSaldo;
+  /** Disponível por espécie, do maior para o menor. */
+  especies: { especieId: Id; emEstoque: number }[];
 }
 
-export type TipoMovimentacao = 'guarda' | 'transferencia' | 'segregacao' | 'saida';
+export type TipoMovimentacao = 'guarda' | 'transferencia' | 'segregacao' | 'saida' | 'retirada';
 
 export interface Movimentacao {
   id: Id;
@@ -387,7 +501,11 @@ export interface Movimentacao {
 }
 
 export type SituacaoRme = 'aberta' | 'em_separacao' | 'pronta' | 'entregue' | 'cancelada';
-export interface ItemRme { especieId: Id; tamanhoId: Id; quantidade: number }
+/**
+ * Item da RME: tamanho e classe obrigatórios; categoria mínima opcional (sem ela, qualquer aprovado; 1 é a melhor) e
+ * espécie opcional. Um item por tamanho + classe.
+ */
+export interface ItemRme { tamanhoId: Id; classe: Classe; categoriaMinima?: Categoria; especieId?: Id; quantidade: number }
 export interface SeparacaoFardo { fardoId: Id; dormentesIds: Id[]; seguiuSugestao: boolean; justificativa?: string }
 
 export interface Rme {
@@ -408,16 +526,13 @@ export interface Rme {
 
 /** Sugestão de separação: fardos abertos primeiro (mais antigos antes), depois os demais do mais antigo ao mais novo. */
 export interface SugestaoSeparacao {
-  itens: {
-    especieId: Id;
-    tamanhoId: Id;
-    quantidade: number;
+  itens: (ItemRme & {
     fardos: { fardoId: Id; dormentesIds: Id[]; aberto: boolean; idadeDias?: number; localId?: Id }[];
     /** Todos os fardos do item com dormentes disponíveis (para validar na hora a leitura fora da sugestão). */
     candidatos: { fardoId: Id; dormentesIds: Id[]; aberto: boolean; idadeDias?: number; localId?: Id }[];
     /** Quanto não há disponível para atender o item. */
     faltam: number;
-  }[];
+  })[];
 }
 
 // ---------- Parâmetros e painel ----------
@@ -433,6 +548,8 @@ export interface Parametros {
   limitesCategoria: [number, number];
   dormentesPorFardoPadrao: number;
   niveis: NivelEstoque[];
+  /** Antecedência (dias úteis) dos alertas do prazo do laudo: [atenção, crítico]. */
+  alertaLaudoDias: [number, number];
   /** Mostra o Simulador e os botões "Simular". */
   modoDemonstracao: boolean;
 }
@@ -446,6 +563,9 @@ export interface Indicadores {
   dofsADeclarar: number;
   rmesAbertas: number;
   naoLocalizados: number;
+  parcelasAtrasadas: number;
+  laudosAVencer: number;
+  reprovadosAguardandoRetirada: number;
 }
 
 export type NivelAlerta = 'info' | 'atencao' | 'critico';
@@ -456,7 +576,8 @@ export interface Alerta { id: Id; nivel: Exclude<NivelAlerta, 'info'>; titulo: s
 // ---------- Visões montadas para as páginas de objeto ----------
 
 /** Item do contrato com os nomes, para exibir. */
-export interface ItemDescrito { especie: Especie; tamanho: Tamanho; tratamento: Tratamento }
+/** Descrição do fardo ou do dormente: tamanho (o item do contrato) e espécie, classe e tratamento informados pelo fornecedor. */
+export interface ItemDescrito { especie: Especie; tamanho: Tamanho; tratamento: Tratamento; classe: Classe }
 
 export interface FardoDetalhe {
   fardo: Fardo;
@@ -488,6 +609,10 @@ export interface FichaDormente {
   recebimento?: Recebimento;
   inspecao?: Inspecao;
   rme?: Rme;
+  /** Empresa inspetora do Boletim de Inspeção da entrega. */
+  empresaInspetora?: EmpresaInspetora;
+  /** Garantia de 5 anos a partir da entrega (recebimento do fardo). */
+  garantiaAte?: string;
 }
 
 /** Tela de inspeção de um fardo: cada dormente com a inspeção que vale. */
@@ -514,7 +639,12 @@ export interface Emissao {
   id: Id;
   contratoId: Id;
   fardosIds: Id[];
+  parcela: number;
+  reentrega: boolean;
   nf: { numero: string; serie: string; chaveAcesso: string; emissao: string; itens: ItemNf[] };
+  /** Boletim de Inspeção e Relatório Técnico de exemplo que acompanham o material (dados para digitar no cadastro). */
+  boletim: Omit<BoletimInspecao, 'arquivo'>;
+  relatorioTecnico: Omit<RelatorioTecnico, 'arquivo'>;
   /** Dados da DOF que o fornecedor envia, para a demonstração (a pessoa digita do documento). */
   dof: { numero: string; validade: string; volumes: VolumeEspecie[] };
   comDocumentos: boolean;

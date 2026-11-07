@@ -8,18 +8,18 @@ import { LinhaTempo, type EventoLinhaTempo } from '../components/LinhaTempo';
 import { RodapeAcoes } from '../components/RodapeAcoes';
 import { useAuth } from '../contexts/AuthContext';
 import { RE_DORMENTE } from '../dominio/identificacao';
-import { RESULTADO_INSPECAO, rotuloCategoria, rotuloClasse, SITUACAO_DORMENTE, TIPO_LOCAL } from '../dominio/rotulos';
+import { RESULTADO_INSPECAO, rotuloCategoria, rotuloClasse, SITUACAO_DORMENTE, TIPO_LOCAL, USO_TAMANHO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { ApiError } from '../services/http';
 import type { Evento, FichaDormente as Ficha } from '../types/models';
-import { cm, data, dataHora, urlSegura } from '../utils/format';
+import { cm, data, dataHora, metros, urlSegura } from '../utils/format';
 
 /** Sigla da marca de cada evento na linha do tempo. */
 const MARCA: Record<Evento['tipo'], string> = {
   emitido: 'EMI', recebido: 'REC', inspecionado: 'INS', guardado: 'GUA', transferido: 'TRF', reservado: 'RES',
-  baixado: 'SAÍ', segregado: 'SEG', nao_localizado: 'N/L', cancelado: 'CAN', ocorrencia: 'OCO',
+  baixado: 'SAÍ', segregado: 'SEG', nao_localizado: 'N/L', cancelado: 'CAN', ocorrencia: 'OCO', retirado: 'RET',
 };
 
 /** "ID não encontrado": mostra o código lido e oferece digitar de novo ou ler outro QR. */
@@ -88,7 +88,7 @@ export default function FichaDormente() {
         <IdCodigo id={d.id} tamanho="grande" />
         <div className="ficha-situacao"><BadgeDe mapa={SITUACAO_DORMENTE} valor={d.situacao} /></div>
         <p className="ficha-especie"><span className="nome-cientifico">{especie.nomeCientifico}</span> · {especie.nomePopular}</p>
-        <p className="ficha-resumo">{rotuloClasse(especie.classe)} · Tamanho {tamanho.codigo} ({cm(tamanho.comprimentoCm)}) · {tratamento.preservativo} / {tratamento.empresa}</p>
+        <p className="ficha-resumo">{rotuloClasse(f.item.classe)} · Item {tamanho.codigo} ({metros(tamanho.comprimentoCm / 100)}, {USO_TAMANHO[tamanho.uso][1]}) · {tratamento.preservativo} / {tratamento.empresa}</p>
       </header>
 
       {d.situacao === 'nao_localizado' && (
@@ -130,10 +130,11 @@ export default function FichaDormente() {
           <Par rotulo="Contrato">{operacao ? <IdCodigo id={f.contrato.numero} para={`/contratos/${f.contrato.numero}`} /> : <span className="mono">{f.contrato.numero}</span>}</Par>
           <Par rotulo="Ata"><span className="mono">{f.ata.numero}</span></Par>
           <Par rotulo="Fornecedor">{operacao ? <Link to={`/fornecedores/${f.fornecedor.id}`}>{f.fornecedor.razaoSocial}</Link> : f.fornecedor.razaoSocial}</Par>
-          <Par rotulo="Empresa inspetora">{cad.nomeEmpresa(f.contrato.empresaInspetoraId)}</Par>
+          <Par rotulo="Empresa inspetora">{f.empresaInspetora?.nome ?? '—'}</Par>
           {f.nf && <Par rotulo="NF">{f.nf.numero} · emitida em {data(f.nf.emissao)}</Par>}
           {f.dof && <Par rotulo="DOF">{f.dof.numero}{f.dof.declarado ? ` · declarado em ${data(f.dof.declarado.quando)}` : ' · ainda não declarado'}</Par>}
           {f.recebimento && <Par rotulo="Recebido em">{dataHora(f.recebimento.recebidoEm)} · {f.recebimento.recebidoPor}</Par>}
+          {f.garantiaAte && <Par rotulo="Garantia até">{data(f.garantiaAte)} (5 anos da entrega)</Par>}
         </dl>
       </Cartao>
 

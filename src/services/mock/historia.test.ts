@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contratoView, dofView, entregaView, fardoView, saldoPorItem } from './consultas';
+import { ataView, contratoView, dofView, entregaView, fardoView, saldoPorItem } from './consultas';
 import { criarDados } from './data';
 import { violacoes } from './invariantes';
 
@@ -42,16 +42,53 @@ describe('história de demonstração', () => {
     expect(entregaView(e, aCaminho[0], HOJE).nivelPrazo).toBe('atencao');
   });
 
-  it('tem cadastros, atas e contratos como no plano', () => {
+  it('tem cadastros, atas e contratos como no plano (itens reais da CPTM)', () => {
     expect(e.fornecedores).toHaveLength(3);
     expect(e.especies).toHaveLength(4);
-    expect(e.tamanhos).toHaveLength(2);
+    // 12 itens de compra (código de material CPTM), 240 × 170 mm; só o 2,80 m é de via corrente.
+    expect(e.tamanhos.map((t) => t.codigo)).toEqual(['006234', '006219', '006220', '006221', '006222', '006223', '006224', '006225', '006226', '006227', '006228', '006231']);
+    expect(e.tamanhos.every((t) => t.larguraCm === 24 && t.alturaCm === 17)).toBe(true);
+    expect(e.tamanhos.filter((t) => t.uso === 'via_corrente').map((t) => t.comprimentoCm)).toEqual([280]);
     expect(e.tratamentos).toHaveLength(2);
-    expect(e.empresasInspetoras.map((x) => x.nome)).toEqual(['UFV', 'Inspetora Exemplo Ltda.']);
+    expect(e.empresasInspetoras.map((x) => x.nome)).toEqual(['IPT', 'UFV']);
     expect(e.locais.map((l) => l.tipo).sort()).toEqual(['armazenagem', 'armazenagem', 'armazenagem', 'armazenagem', 'armazenagem', 'expedicao', 'inspecao', 'segregacao']);
-    expect(e.atas).toHaveLength(2);
-    expect(e.contratos.map((c) => contratoView(e, c).situacao)).toEqual(['vigente', 'concluido', 'vigente', 'vigente']);
+    expect(e.atas.map((a) => a.numero)).toEqual(['AR00224', 'AR00311']);
+    expect(e.atas[0].regras).toMatchObject({ pedidoMinimo: 6000, maxParcelas: 6, parcelaMinima: 3000, parcelaMaxima: 6000 });
+    expect(e.atas.every((a) => ataView(e, a, HOJE).vigente)).toBe(true);
+    const contratos = e.contratos.map((c) => contratoView(e, c, HOJE));
+    expect(contratos.map((c) => `${c.numero}:${c.situacao}`)).toEqual([
+      'AR00224-01:vigente', 'AR00311-02:concluido', 'AR00224-02:vigente', 'AR00311-01:vigente', 'AR00311-03:vigente', 'AR00224-03:vigente',
+    ]);
     expect(e.fornecedores.filter((f) => f.ctfValidade < HOJE)).toHaveLength(1);
+    // Pessoas fictícias: nenhum gestor com nome de documento real.
+    expect(e.contratos.every((c) => c.gestor.startsWith('Gestor Exemplo'))).toBe(true);
+  });
+
+  it('tem o cronograma: parcelas atrasadas, entregues e o recebimento definitivo do contrato concluído', () => {
+    const [c1, c5] = e.contratos.map((c) => contratoView(e, c, HOJE));
+    expect(c1.parcelas.map((p) => p.situacao)).toEqual(['atrasada', 'atrasada']);
+    expect(c1.parcelasAtrasadas).toBe(2);
+    expect(c5.parcelas[0].situacao).toBe('entregue');
+    expect(c5.recebimentoDefinitivoEm).toBe('2026-09-02');
+    expect(e.entregas.every((x) => c5.id !== x.contratoId || x.laudo)).toBe(true);
+  });
+
+  it('tem espécie, classe e tratamento por fardo e dormente, e laudos em todas as fases', () => {
+    expect(e.fardos.every((f) => e.dormentes.filter((d) => d.fardoId === f.id).every((d) => d.especieId === f.especieId && d.classe === f.classe && d.tratamentoId === f.tratamentoId))).toBe(true);
+    expect(new Set(e.fardos.map((f) => f.especieId)).size).toBeGreaterThan(2);
+    expect(e.fardos.some((f) => f.classe === 2)).toBe(true);
+    const etapas = e.entregas.map((x) => entregaView(e, x, HOJE)).map((x) => `${x.etapa}${x.nivelPrazoLaudo ? `:${x.nivelPrazoLaudo}` : ''}`);
+    expect(etapas.filter((x) => x === 'concluida')).toHaveLength(4);
+    expect(etapas).toContain('aguardando_laudo:vencido');
+    expect(e.entregas.filter((x) => x.reentrega)).toHaveLength(1);
+    expect(e.entregas.filter((x) => x.boletim && x.relatorioTecnico)).toHaveLength(e.entregas.length);
+  });
+
+  it('tem reprovados retirados e aguardando retirada', () => {
+    expect(e.dormentes.filter((d) => d.situacao === 'retirado')).toHaveLength(6);
+    const aguardando = e.fardos.filter((f) => f.reprovacao && !f.reprovacao.retiradoEm);
+    expect(aguardando.filter((f) => f.reprovacao!.comunicadoEm).length).toBeGreaterThan(0);
+    expect(aguardando.filter((f) => !f.reprovacao!.comunicadoEm).length).toBeGreaterThan(0);
   });
 
   it('declarou só DOFs de entregas já recebidas', () => {
@@ -67,12 +104,12 @@ describe('história de demonstração', () => {
   });
 
   it('tem ~5% de reprovados, uma reposição e 2 não localizados', () => {
-    const inspecionados = e.dormentes.filter((d) => ['em_estoque', 'reservado', 'baixado', 'reprovado'].includes(d.situacao));
-    const reprovados = e.dormentes.filter((d) => d.situacao === 'reprovado').length;
+    const inspecionados = e.dormentes.filter((d) => ['em_estoque', 'reservado', 'baixado', 'reprovado', 'retirado'].includes(d.situacao));
+    const reprovados = e.dormentes.filter((d) => d.situacao === 'reprovado' || d.situacao === 'retirado').length;
     expect(reprovados / inspecionados.length).toBeGreaterThan(0.03);
     expect(reprovados / inspecionados.length).toBeLessThan(0.08);
     expect(e.dormentes.filter((d) => d.situacao === 'nao_localizado')).toHaveLength(2);
-    const c2 = contratoView(e, e.contratos[1]);
+    const c2 = contratoView(e, e.contratos[1], HOJE);
     expect(c2.itens[0].emitidos).toBe(30);
     expect(c2.itens[0].aprovados).toBe(28);
   });
@@ -87,7 +124,7 @@ describe('história de demonstração', () => {
 
   it('tem as DOFs: 1 vencida, 1 em 1 dia, 1 em 3 dias e as demais declaradas', () => {
     const niveis = e.dofs.map((d) => dofView(e, d, HOJE)).map((d) => (d.declarado ? 'declarada' : d.nivelPrazo)).sort();
-    expect(niveis).toEqual(['atencao', 'critico', 'declarada', 'declarada', 'declarada', 'declarada', 'declarada', 'vencido']);
+    expect(niveis).toEqual(['atencao', 'critico', 'declarada', 'declarada', 'declarada', 'declarada', 'declarada', 'declarada', 'vencido']);
   });
 
   it('tem as RMEs em cada situação, com fardo aberto pela saída', () => {

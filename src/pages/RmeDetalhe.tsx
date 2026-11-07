@@ -69,7 +69,7 @@ export default function RmeDetalhe() {
   const podeCancelar = rme.situacao !== 'entregue' && rme.situacao !== 'cancelada' && (pode('rme:separar') || (pode('rme:abrir') && rme.solicitanteId === usuario?.id));
   const separados = (i: Rme['itens'][number]) => (rme.separacao ?? []).filter((l) => {
     const f = fardos.dados?.find((x) => x?.fardo.id === l.fardoId);
-    return f && f.item.especie.id === i.especieId && f.item.tamanho.id === i.tamanhoId;
+    return f && f.item.tamanho.id === i.tamanhoId && f.item.classe === i.classe;
   }).reduce((t, l) => t + l.dormentesIds.length, 0);
   const total = rme.itens.reduce((t, i) => t + i.quantidade, 0);
 
@@ -130,8 +130,8 @@ export default function RmeDetalhe() {
               <thead><tr><th scope="col">Item</th><th scope="col" className="al-right">Pedida</th><th scope="col" className="al-right">Separada</th></tr></thead>
               <tbody>
                 {rme.itens.map((i) => (
-                  <tr key={`${i.especieId}|${i.tamanhoId}`}>
-                    <td>{cad.descreverItem(i)}</td>
+                  <tr key={`${i.tamanhoId}|${i.classe}`}>
+                    <td>{cad.descreverItemRme(i)}</td>
                     <td className="al-right" data-rotulo="Pedida">{numero(i.quantidade)}</td>
                     <td className="al-right" data-rotulo="Separada">{rme.separacao ? numero(separados(i)) : '—'}</td>
                   </tr>

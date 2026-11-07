@@ -1,6 +1,6 @@
 import type {
   NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEmissao, SituacaoEntrega,
-  SituacaoFardo, SituacaoRme, SituacaoSaldo, TipoLocal, TipoMovimentacao, TipoOcorrencia,
+  SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
 } from '../types/models';
 
 /**
@@ -19,6 +19,7 @@ export const SITUACAO_DORMENTE: Rotulos<SituacaoDormente> = {
   reservado: ['azul', 'Reservado'],
   baixado: ['cinza', 'Baixado'],
   reprovado: ['vermelho', 'Reprovado'],
+  retirado: ['cinza', 'Retirado pelo fornecedor'],
   nao_localizado: ['vermelho', 'Não localizado'],
 };
 
@@ -96,6 +97,7 @@ export const TIPO_MOVIMENTACAO: Rotulos<TipoMovimentacao> = {
   transferencia: ['azul', 'Transferência'],
   segregacao: ['vermelho', 'Segregação'],
   saida: ['cinza', 'Saída'],
+  retirada: ['cinza', 'Retirada pelo fornecedor'],
 };
 
 export const TIPO_OCORRENCIA: Rotulos<TipoOcorrencia> = {
@@ -112,5 +114,20 @@ export const NIVEL_ALERTA: Rotulos<NivelAlerta> = {
 };
 
 /** Classe vem do cadastro da espécie; categoria vem da inspeção. Sempre com o nome do campo. */
-export const rotuloClasse = (c?: string) => (c ? `Classe ${c}` : 'Classe a definir');
+/** "1ª" ou "2ª" (NBR 7511). */
+export const ordinalClasse = (c: number) => `${c}ª`;
+export const rotuloClasse = (c?: number) => (c ? `Classe ${ordinalClasse(c)}` : 'Classe a definir');
+
+/** Uso do tamanho: via corrente (2,80 m, bitola larga) ou AMV (aparelho de mudança de via). */
+export const USO_TAMANHO: Rotulos<UsoTamanho> = {
+  via_corrente: ['azul', 'Via corrente'],
+  amv: ['laranja', 'AMV'],
+};
+
+export const SITUACAO_PARCELA: Rotulos<SituacaoParcela> = {
+  a_entregar: ['azul', 'A entregar'],
+  atrasada: ['vermelho', 'Atrasada'],
+  entregue: ['verde', 'Entregue'],
+  entregue_com_atraso: ['laranja', 'Entregue com atraso'],
+};
 export const rotuloCategoria = (c?: number) => (c ? `Categoria ${c}` : 'Categoria a definir');

@@ -26,10 +26,10 @@ O sistema dá a cada dormente um QR code individual e acompanha sua vida do cont
 | Entra no protótipo | Fica fora (melhoria futura) |
 | --- | --- |
 | Cadastros de espécies, tamanhos, tratamentos, fornecedores, locais e usuários | Back-end próprio (os dados ficam no Supabase) e integração real com o sistema de inspeção |
-| Contratos | Declaração automática da DOF no Sinaflor |
+| Atas e contratos com cronograma por parcela | Declaração automática da DOF no Sinaflor |
 | Simulador do fornecedor (geração de QR para demonstração) | Etiqueta de contingência para dormente sem QR |
-| Reprovados segregados | Devolução dos reprovados ao fornecedor |
-| Recebimento com NF e DOF | Aprovações em duas etapas e ajustes de inventário |
+| Reprovados segregados, comunicação ao fornecedor e retirada | RME por jogo de dormentes de AMV |
+| Recebimento com NF, DOF, Boletim de Inspeção e Relatório Técnico; recebimento provisório e Laudo Técnico | Aprovações em duas etapas e ajustes de inventário |
 | Inspeção (retorno simulado) | Uso offline e RFID |
 | Estoque com localização e movimentações | |
 | Ficha do dormente pelo QR code | |
@@ -126,18 +126,19 @@ O banco tem dois níveis de detalhe, o fardo e o dormente, e todo dormente apont
 | Entidade | Campos principais | Liga com |
 | --- | --- | --- |
 | Fornecedor | Razão social, CNPJ, cidade/UF, situação, CTF IBAMA e validade (bloqueio calculado), certificados | Espécies que fornece, atas |
-| Espécie | Nome científico, nome popular, classe | Tamanhos, itens do contrato |
-| Tamanho | Código, comprimento, largura, altura, volume calculado | Itens do contrato |
-| Tratamento | Preservativo, empresa de tratamento | Itens do contrato |
-| Empresa inspetora | Nome, CNPJ (opcional), ativa ou inativa | Contratos |
+| Espécie | Nome científico, nome popular | Fardos e dormentes, DOF, boletim |
+| Tamanho | Código de material CPTM (ex. 006234), uso (via corrente ou AMV), comprimento, largura, altura, volume calculado | Itens da ata e do contrato |
+| Tratamento | Preservativo, empresa de tratamento | Fardos e dormentes |
+| Empresa inspetora | Nome (acreditada pelo INMETRO, ex. IPT, UFV), CNPJ (opcional), ativa ou inativa | Boletim de Inspeção da entrega |
 | Local | Código, descrição, tipo, capacidade em dormentes, QR | Fardos guardados |
 | Usuário | Nome, e-mail, perfil, ativo | Todo registro guarda quem fez |
-| Ata | Número, fornecedor, vigência | Contratos |
-| Contrato | Número, ata, empresa inspetora (do cadastro), situação (o fornecedor vem da ata) | Itens, entregas, fardos, dormentes, NFs |
-| Item do contrato | Espécie, tamanho, tratamento, quantidade em unidades | Contrato, dormentes |
-| Entrega | NF, DOF, fardos esperados, situação (a caminho, recebida em parte, recebida) | Contrato, NF, DOF, fardos, recebimento |
-| Fardo | ID, contrato, quantidade inicial, saldo físico e disponível (calculados), local, situação | Dormentes, recebimento, movimentações |
-| Dormente | ID, item do contrato, fardo, situação, categoria, medidas | Fardo, inspeção, saída |
+| Ata | Número, fornecedor, vigência (12 meses), regras (pedido mínimo, parcelas e prazos), quantidades registradas por tamanho | Contratos |
+| Contrato | Número, ata, data de assinatura, gestor, situação (o fornecedor vem da ata); não existe AF: cada pedido é um contrato | Itens, parcelas, entregas, fardos, dormentes, NFs |
+| Item do contrato | Tamanho (código de material CPTM) e quantidade em unidades; sem espécie, classe nem tratamento | Contrato, dormentes |
+| Parcela | Número, quantidade por tamanho; janela de entrega e situação calculadas pela assinatura e pelas regras da ata | Contrato, entregas |
+| Entrega | NF, DOF, parcela, reentrega, Boletim de Inspeção, Relatório Técnico, Laudo Técnico, fardos esperados, situação | Contrato, NF, DOF, fardos, recebimento |
+| Fardo | ID, contrato, tamanho, espécie, classe e tratamento informados pelo fornecedor, quantidade inicial, saldo físico e disponível (calculados), local, situação, reprovação (comunicação e retirada) | Dormentes, recebimento, movimentações |
+| Dormente | ID, tamanho, fardo, espécie, classe, tratamento, situação, categoria, medidas | Fardo, inspeção, saída |
 | NF | Número, chave, fornecedor, data, XML | Contrato, entrega, DOF |
 | DOF | Número, validade, volume por espécie, PDF, declarado no Sinaflor | NF |
 | Recebimento | Data, responsável, conformidade, fotos | Entrega, fardos recebidos |
@@ -146,6 +147,14 @@ O banco tem dois níveis de detalhe, o fardo e o dormente, e todo dormente apont
 | Saída | Número, destino (obra ou trecho), solicitante, situação | Itens, dormentes baixados |
 
 Mudança em relação ao sistema atual: sai o conceito de lote (NF + espécie + tamanho, com código LT26-0042). O agrupamento passa a ser o contrato e o fardo, e o ID do dormente vem da plaquinha, não de uma etiqueta impressa na inspeção.
+
+**Escopo.** Exclusivamente dormentes de madeira, conforme os documentos reais da CPTM (Ata AR00224 e contratos AR00224-01, -02 e -03).
+
+**Compra.** A ata registra o fornecedor, a vigência de 12 meses e as regras: pedido mínimo de 6.000 dormentes por contrato, até 6 parcelas por contrato, cada parcela entre 3.000 e 6.000 dormentes (somando os itens), com prazos contados da assinatura do contrato (1ª até 90 dias; 2ª do 91º ao 120º; 3ª do 121º ao 150º; 4ª do 151º ao 180º; 5ª do 181º ao 210º; 6ª do 211º ao 240º). As regras são parâmetros da ata, com esses valores como padrão. Não existe AF: cada pedido da CPTM é um contrato sob a ata, com data de assinatura, gestor e cronograma por item e parcela; o sistema valida as regras da ata, calcula o prazo de cada parcela e marca as atrasadas. O item do contrato é o tamanho, identificado pelo código de material CPTM (240 × 170 mm: 006234 = 2,80 m, via corrente, bitola larga de 1,60 m; 006219 a 006231 = 3,00 m a 5,40 m, AMV). Espécie, classe (1ª ou 2ª, NBR 7511) e tratamento são do fardo e de cada dormente, informados pelo fornecedor.
+
+**Entrada.** Toda entrega é vinculada a uma parcela. Além de NF e DOF, entram o Boletim de Inspeção (empresa inspetora acreditada pelo INMETRO, por tamanho, espécies e quantidades aprovadas) e o Relatório Técnico do lote. O recebimento é provisório na chegada (canhoto da NF) e se completa com o Laudo Técnico de aprovação, emitido depois da inspeção, em até 20 dias úteis da entrega; o recebimento definitivo do contrato é 15 dias após o laudo da última entrega. Reprovados: ao concluir a inspeção, o sistema registra a comunicação ao fornecedor (5 dias úteis) e o prazo de retirada (15 dias úteis); retirados, ficam "retirado pelo fornecedor"; a reentrega (reposição) só é aceita depois da retirada. Garantia: 5 anos a partir da entrega.
+
+**Estoque e saída.** O item de estoque e os níveis de mínimo e máximo são por classe e tamanho, com a espécie como detalhe; o uso (via corrente ou AMV) filtra o Estoque e separa o Painel. A RME é pedida por tamanho e classe, com categoria mínima opcional (padrão: qualquer aprovado) e espécie opcional; a sugestão aceita qualquer espécie que atenda à classe e à categoria. Item abaixo do mínimo mostra o saldo na ata vigente e o atalho para novo contrato.
 
 ## 5. Módulos e regras de negócio
 
@@ -200,14 +209,16 @@ Os indicadores respondem aos que a CPTM pediu no plano de trabalho (tempo de loc
 | DOFs a declarar | DOFs com prazo vencido, em até 1 dia e em até 3 dias |
 | Rastreabilidade | Dormentes baixados com histórico completo do contrato à saída |
 
+**Pergunta em aberto:** obter a Especificação Técnica CPTM AD1956-4 para confirmar o padrão da plaquinha de identificação e a lista de espécies aceitas por classe.
+
 **Melhorias futuras**
 
 - Etiqueta de contingência para dormente que chega sem QR ou com QR ilegível
-- Devolução dos reprovados ao fornecedor
 - Portal real do fornecedor, no lugar do simulador
 - Integração real com o sistema de inspeção (e confirmação do mapeamento do ATENÇÃO e das categorias) e com o Sinaflor
 - Inventário físico por leitura de QR e ajustes com aprovação
 - Uso offline no pátio e leitura por RFID
 - Movimentação física parcial: levar para a expedição só os dormentes separados de um fardo, sem o fardo inteiro
+- RME por jogo de dormentes de AMV (o conjunto completo para um travessão de determinada geometria)
 
 Em aberto: até onde vai a localização (área ou posição do fardo), valores de mínimo e máximo por item, limite de dias em estoque e o nome popular das espécies ("Jataipeba" para *Dialium guianense*).

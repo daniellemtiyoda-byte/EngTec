@@ -1,6 +1,7 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Aviso, Carregando, Erro } from '../components/Estados';
 import { EtiquetaQr } from '../components/EtiquetaQr';
+import { ordinalClasse } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
 import { metros, numero } from '../utils/format';
@@ -48,10 +49,10 @@ export default function EtiquetasImpressao() {
         {lista.map(({ fardo, item, dormentesIds }) => [
           <EtiquetaQr
             key={fardo.id} tipo="fardo" id={fardo.id} titulo="FARDO" tamanho="grande"
-            linhas={[`Contrato ${contrato.numero}`, `${item.especie.nomePopular} · ${item.tamanho.codigo}`, `${numero(fardo.quantidadeInicial)} dormentes`]}
+            linhas={[`Contrato ${contrato.numero}`, `Item ${item.tamanho.codigo} · ${metros(item.tamanho.comprimentoCm / 100)}`, `${item.especie.nomePopular} · ${ordinalClasse(item.classe)} classe`, `${numero(fardo.quantidadeInicial)} dormentes`]}
           />,
           ...(soFardo ? [] : dormentesIds.map((id) => (
-            <EtiquetaQr key={id} tipo="dormente" id={id} titulo="DORMENTE" linhas={[`Contrato ${contrato.numero}`, item.especie.nomePopular, metros(item.tamanho.comprimentoCm / 100)]} />
+            <EtiquetaQr key={id} tipo="dormente" id={id} titulo="DORMENTE" linhas={[`Contrato ${contrato.numero}`, `${item.especie.nomePopular} · ${ordinalClasse(item.classe)} classe`, `${item.tamanho.codigo} · ${metros(item.tamanho.comprimentoCm / 100)}`]} />
           ))),
         ])}
       </div>

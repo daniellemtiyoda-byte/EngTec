@@ -12,7 +12,7 @@ import { DisponivelFardo, SituacaoFardo } from '../components/SituacaoFardo';
 import { useToast } from '../components/Toast';
 import { TransferirFardo } from '../components/TransferirFardo';
 import { RE_FARDO } from '../dominio/identificacao';
-import { rotuloCategoria, SITUACAO_DORMENTE, SITUACAO_FARDO, TIPO_MOVIMENTACAO } from '../dominio/rotulos';
+import { ordinalClasse, rotuloCategoria, rotuloClasse, SITUACAO_DORMENTE, SITUACAO_FARDO, TIPO_MOVIMENTACAO } from '../dominio/rotulos';
 import { useAuth } from '../contexts/AuthContext';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
@@ -74,7 +74,7 @@ export default function FardoDetalhe() {
           <FatoChave rotulo="Idade" valor={f.idadeDias !== undefined ? <>{dias(f.idadeDias)}{f.acimaLimiteDias && <span className="texto-critico"> · acima do limite</span>}</> : '—'} />
           <FatoChave rotulo="Contrato" valor={<span className="mono">{contrato.numero}</span>} para={`/contratos/${contrato.numero}`} />
           {f.recebidoEm && <FatoChave rotulo="Recebido em" valor={data(f.recebidoEm)} />}
-          <FatoChave rotulo="Item" valor={`${item.especie.nomePopular} · ${item.tamanho.codigo}`} />
+          <FatoChave rotulo="Item" valor={`${item.tamanho.codigo} · ${ordinalClasse(item.classe)} classe · ${item.especie.nomePopular}`} />
           {f.faltaDeclarada ? <FatoChave rotulo="Falta no recebimento" valor={`${numero(f.faltaDeclarada)} dormente(s)`} /> : null}
           {f.progressoInspecao && <FatoChave rotulo="Inspeção" valor={`${numero(f.progressoInspecao.inspecionados)} de ${numero(f.progressoInspecao.total)}`} para={`/inspecao/${f.id}`} />}
         </>}
@@ -102,8 +102,9 @@ export default function FardoDetalhe() {
             <dl className="detalhes">
               <dt>Contrato</dt><dd><IdCodigo id={contrato.numero} para={`/contratos/${contrato.numero}`} /></dd>
               <dt>Fornecedor</dt><dd><Link to={`/fornecedores/${contrato.fornecedorId}`}>{cad.nomeFornecedor(contrato.fornecedorId)}</Link></dd>
-              <dt>Empresa inspetora</dt><dd>{cad.nomeEmpresa(contrato.empresaInspetoraId)}</dd>
-              <dt>Item</dt><dd>{item.especie.nomeCientifico} ({item.especie.nomePopular}) · {item.tamanho.codigo} · {item.tratamento.preservativo} / {item.tratamento.empresa}</dd>
+              <dt>Empresa inspetora</dt><dd>{entrega?.boletim ? `${cad.nomeEmpresa(entrega.boletim.empresaInspetoraId)} · Boletim ${entrega.boletim.numero}` : '—'}</dd>
+              <dt>Item</dt><dd>{cad.descreverTamanho(item.tamanho.id)} · {rotuloClasse(item.classe)}</dd>
+              <dt>Madeira</dt><dd>{item.especie.nomeCientifico} ({item.especie.nomePopular}) · {item.tratamento.preservativo} / {item.tratamento.empresa}</dd>
               <dt>NF</dt><dd>{nf ? `${nf.numero} · emitida em ${data(nf.emissao)}` : '—'}</dd>
               <dt>DOF</dt><dd>{dof ? `${dof.numero} · validade ${data(dof.validade)}${dof.declarado ? ` · declarado em ${data(dof.declarado.quando)}` : ''}` : '—'}</dd>
               <dt>Recebimento</dt><dd>{recebimento ? `${dataHora(recebimento.recebidoEm)} · ${recebimento.recebidoPor}` : 'Ainda não recebido'}</dd>

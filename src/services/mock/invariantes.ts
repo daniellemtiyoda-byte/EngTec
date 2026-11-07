@@ -21,7 +21,7 @@ export function violacoes(e: Estado, hoje: string): string[] {
       const seqs = lista.filter((x) => x.contratoId === c.id).map((x) => sequenciaDe(x.id) ?? 0).sort((a, b) => a - b);
       seqs.forEach((s, i) => v(s === i + 1, `Sequência com buraco no contrato ${c.numero}: esperado ${i + 1}, achado ${s}`));
     }
-    for (const i of contratoView(e, c).itens) v(i.emitidos - i.reprovados <= i.quantidade, `Item ${i.id} do ${c.numero} passou do contratado`);
+    for (const i of contratoView(e, c, hoje).itens) v(i.emitidos - i.reprovados <= i.quantidade, `Item ${i.id} do ${c.numero} passou do contratado`);
   }
 
   const fardoDe = new Map(e.fardos.map((f) => [f.id, f]));
@@ -29,6 +29,8 @@ export function violacoes(e: Estado, hoje: string): string[] {
     const f = fardoDe.get(d.fardoId);
     if (!f) { erros.push(`Dormente ${d.id} sem fardo`); continue; }
     v(f.contratoId === d.contratoId && f.itemContratoId === d.itemContratoId, `Dormente ${d.id} com contrato/item diferente do fardo`);
+    if (d.situacao === 'retirado') v(!d.localId && !!f.reprovacao?.retiradoEm && f.reprovacao.dormentesIds.includes(d.id), `Retirado ${d.id} sem retirada registrada no fardo`);
+    if (d.situacao === 'reprovado') v(!!f.reprovacao?.dormentesIds.includes(d.id), `Reprovado ${d.id} sem reprovação registrada no fardo`);
     v((d.situacao === 'emitido') === !f.recebidoEm, `Dormente ${d.id} (${d.situacao}) incoerente com o recebimento do fardo ${f.id}`);
     if (['em_estoque', 'reservado', 'baixado', 'reprovado', 'nao_localizado'].includes(d.situacao)) v(!!f.conclusaoInspecao, `Dormente ${d.id} (${d.situacao}) num fardo sem inspeção concluída`);
     if (d.situacao === 'aguardando_inspecao') v(!f.conclusaoInspecao, `Dormente ${d.id} aguardando inspeção num fardo concluído`);
@@ -58,6 +60,17 @@ export function violacoes(e: Estado, hoje: string): string[] {
     if (esperada) v(separados.every((id) => e.dormentes.find((d) => d.id === id)?.situacao === esperada), `RME ${r.numero} (${r.situacao}) com dormentes fora de "${esperada}"`);
     if (r.situacao === 'pronta' || r.situacao === 'entregue') v(r.itens.reduce((s, i) => s + i.quantidade, 0) === separados.length, `RME ${r.numero} separada com quantidade diferente da pedida`);
   }
+
+  // Cronograma: parcelas dentro das regras da ata e entregas em parcelas que existem.
+  for (const c of e.contratos) {
+    const ata = e.atas.find((a) => a.id === c.ataId)!;
+    v(c.parcelas.length <= ata.regras.maxParcelas, `Contrato ${c.numero} com parcelas demais`);
+    for (const p of c.parcelas) {
+      const soma = p.itens.reduce((t, i) => t + i.quantidade, 0);
+      v(soma >= ata.regras.parcelaMinima && soma <= ata.regras.parcelaMaxima, `Contrato ${c.numero}: parcela ${p.numero} fora das regras da ata`);
+    }
+  }
+  for (const en of e.entregas) v(e.contratos.find((c) => c.id === en.contratoId)!.parcelas.some((p) => p.numero === en.parcela), `Entrega ${en.id} numa parcela inexistente`);
 
   for (const en of e.entregas) {
     const fardos = e.fardos.filter((f) => en.fardosIds.includes(f.id));

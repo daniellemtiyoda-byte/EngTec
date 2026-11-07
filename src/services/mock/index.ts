@@ -1,6 +1,6 @@
 import { dataSP } from '../../dominio/parametros';
 import { PERFIS, type Permissao } from '../../dominio/permissoes';
-import type { ListQuery, Parametros, SaldoItem, Usuario } from '../../types/models';
+import type { Id, ListQuery, Parametros, SaldoItem, Usuario } from '../../types/models';
 import { autenticacao } from '../auth';
 import type { Servicos } from '../contracts';
 import { ApiError } from '../http';
@@ -9,16 +9,16 @@ import {
   salvarTamanho, salvarTratamento, situacaoFornecedor,
 } from './cadastros';
 import {
-  contratoView, dofView, emissaoView, entregaView, etiquetasEmissao, fardoDetalhe, fardoView, fichaDormente, fornecedorView, inspecaoFardo, localView, resumoFornecedor, saldoPorItem, tamanhoView,
+  ataView, contratoView, dofView, emissaoView, entregaView, etiquetasEmissao, fardoDetalhe, fardoView, fichaDormente, fornecedorView, inspecaoFardo, localView, resumoFornecedor, saldoPorItem, tamanhoView,
 } from './consultas';
 import { criarDados } from './data';
 import { cadastrarEntrega, declararDof } from './documentos';
 import { achar, falha, type Ctx, type Estado } from './estado';
 import { transferirFardo } from './estoque';
-import { concluirInspecao, registrarInspecao, simularFardo } from './inspecao';
+import { concluirInspecao, registrarComunicacao, registrarInspecao, registrarRetirada, simularFardo } from './inspecao';
 import { alertas, indicadores, pendencias } from './painel';
 import { armazenamentoPadrao, carregar, salvar, type Armazenamento } from './persistencia';
-import { previaRecebimento, receber } from './recebimento';
+import { emitirLaudo, previaRecebimento, receber } from './recebimento';
 import { abrirRme, acharRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './rme';
 import { emitir, xmlDaNf } from './simulador';
 import { paginar, simularRede } from './util';
@@ -152,19 +152,21 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
     },
 
     atas: {
-      listar: (q) => ler((e) => paginar(e.atas, q)),
-      criar: (d) => escrever(['contratos:editar'], (e, ctx) => criarAta(e, d, ctx)),
+      listar: (q) => ler((e) => paginar(e.atas.map((a) => ataView(e, a, dia())), q)),
+      criar: (d) => escrever(['contratos:editar'], (e, ctx) => ataView(e, criarAta(e, d, ctx), dia())),
     },
     contratos: {
       listar: (q = {}) => ler((e) => {
-        const { especieId, ...filters } = q.filters ?? {};
-        const lista = e.contratos.map((c) => contratoView(e, c)).filter((c) => !especieId || c.itens.some((i) => i.especieId === especieId));
+        // tamanhoId: contratos com o item; atrasada: com parcela atrasada.
+        const { tamanhoId, atrasada, ...filters } = q.filters ?? {};
+        const lista = e.contratos.map((c) => contratoView(e, c, dia()))
+          .filter((c) => (!tamanhoId || c.itens.some((i) => i.tamanhoId === tamanhoId)) && (atrasada !== 'sim' || c.parcelasAtrasadas > 0));
         return paginar(lista, { ...q, filters });
       }),
-      obter: (numero) => ler((e) => contratoView(e, achar(e.contratos, (c) => c.numero === numero.trim().toUpperCase(), `Contrato ${numero}`))),
-      criar: (d) => escrever(['contratos:editar'], (e, ctx) => contratoView(e, criarContrato(e, d, ctx))),
-      atualizar: (numero, d) => escrever(['contratos:editar'], (e) => contratoView(e, atualizarContrato(e, numero, d))),
-      cancelar: (numero, motivo) => escrever(['contratos:editar'], (e, ctx) => contratoView(e, cancelarContrato(e, numero, motivo, ctx))),
+      obter: (numero) => ler((e) => contratoView(e, achar(e.contratos, (c) => c.numero === numero.trim().toUpperCase(), `Contrato ${numero}`), dia())),
+      criar: (d) => escrever(['contratos:editar'], (e, ctx) => contratoView(e, criarContrato(e, d, ctx), dia())),
+      atualizar: (numero, d) => escrever(['contratos:editar'], (e, ctx) => contratoView(e, atualizarContrato(e, numero, d, ctx), dia())),
+      cancelar: (numero, motivo) => escrever(['contratos:editar'], (e, ctx) => contratoView(e, cancelarContrato(e, numero, motivo, ctx), dia())),
     },
 
     simulador: {
@@ -194,6 +196,7 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       entregasACaminho: () => ler((e) => e.entregas.filter((x) => x.situacao !== 'recebida').map((x) => entregaView(e, x, dia()))),
       previa: (entregaId, fardosLidos, faltas) => ler((e) => previaRecebimento(e, entregaId, fardosLidos, faltas)),
       receber: (entregaId, d) => escrever(['recebimento:registrar'], (e, ctx) => receber(e, entregaId, d, ctx)),
+      emitirLaudo: (entregaId) => escrever(['inspecao:operar'], (e, ctx) => emitirLaudo(e, entregaId, ctx)),
     },
 
     inspecao: {
@@ -206,6 +209,9 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
       }),
       simularFardo: (id) => escrever(['inspecao:operar'], (e, ctx) => { exigirDemonstracao(e); simularFardo(e, id, ctx); return inspecaoFardo(e, id, dia()); }),
       concluir: (id, d) => escrever(['inspecao:operar'], (e, ctx) => fardoView(e, concluirInspecao(e, id, d, ctx), dia())),
+      reprovados: (q) => ler((e) => paginar(fardosView(e).filter((f) => f.reprovacao && !f.reprovacao.retiradoEm), q?.sortBy || q?.sort ? q : { ...q, sort: [{ campo: 'id', dir: 'asc' }] })),
+      registrarComunicacao: (id) => escrever(['inspecao:operar'], (e, ctx) => fardoView(e, registrarComunicacao(e, id, ctx), dia())),
+      registrarRetirada: (id) => escrever(['inspecao:operar'], (e, ctx) => fardoView(e, registrarRetirada(e, id, ctx), dia())),
     },
 
     fardos: {
@@ -226,19 +232,23 @@ export function criarServicosSimulados(op: OpcoesMock = {}): Servicos {
 
     estoque: {
       porItem: (q = {}) => ler((e) => {
-        const nomes = (s: SaldoItem) => [e.especies.find((x) => x.id === s.especieId)?.nomePopular ?? '', e.tamanhos.find((x) => x.id === s.tamanhoId)?.codigo ?? ''];
-        const ordenado = [...saldoPorItem(e)].sort((a, b) => nomes(a).join(' ').localeCompare(nomes(b).join(' '), 'pt-BR'));
+        // Ordem: uso (via corrente, depois AMV), comprimento e classe. A busca olha o código do tamanho e as espécies.
+        const tam = (id: Id) => e.tamanhos.find((x) => x.id === id);
+        const nomes = (s: SaldoItem) => [tam(s.tamanhoId)?.codigo ?? '', ...s.especies.map((x) => e.especies.find((y) => y.id === x.especieId)?.nomePopular ?? '')];
+        const ordenado = [...saldoPorItem(e)].sort((a, b) => a.uso.localeCompare(b.uso) * -1 || (tam(a.tamanhoId)?.comprimentoCm ?? 0) - (tam(b.tamanhoId)?.comprimentoCm ?? 0) || a.classe - b.classe);
         return paginar(ordenado, q, nomes);
       }),
       porFardo: (q = {}) => ler((e) => {
-        const { especieId, tamanhoId, acimaLimite, ...filters } = q.filters ?? {};
-        const itemDe = new Map(e.contratos.flatMap((c) => c.itens).map((i) => [i.id, i]));
+        // Filtros pelo item do contrato (tamanho) e pelo uso do tamanho; espécie e classe são campos do fardo.
+        const { tamanhoId, uso, acimaLimite, ...filters } = q.filters ?? {};
+        const tamanhoDe = new Map(e.contratos.flatMap((c) => c.itens).map((i) => [i.id, i.tamanhoId]));
         const lista = fardosView(e).filter((f) => {
           if (f.situacao !== 'em_estoque') return false;
-          const item = itemDe.get(f.itemContratoId);
-          return (!especieId || item?.especieId === especieId) && (!tamanhoId || item?.tamanhoId === tamanhoId) && (acimaLimite !== 'sim' || f.acimaLimiteDias);
+          const t = e.tamanhos.find((x) => x.id === tamanhoDe.get(f.itemContratoId));
+          return (!tamanhoId || t?.id === tamanhoId) && (!uso || t?.uso === uso) && (acimaLimite !== 'sim' || f.acimaLimiteDias);
         });
-        return paginar(lista, maisAntigos({ ...q, filters }));
+        const busca = (f: (typeof lista)[number]) => [e.especies.find((x) => x.id === f.especieId)?.nomePopular ?? '', e.tamanhos.find((x) => x.id === tamanhoDe.get(f.itemContratoId))?.codigo ?? ''];
+        return paginar(lista, maisAntigos({ ...q, filters }), busca);
       }),
     },
 

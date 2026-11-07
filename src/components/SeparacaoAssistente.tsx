@@ -58,7 +58,7 @@ export function SeparacaoAssistente({ aberto, rme, cad, aoFechar, aoSeparar }: P
   }, [sugestao]);
 
   const porItem = (item: number) => Object.values(lidos).filter((o) => o.item === item).length;
-  const descricao = (item: number) => (sugestao ? cad.descreverItem(sugestao.itens[item]) : '');
+  const descricao = (item: number) => (sugestao ? cad.descreverItemRme(sugestao.itens[item]) : '');
 
   function marcar(id: string, origem: Origem) { setLidos((l) => ({ ...l, [id]: origem })); }
   function desmarcar(id: string) { setLidos((l) => { const n = { ...l }; delete n[id]; return n; }); }

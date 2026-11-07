@@ -13,7 +13,8 @@ const TRANSICOES: Record<SituacaoDormente, SituacaoDormente[]> = {
   em_estoque: ['reservado'],
   reservado: ['em_estoque', 'baixado'],
   baixado: [],
-  reprovado: [],
+  reprovado: ['retirado'],
+  retirado: [],
 };
 
 interface Opcoes {
@@ -34,6 +35,7 @@ export function movimentarDormentes(e: Estado, ids: Id[], para: SituacaoDormente
     if (para === 'reservado' || para === 'baixado') d.rmeNumero = op.rmeNumero;
     if (para === 'em_estoque' && d.situacao === 'reservado') d.rmeNumero = undefined;
     if (para === 'reprovado') d.localId = op.localId;
+    if (para === 'retirado') d.localId = undefined;
     d.situacao = para;
     d.historico.push({ ...ev });
   }

@@ -677,3 +677,15 @@ span.codigo { font-weight: 600; color: var(--texto); }
 .lista-codigos { display: flex; flex-wrap: wrap; gap: var(--esp-1) var(--esp-3); margin: var(--esp-2) 0; }
 .itens-rme { list-style: none; margin: 0 0 var(--esp-2); padding: 0; display: flex; flex-direction: column; gap: var(--esp-3); }
 .itens-rme li { display: flex; flex-direction: column; gap: var(--esp-2); padding-bottom: var(--esp-3); border-bottom: 1px solid var(--borda); }
+
+/* Cronograma do contrato: parcelas com a quantidade por tamanho */
+.parcelas-contrato { display: flex; flex-direction: column; gap: var(--esp-3); }
+.parcela-contrato { border: 1px solid var(--borda); border-radius: var(--raio); padding: var(--esp-3); display: flex; flex-direction: column; gap: var(--esp-2); }
+.parcela-topo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2) var(--esp-4); }
+.parcela-item { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: var(--esp-2); align-items: end; }
+.parcela-item .erro-campo { grid-column: 1 / -1; }
+.parcela-rodape { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-2); margin-top: var(--esp-3); }
+@media (max-width: 760px) {
+  .parcela-item { grid-template-columns: 1fr 110px; }
+  .parcela-item > .btn { grid-column: 1 / -1; justify-self: start; }
+}

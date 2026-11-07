@@ -41,11 +41,23 @@ export default function RecebimentoDetalhe() {
   const [aba, setAba] = useAbaNoEndereco<AbaRec>(['fardos', 'documentos', 'ocorrencias', 'historico']);
   const [declarar, setDeclarar] = useState(false);
   const [declarando, setDeclarando] = useState(false);
+  const [laudo, setLaudo] = useState(false);
 
   if (r.carregando && !r.dados) return <section className="painel"><Carregando /></section>;
   if (r.erro || !r.dados) return <section className="painel"><Erro erro={r.erro} aoTentar={r.recarregar} /></section>;
   const { rec, entrega, nf, dof, fardos, contrato } = r.dados;
   const lidosAqui = fardos.filter((f) => rec.fardosLidos.includes(f.id));
+
+  async function emitirLaudo() {
+    if (!entrega) return;
+    setDeclarando(true);
+    try {
+      const en = await servicos.recebimentos.emitirLaudo(entrega.id);
+      notificar('sucesso', `Laudo Técnico ${en.laudo?.numero} emitido: ${en.laudo?.aprovados} aprovados e ${en.laudo?.reprovados} reprovados.`);
+      r.recarregar();
+    } catch (e) { notificar('erro', mensagemSegura(e)); }
+    finally { setDeclarando(false); setLaudo(false); }
+  }
 
   async function confirmarDeclaracao() {
     if (!dof) return;
@@ -65,6 +77,7 @@ export default function RecebimentoDetalhe() {
     { valor: 'historico', rotulo: 'Histórico' },
   ];
   const eventos: EventoLinhaTempo[] = [
+    ...(entrega?.laudo ? [{ quando: entrega.laudo.emitidoEm, quem: entrega.laudo.emitidoPor, titulo: `Laudo Técnico ${entrega.laudo.numero} emitido`, marca: 'LT' }] : []),
     ...(dof?.declarado ? [{ quando: dof.declarado.quando, quem: dof.declarado.quem, titulo: `DOF ${dof.numero} declarada no Sinaflor`, marca: 'DOF' }] : []),
     { quando: rec.recebidoEm, quem: rec.recebidoPor, titulo: `Recebidos ${rec.fardosLidos.length} fardo(s) em ${cad.codigoLocal(rec.localEsperaId)}`, detalhe: rec.conforme ? 'Conforme' : `${rec.ocorrencias.length} ocorrência(s)`, marca: 'REC', tipo: 'recebimento' },
     ...(nf ? [{ quando: nf.criadoEm, quem: nf.criadoPor, titulo: `NF ${nf.numero} e DOF cadastradas`, marca: 'NF' }] : []),
@@ -76,7 +89,10 @@ export default function RecebimentoDetalhe() {
         tipo="Recebimento" titulo={`NF ${nf?.numero ?? '—'}`}
         situacao={rec.conforme ? <Badge tom="verde">Conforme</Badge> : <Badge tom="laranja">Com ocorrência</Badge>}
         migalhas={[{ rotulo: 'Recebimentos', para: '/recebimentos' }, { rotulo: `Recebimento da NF ${nf?.numero ?? ''}` }]}
-        acoes={dof?.podeDeclarar && pode('dof:declarar') && <button className="btn btn-pri" onClick={() => setDeclarar(true)}>Marcar DOF como declarada no Sinaflor</button>}
+        acoes={<>
+          {entrega?.podeEmitirLaudo && pode('inspecao:operar') && <button className="btn btn-pri" onClick={() => setLaudo(true)}>Emitir Laudo Técnico</button>}
+          {dof?.podeDeclarar && pode('dof:declarar') && <button className={`btn ${entrega?.podeEmitirLaudo ? 'btn-acao' : 'btn-pri'}`} onClick={() => setDeclarar(true)}>Marcar DOF como declarada no Sinaflor</button>}
+        </>}
         fatos={<>
           <FatoChave rotulo="NF" valor={nf ? `${nf.numero} · série ${nf.serie}` : '—'} />
           <FatoChave rotulo="DOF" valor={dof ? <>{dof.numero} · {dof.declarado ? 'declarada' : <PrazoDof prazo={dof.prazoDeclaracao} nivel={dof.nivelPrazo} />}</> : '—'} />
@@ -84,6 +100,10 @@ export default function RecebimentoDetalhe() {
           <FatoChave rotulo="Fardos" valor={`${rec.fardosLidos.length} lidos de ${rec.fardosEsperados.length} esperados`} />
           <FatoChave rotulo="Recebido em" valor={dataHora(rec.recebidoEm)} />
           <FatoChave rotulo="Por" valor={rec.recebidoPor} />
+          <FatoChave rotulo="Parcela" valor={entrega ? `${entrega.parcela}ª${entrega.reentrega ? ' · reentrega' : ''}` : '—'} />
+          <FatoChave rotulo="Laudo Técnico" valor={entrega?.laudo
+            ? <span className="mono">{entrega.laudo.numero}</span>
+            : entrega?.prazoLaudo ? <PrazoDof prazo={entrega.prazoLaudo} nivel={entrega.nivelPrazoLaudo ?? 'ok'} /> : '—'} />
         </>}
       />
       {entrega?.situacao === 'recebida_parcial' && <Aviso tom="alerta">Entrega recebida em parte: {entrega.fardosIds.filter((x) => !entrega.fardosRecebidos.includes(x)).join(', ')} ainda em trânsito.</Aviso>}
@@ -117,6 +137,13 @@ export default function RecebimentoDetalhe() {
                 <dt>Prazo de declaração</dt><dd>{dof ? <PrazoDof prazo={dof.prazoDeclaracao} nivel={dof.nivelPrazo} declarado={!!dof.declarado} /> : '—'}</dd>
                 <dt>Declaração</dt><dd>{dof?.declarado ? `${dataHora(dof.declarado.quando)} · ${dof.declarado.quem}` : 'Ainda não declarada'}</dd>
                 <dt>PDF da DOF</dt><dd>{dof?.pdf?.nome ?? '—'}</dd>
+                <dt>Boletim de Inspeção</dt><dd>{entrega?.boletim ? `${entrega.boletim.numero} · ${data(entrega.boletim.data)} · ${cad.nomeEmpresa(entrega.boletim.empresaInspetoraId)}${entrega.boletim.arquivo ? ` · ${entrega.boletim.arquivo.nome}` : ''}` : '—'}</dd>
+                {entrega?.boletim?.itens.length ? <><dt>Aprovados no boletim</dt><dd>{entrega.boletim.itens.map((i) => `${cad.descreverTamanho(i.tamanhoId)} · ${cad.nomeEspecie(i.especieId)}: ${numero(i.quantidade)}`).join('; ')}</dd></> : null}
+                <dt>Relatório Técnico</dt><dd>{entrega?.relatorioTecnico ? `${entrega.relatorioTecnico.numero} · ${data(entrega.relatorioTecnico.data)}${entrega.relatorioTecnico.arquivo ? ` · ${entrega.relatorioTecnico.arquivo.nome}` : ''}` : '—'}</dd>
+                <dt>Canhoto da NF</dt><dd>{rec.canhoto?.nome ?? 'Sem foto'} (recebimento provisório em {dataHora(rec.recebidoEm)})</dd>
+                <dt>Laudo Técnico</dt><dd>{entrega?.laudo
+                  ? `${entrega.laudo.numero} · ${dataHora(entrega.laudo.emitidoEm)} · ${entrega.laudo.emitidoPor} · ${numero(entrega.laudo.aprovados)} aprovados, ${numero(entrega.laudo.reprovados)} reprovados`
+                  : entrega?.prazoLaudo ? `A emitir até ${data(entrega.prazoLaudo)} (20 dias úteis da entrega)` : '—'}</dd>
               </dl>
               <TabelaVolumes volumes={entrega?.divergenciaVolume ?? rec.divergenciaVolume} legenda="Volume documental, nominal e medido por espécie" />
               <p className="mudo">Divergência acumulada da entrega (DOF × tudo o que já chegou), recalculada a cada recebimento e depois da inspeção.</p>
@@ -143,6 +170,11 @@ export default function RecebimentoDetalhe() {
           { icone: 'local', tipo: 'Local de espera', valor: cad.codigoLocal(rec.localEsperaId), para: `/locais/${cad.codigoLocal(rec.localEsperaId)}` },
         ]} />
       </div>
+      <ConfirmModal
+        titulo="Emitir Laudo Técnico" aberto={laudo} carregando={declarando} rotuloConfirmar="Emitir laudo"
+        mensagem={entrega ? `Emitir o Laudo Técnico de aprovação da entrega da NF ${entrega.nfNumero}? Ele registra os aprovados e reprovados da inspeção e conclui a entrada.` : ''}
+        aoConfirmar={() => void emitirLaudo()} aoCancelar={() => setLaudo(false)}
+      />
       <ConfirmModal
         titulo="Declarar a DOF no Sinaflor" aberto={declarar} carregando={declarando} rotuloConfirmar="Marcar como declarada"
         mensagem={dof ? `Confirma que a DOF ${dof.numero} foi declarada no Sinaflor? Fica registrado quem marcou e quando.` : ''}

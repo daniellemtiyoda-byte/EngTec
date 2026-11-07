@@ -13,7 +13,7 @@ import { useToast } from '../components/Toast';
 import { PROTOCOLO_INSPECTOR } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
 import { linkQr, RE_FARDO, type CodigoLido } from '../dominio/identificacao';
-import { RESULTADO_INSPECAO, rotuloCategoria, SITUACAO_FARDO } from '../dominio/rotulos';
+import { ordinalClasse, RESULTADO_INSPECAO, rotuloCategoria, SITUACAO_FARDO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { useTelaPequena } from '../hooks/useTelaPequena';
@@ -96,7 +96,7 @@ export default function InspecaoFardo() {
   const podeRegistrar = operar && (aberta || naoLocalizados.length > 0);
   const demonstracao = !!parametros.dados?.modoDemonstracao;
   const enderecoInspector = `${PROTOCOLO_INSPECTOR}?${new URLSearchParams({
-    fardo: f.id, especie: item.especie.nomeCientifico, tamanho: item.tamanho.codigo, quantidade: String(dormentes.length), retorno: linkQr('fardo', f.id),
+    fardo: f.id, especie: item.especie.nomeCientifico, classe: String(item.classe), tamanho: item.tamanho.codigo, quantidade: String(dormentes.length), retorno: linkQr('fardo', f.id),
   }).toString()}`;
 
   /** Leitura no modo "Registrar à mão": aceita só dormente deste fardo ainda sem conclusão. */
@@ -195,7 +195,7 @@ export default function InspecaoFardo() {
           <Link className="btn btn-sec" to={`/f/${f.id}`}>Página do fardo</Link>
         </>}
         fatos={<>
-          <FatoChave rotulo="Item" valor={`${item.especie.nomePopular} · ${item.tamanho.codigo}`} />
+          <FatoChave rotulo="Item" valor={`${item.tamanho.codigo} · ${ordinalClasse(item.classe)} classe · ${item.especie.nomePopular}`} />
           <FatoChave rotulo="Inspecionados" valor={`${numero(progresso.inspecionados)} de ${numero(progresso.total)}`} />
           <FatoChave rotulo="Local" valor={local ? local.codigo : '—'} para={local ? `/locais/${local.codigo}` : undefined} />
           <FatoChave rotulo="Recebido há" valor={f.idadeDias !== undefined ? dias(f.idadeDias) : '—'} />

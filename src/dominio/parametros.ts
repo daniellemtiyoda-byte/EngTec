@@ -3,7 +3,7 @@
  * regras valem no banco. Valores que a CPTM ainda vai definir NÃO ficam aqui: estão em `servicos.parametros`
  * (limite de dias em estoque, antecedência dos alertas de DOF, níveis de estoque, limites das categorias).
  */
-import type { Categoria, NivelPrazo, ResultadoInspecao, SituacaoSaldo, VereditoInspector } from '../types/models';
+import type { Categoria, NivelPrazo, RegrasAta, ResultadoInspecao, SituacaoParcela, SituacaoSaldo, VereditoInspector } from '../types/models';
 
 /** Divergência de volume acima disto (por espécie) gera alerta: regra da IN Ibama, não editável. */
 export const TOLERANCIA_VOLUME_PCT = 10;
@@ -16,6 +16,28 @@ export const LIMITES_CATEGORIA_PADRAO: [number, number] = [80, 50];
 export const DORMENTES_POR_FARDO_PADRAO = 14;
 /** CTF Ibama vencendo em até tantos dias aparece em atenção (o vencido bloqueia o fornecedor). */
 export const DIAS_AVISO_CTF = 30;
+
+/**
+ * Regras da ata nos documentos da CPTM (Ata AR00224): padrão de cada nova ata, editáveis por ata. Pedido mínimo de
+ * 6.000 dormentes por contrato, até 6 parcelas de 3.000 a 6.000 (somando os itens), com prazos contados da
+ * assinatura: 1ª até 90 dias; 2ª do 91º ao 120º; 3ª do 121º ao 150º; 4ª do 151º ao 180º; 5ª do 181º ao 210º; 6ª do 211º ao 240º.
+ */
+export const REGRAS_ATA_PADRAO: RegrasAta = {
+  pedidoMinimo: 6000, maxParcelas: 6, parcelaMinima: 3000, parcelaMaxima: 6000,
+  prazosParcelas: [[0, 90], [91, 120], [121, 150], [151, 180], [181, 210], [211, 240]],
+};
+/** Vigência da ata de registro de preços. */
+export const VIGENCIA_ATA_MESES = 12;
+/** Laudo Técnico de aprovação: até 20 dias úteis contados da entrega (recebimento provisório). */
+export const PRAZO_LAUDO_DIAS_UTEIS = 20;
+export const ALERTA_LAUDO_DIAS_PADRAO: [number, number] = [5, 2];
+/** Recebimento definitivo do contrato: 15 dias após o laudo da última entrega. */
+export const DIAS_RECEBIMENTO_DEFINITIVO = 15;
+/** Reprovados: comunicação ao fornecedor em até 5 dias úteis e retirada em até 15 dias úteis da conclusão da inspeção. */
+export const PRAZO_COMUNICACAO_REPROVADOS_DIAS_UTEIS = 5;
+export const PRAZO_RETIRADA_REPROVADOS_DIAS_UTEIS = 15;
+/** Garantia do dormente: 5 anos a partir da entrega. */
+export const GARANTIA_ANOS = 5;
 
 const DIA_MS = 86_400_000;
 
@@ -71,6 +93,65 @@ export function somarDias(aaaammdd: string, dias: number): string {
 /** Dias de `de` até `ate` (AAAA-MM-DD); negativo se `ate` vier antes. */
 export function diasEntre(de: string, ate: string): number {
   return Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / DIA_MS);
+}
+
+/** Soma dias úteis (segunda a sexta) a uma data AAAA-MM-DD. Feriados ainda não entram (a CPTM pode fornecer o calendário). */
+export function somarDiasUteis(aaaammdd: string, dias: number): string {
+  let d = aaaammdd;
+  let falta = dias;
+  while (falta > 0) {
+    d = somarDias(d, 1);
+    const semana = new Date(`${d}T00:00:00Z`).getUTCDay();
+    if (semana !== 0 && semana !== 6) falta--;
+  }
+  return d;
+}
+
+/** Dias úteis de `de` até `ate` (negativo se `ate` já passou). */
+export function diasUteisEntre(de: string, ate: string): number {
+  if (ate < de) return -diasUteisEntre(ate, de);
+  let n = 0;
+  for (let d = de; d < ate; d = somarDias(d, 1)) {
+    const semana = new Date(`${somarDias(d, 1)}T00:00:00Z`).getUTCDay();
+    if (semana !== 0 && semana !== 6) n++;
+  }
+  return n;
+}
+
+/** Soma anos a uma data AAAA-MM-DD (29/02 vira 28/02 em ano não bissexto). */
+export function somarAnos(aaaammdd: string, anos: number): string {
+  const [a, m, d] = aaaammdd.split('-').map(Number);
+  const ultimo = new Date(Date.UTC(a + anos, m, 0)).getUTCDate();
+  return `${a + anos}-${String(m).padStart(2, '0')}-${String(Math.min(d, ultimo)).padStart(2, '0')}`;
+}
+
+/** Soma meses a uma data AAAA-MM-DD (vigência da ata). */
+export function somarMeses(aaaammdd: string, meses: number): string {
+  const [a, m, d] = aaaammdd.split('-').map(Number);
+  const alvo = new Date(Date.UTC(a, m - 1 + meses, 1));
+  const ultimo = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(d, ultimo)).padStart(2, '0')}`;
+}
+
+/** Janela de entrega da parcela `numero` (1, 2…): dias contados da assinatura do contrato, pelas regras da ata. */
+export function janelaParcela(assinatura: string, regras: RegrasAta, numero: number): { inicio: string; fim: string } {
+  const [de, ate] = regras.prazosParcelas[numero - 1] ?? regras.prazosParcelas[regras.prazosParcelas.length - 1];
+  return { inicio: somarDias(assinatura, de), fim: somarDias(assinatura, ate) };
+}
+
+/** Situação da parcela: entregue (no prazo ou com atraso) quando os recebidos alcançam a quantidade; senão, atrasada depois do fim. */
+export function situacaoParcela(quantidade: number, recebidos: number, fim: string, hoje: string, entregueEm?: string): SituacaoParcela {
+  if (recebidos >= quantidade && entregueEm) return entregueEm > fim ? 'entregue_com_atraso' : 'entregue';
+  return hoje > fim ? 'atrasada' : 'a_entregar';
+}
+
+/** Nível do prazo em dias úteis (laudo): vencido, crítico, atenção ou ok. */
+export function nivelPrazoUteis(prazo: string, hoje: string, [atencao, critico]: [number, number]): NivelPrazo {
+  if (hoje > prazo) return 'vencido';
+  const dias = diasUteisEntre(hoje, prazo);
+  if (dias <= critico) return 'critico';
+  if (dias <= atencao) return 'atencao';
+  return 'ok';
 }
 
 /** Data AAAA-MM-DD de um instante, no fuso de São Paulo. */

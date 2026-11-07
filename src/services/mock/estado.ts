@@ -1,7 +1,7 @@
 import { dataSP } from '../../dominio/parametros';
 import type {
   Anexo, Ata, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, ItemContrato, Local,
-  Movimentacao, NotaFiscal, Parametros, Recebimento, Rme, Tamanho, Tratamento, Usuario,
+  Movimentacao, NotaFiscal, ParcelaContrato, Parametros, Recebimento, Rme, Tamanho, Tratamento, Usuario,
 } from '../../types/models';
 import { ApiError } from '../http';
 
@@ -12,12 +12,16 @@ import { ApiError } from '../http';
 export type FornecedorReg = Omit<Fornecedor, 'bloqueado'>;
 export type TamanhoReg = Omit<Tamanho, 'volumeM3'>;
 export type LocalReg = Omit<Local, 'ocupacao' | 'fardos'>;
-export type ItemContratoReg = Pick<ItemContrato, 'id' | 'especieId' | 'tamanhoId' | 'tratamentoId' | 'quantidade'>;
-export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao'> & { situacao: 'vigente' | 'cancelado'; itens: ItemContratoReg[] };
+export type AtaReg = Omit<Ata, 'itens' | 'vigente'> & { itens: { tamanhoId: Id; quantidade: number }[] };
+export type ItemContratoReg = Pick<ItemContrato, 'id' | 'tamanhoId' | 'quantidade'>;
+export type ParcelaReg = Pick<ParcelaContrato, 'numero' | 'itens'>;
+export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao' | 'parcelas' | 'parcelasAtrasadas' | 'recebimentoDefinitivoEm'> & {
+  situacao: 'vigente' | 'cancelado'; itens: ItemContratoReg[]; parcelas: ParcelaReg[];
+};
 export type FardoReg = Omit<Fardo, 'saldo' | 'disponivel' | 'situacao' | 'aberto' | 'idadeDias' | 'acimaLimiteDias' | 'progressoInspecao'>;
 export type EmissaoReg = Omit<Emissao, 'dormentes' | 'situacao'>;
 export type DofReg = Omit<Dof, 'prazoDeclaracao' | 'diasParaPrazo' | 'nivelPrazo' | 'nfNumero' | 'fornecedorId' | 'contratoId' | 'entregaId' | 'situacaoDeclaracao' | 'podeDeclarar'>;
-export type EntregaReg = Omit<Entrega, 'nfNumero' | 'fornecedorId' | 'fardosRecebidos' | 'dormentes' | 'prazoDeclaracao' | 'nivelPrazo' | 'divergenciaVolume' | 'etapa' | 'comOcorrencia' | 'recebimentosIds'>;
+export type EntregaReg = Omit<Entrega, 'nfNumero' | 'fornecedorId' | 'fardosRecebidos' | 'dormentes' | 'prazoDeclaracao' | 'nivelPrazo' | 'divergenciaVolume' | 'etapa' | 'comOcorrencia' | 'recebimentosIds' | 'recebidaEm' | 'prazoLaudo' | 'nivelPrazoLaudo' | 'podeEmitirLaudo'>;
 
 export interface Estado {
   /** Muda quando o formato do estado muda: estado salvo de outra versão é descartado e a demonstração recomeça. */
@@ -31,7 +35,7 @@ export interface Estado {
   tratamentos: Tratamento[];
   empresasInspetoras: EmpresaInspetora[];
   locais: LocalReg[];
-  atas: Ata[];
+  atas: AtaReg[];
   contratos: ContratoReg[];
   fardos: FardoReg[];
   dormentes: Dormente[];
@@ -48,7 +52,7 @@ export interface Estado {
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 5;
+export const VERSAO_ESTADO = 6;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }

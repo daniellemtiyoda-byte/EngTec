@@ -57,6 +57,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
   const [lendo, setLendo] = useState(false);
   const [cadastrando, setCadastrando] = useState(false);
   const [conforme, setConforme] = useState(true);
+  const [canhoto, setCanhoto] = useState<File>();
   const [ocorrencias, setOcorrencias] = useState<LinhaOcorrencia[]>([]);
   const [localId, setLocalId] = useState('');
   const [previa, setPrevia] = useState<PreviaRecebimento>();
@@ -72,7 +73,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
 
   useEffect(() => {
     if (!aberto) return;
-    setPasso(entregaId ? 1 : 0); setEscolhida(entregaId ?? ''); setBusca(''); setLidos([]); setConforme(true); setOcorrencias([]);
+    setPasso(entregaId ? 1 : 0); setEscolhida(entregaId ?? ''); setBusca(''); setLidos([]); setConforme(true); setOcorrencias([]); setCanhoto(undefined);
     setLocalId(''); setPrevia(undefined); setJustificativa(''); setErros({}); setErroGeral(undefined);
     carregarEntregas(entregaId);
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -151,7 +152,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
       const declaradas: DadosOcorrencia[] = conforme ? [] : ocorrencias.map((o) => ({
         tipo: o.tipo, descricao: o.descricao, fardoId: o.fardoId || undefined, quantidade: o.tipo === 'falta' ? paraNumero(o.quantidade, true) : undefined, fotos: o.fotos,
       }));
-      const r = await servicos.recebimentos.receber(entrega.id, { fardosLidos: lidos, ocorrencias: declaradas, localEsperaId: localId, justificativaDivergencia: justificativa });
+      const r = await servicos.recebimentos.receber(entrega.id, { fardosLidos: lidos, ocorrencias: declaradas, localEsperaId: localId, justificativaDivergencia: justificativa, canhoto });
       aoReceber(r);
     } catch (err) {
       if (err instanceof ApiError && err.detalhes) {
@@ -251,6 +252,11 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
 
         {passo === 2 && entrega && (
           <div className="assistente-passo">
+            <div className="campo">
+              <label htmlFor="rec-canhoto">Canhoto da NF assinado (foto, opcional)</label>
+              <input id="rec-canhoto" type="file" accept="image/*" capture="environment" onChange={(e) => setCanhoto(e.target.files?.[0])} />
+              <span className="ajuda">Este é o recebimento provisório. O definitivo vem com o Laudo Técnico, depois da inspeção (até 20 dias úteis).</span>
+            </div>
             <div className="opcoes-ata" role="radiogroup" aria-label="Conferência">
               <label className="caixa caixa-grande"><input type="radio" name="rec-conf" checked={conforme} onChange={() => setConforme(true)} /> Conforme</label>
               <label className="caixa caixa-grande"><input type="radio" name="rec-conf" checked={!conforme} onChange={() => { setConforme(false); if (!ocorrencias.length) setOcorrencias([novaOcorrencia()]); }} /> Com ocorrência</label>

@@ -43,17 +43,21 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
   const [contratoId, setContratoId] = useState('');
   const [qtd, setQtd] = useState<Record<string, { fardos: string; porFardo: string }>>({});
   const [comDocumentos, setComDocumentos] = useState(true);
+  const [parcela, setParcela] = useState('');
+  const [reentrega, setReentrega] = useState(false);
   const [erro, setErro] = useState<string>();
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     if (!aberto) return;
-    setPasso(0); setErro(undefined); setQtd({}); setComDocumentos(true);
+    setPasso(0); setErro(undefined); setQtd({}); setComDocumentos(true); setParcela(''); setReentrega(false);
     setContratoId(contratos.find((c) => c.numero === inicial)?.id ?? '');
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const contrato = contratos.find((c) => c.id === contratoId);
-  const linhas = (contrato?.itens ?? []).map((i) => {
+  const daParcela = contrato?.parcelas.find((p) => String(p.numero) === parcela);
+  // Só os tamanhos da parcela escolhida.
+  const linhas = (contrato?.itens ?? []).filter((i) => daParcela?.itens.some((x) => x.tamanhoId === i.tamanhoId)).map((i) => {
     const q = qtd[i.id] ?? { fardos: '0', porFardo: String(porFardo) };
     const fardos = paraNumero(q.fardos, true) || 0;
     const por = paraNumero(q.porFardo, true) || 0;
@@ -65,6 +69,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
   function avancar() {
     setErro(undefined);
     if (passo === 0 && !contrato) { setErro('Escolha o contrato.'); return; }
+    if (passo === 0 && !daParcela) { setErro('Escolha a parcela do cronograma.'); return; }
     if (passo === 1) {
       if (!totalFardos) { setErro('Informe ao menos um fardo.'); return; }
       if (linhas.some((l) => l.fardos > 0 && (l.por < 1 || l.por > 50))) { setErro('De 1 a 50 dormentes por fardo.'); return; }
@@ -78,7 +83,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
     setEnviando(true); setErro(undefined);
     try {
       const em = await servicos.simulador.emitir({
-        contratoId: contrato.id, comDocumentos,
+        contratoId: contrato.id, parcela: Number(parcela), reentrega, comDocumentos,
         itens: linhas.filter((l) => l.fardos > 0).map((l) => ({ itemContratoId: l.item.id, fardos: l.fardos, dormentesPorFardo: l.por })),
       });
       aoGerar(em);
@@ -104,11 +109,21 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
       {passo === 0 && (
         <div className="campo">
           <label htmlFor="sim-contrato">Contrato vigente<span className="obrig" aria-hidden="true"> *</span></label>
-          <select id="sim-contrato" value={contratoId} onChange={(e) => setContratoId(e.target.value)}>
+          <select id="sim-contrato" value={contratoId} onChange={(e) => { setContratoId(e.target.value); setParcela(''); }}>
             <option value="">Selecione…</option>
             {contratos.map((c) => <option key={c.id} value={c.id}>{c.numero} · {cad.nomeFornecedor(c.fornecedorId)}</option>)}
           </select>
-          <span className="ajuda">Os IDs continuam a sequência do contrato: nenhum se repete entre entregas.</span>
+          <span className="ajuda">Os IDs continuam a sequência do contrato: nenhum se repete entre entregas. Espécie, classe e tratamento de cada fardo são atribuídos pelo simulador, entre as espécies que o fornecedor fornece.</span>
+          {contrato && (
+            <>
+              <label htmlFor="sim-parcela">Parcela do cronograma<span className="obrig" aria-hidden="true"> *</span></label>
+              <select id="sim-parcela" value={parcela} onChange={(e) => setParcela(e.target.value)}>
+                <option value="">Selecione…</option>
+                {contrato.parcelas.map((p) => <option key={p.numero} value={p.numero}>{p.numero}ª · {numero(p.recebidos)} de {numero(p.quantidade)} · até {data(p.fim)}</option>)}
+              </select>
+              <label className="caixa"><input type="checkbox" checked={reentrega} onChange={(e) => setReentrega(e.target.checked)} /> Reentrega (reposição de reprovados)</label>
+            </>
+          )}
         </div>
       )}
       {passo === 1 && contrato && (
@@ -116,14 +131,14 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
           {linhas.map((l) => (
             <li key={l.item.id} className={l.passou ? 'invalido' : undefined}>
               <div>
-                <strong>{cad.descreverItem(l.item)}</strong>
+                <strong>{cad.descreverTamanho(l.item.tamanhoId)}</strong>
                 <span className="mudo">Saldo a emitir: {numero(l.item.saldoAEmitir)} de {numero(l.item.quantidade)}</span>
               </div>
               <label className="campo-contador"><span>Fardos</span>
-                <Contador rotulo={`${cad.descreverItem(l.item)}: fardos`} valor={l.q.fardos} min={0} max={50} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, fardos: v } }))} />
+                <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: fardos`} valor={l.q.fardos} min={0} max={50} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, fardos: v } }))} />
               </label>
               <label className="campo-contador"><span>Dormentes por fardo</span>
-                <Contador rotulo={`${cad.descreverItem(l.item)}: dormentes por fardo`} valor={l.q.porFardo} min={1} max={50} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, porFardo: v } }))} />
+                <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: dormentes por fardo`} valor={l.q.porFardo} min={1} max={50} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, porFardo: v } }))} />
               </label>
               <span className={l.passou ? 'texto-critico' : 'mudo'}>{numero(l.total)} dormentes{l.passou && ' · passa do saldo a emitir'}</span>
             </li>
@@ -132,9 +147,9 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
       )}
       {passo === 2 && contrato && (
         <div className="resumo-revisao">
-          <p>Contrato <span className="mono">{contrato.numero}</span> · {cad.nomeFornecedor(contrato.fornecedorId)}</p>
+          <p>Contrato <span className="mono">{contrato.numero}</span> · {cad.nomeFornecedor(contrato.fornecedorId)} · {parcela}ª parcela{reentrega && ' · reentrega'}</p>
           <ul>
-            {linhas.filter((l) => l.fardos > 0).map((l) => <li key={l.item.id}>{cad.descreverItem(l.item)}: {l.fardos} fardo(s) × {l.por} = {numero(l.total)} dormentes</li>)}
+            {linhas.filter((l) => l.fardos > 0).map((l) => <li key={l.item.id}>{cad.descreverTamanho(l.item.tamanhoId)}: {l.fardos} fardo(s) × {l.por} = {numero(l.total)} dormentes</li>)}
           </ul>
           <p><strong>{numero(totalFardos)} fardos e {numero(totalDormentes)} dormentes</strong>, com IDs sequenciais do contrato, em trânsito.</p>
           <fieldset className="opcoes-radio">
@@ -148,18 +163,18 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
               <span><strong>Gerar só os fardos (sem NF e DOF)</strong><span className="mudo">Para demonstrar o fluxo completo: baixe o XML da NF aqui, cadastre NF e DOF em Entrada › NF e DOF e depois receba.</span></span>
             </label>
           </fieldset>
-          <p className="mudo">A NF e a DOF de exemplo têm validade de 7 dias; os dados da DOF ficam em "Ver DOF" na lista.</p>
+          <p className="mudo">A NF e a DOF de exemplo têm validade de 7 dias; com elas vão o Boletim de Inspeção e o Relatório Técnico. Os dados ficam em "Ver documentos" na lista.</p>
         </div>
       )}
     </Modal>
   );
 }
 
-/** Dados da DOF da emissão, para digitar no cadastro de NF e DOF (o volume vem do documento, não da NF). */
+/** Documentos de exemplo da emissão (DOF, Boletim de Inspeção e Relatório Técnico), para digitar no cadastro de NF e DOF. */
 function VerDof({ emissao, aoFechar }: { emissao?: Emissao; aoFechar: () => void }) {
   const cad = useCadastros();
   return (
-    <Modal titulo={`DOF ${emissao?.dof.numero ?? ''}`} aberto={!!emissao} aoFechar={aoFechar} rodape={<button type="button" className="btn btn-sec" onClick={aoFechar}>Fechar</button>}>
+    <Modal titulo={`Documentos da NF ${emissao?.nf.numero ?? ''}`} aberto={!!emissao} aoFechar={aoFechar} rodape={<button type="button" className="btn btn-sec" onClick={aoFechar}>Fechar</button>}>
       {emissao && (
         <div className="resumo-revisao">
           <p>DOF de exemplo que acompanha a NF {emissao.nf.numero}. No cadastro de NF e DOF, o número vem do XML; a validade e o volume por espécie são digitados deste documento.</p>
@@ -168,6 +183,9 @@ function VerDof({ emissao, aoFechar }: { emissao?: Emissao; aoFechar: () => void
             <dt>Validade</dt><dd>{data(emissao.dof.validade)}</dd>
             {emissao.dof.volumes.map((v) => [<dt key={`t${v.especieId}`}>{cad.nomeEspecie(v.especieId)}</dt>, <dd key={`d${v.especieId}`} className="al-right">{m3(v.volumeM3)}</dd>])}
           </dl>
+          <p><strong>Boletim de Inspeção {emissao.boletim.numero}</strong> · {data(emissao.boletim.data)} · {cad.nomeEmpresa(emissao.boletim.empresaInspetoraId)}</p>
+          <ul>{emissao.boletim.itens.map((i) => <li key={`${i.tamanhoId}${i.especieId}`}>{cad.descreverTamanho(i.tamanhoId)} · {cad.nomeEspecie(i.especieId)}: {numero(i.quantidade)} aprovados</li>)}</ul>
+          <p><strong>Relatório Técnico {emissao.relatorioTecnico.numero}</strong> · {data(emissao.relatorioTecnico.data)}</p>
         </div>
       )}
     </Modal>
@@ -220,7 +238,7 @@ export default function Simulador() {
         acoesLinha={[
           { rotulo: 'Imprimir etiquetas', principal: true, aoClicar: (em) => nav(`/simulador/etiquetas/${em.id}`) },
           { rotulo: 'Baixar XML da NF', aoClicar: (em) => { baixarXml(em).catch((e) => notificar('erro', mensagemSegura(e))); } },
-          { rotulo: 'Ver DOF', aoClicar: setVerDof },
+          { rotulo: 'Ver documentos', aoClicar: setVerDof },
         ]}
       />
       <VerDof emissao={verDof} aoFechar={() => setVerDof(undefined)} />

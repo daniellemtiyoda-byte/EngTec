@@ -1,5 +1,5 @@
 import { idRme, RE_RME } from '../../dominio/identificacao';
-import type { Id, Rme, SeparacaoFardo, SugestaoSeparacao, Usuario } from '../../types/models';
+import type { Classe, Dormente, Id, ItemRme, Rme, SeparacaoFardo, SugestaoSeparacao, Usuario } from '../../types/models';
 import type { DadosRme, DadosSeparacao } from '../contracts';
 import { dormentesDoFardo, fardoView } from './consultas';
 import { achar, evento, falha, hoje, instante, novoId, type Ctx, type Estado } from './estado';
@@ -22,9 +22,12 @@ export function abrirRme(e: Estado, dados: DadosRme, solicitante: Usuario, ctx: 
   if (!dados.itens?.length) campos.itens = 'Informe ao menos um item.';
   const vistos = new Set<string>();
   dados.itens?.forEach((i, n) => {
-    const k = `${i.especieId}|${i.tamanhoId}`;
-    if (!e.especies.some((x) => x.id === i.especieId) || !e.tamanhos.some((x) => x.id === i.tamanhoId)) campos[`itens.${n}`] = 'Espécie ou tamanho não encontrado.';
-    else if (vistos.has(k)) campos[`itens.${n}`] = 'Item repetido: some as quantidades numa linha.';
+    const k = chaveItem(i);
+    if (!e.tamanhos.some((x) => x.id === i.tamanhoId)) campos[`itens.${n}`] = 'Escolha o tamanho.';
+    else if (i.classe !== 1 && i.classe !== 2) campos[`itens.${n}`] = 'Escolha a classe (1ª ou 2ª).';
+    else if (i.categoriaMinima !== undefined && ![1, 2, 3].includes(i.categoriaMinima)) campos[`itens.${n}`] = 'Categoria mínima 1, 2 ou 3 (ou qualquer aprovado).';
+    else if (i.especieId && !e.especies.some((x) => x.id === i.especieId)) campos[`itens.${n}`] = 'Espécie não encontrada.';
+    else if (vistos.has(k)) campos[`itens.${n}`] = 'Tamanho e classe repetidos: some as quantidades numa linha.';
     else if (!Number.isInteger(i.quantidade) || i.quantidade <= 0) campos[`itens.${n}`] = 'Quantidade em unidades, maior que zero.';
     vistos.add(k);
   });
@@ -33,7 +36,8 @@ export function abrirRme(e: Estado, dados: DadosRme, solicitante: Usuario, ctx: 
   const seq = e.rmes.map((r) => RE_RME.exec(r.numero)).filter((m) => m && Number(m[1]) === ano).reduce((max, m) => Math.max(max, Number(m![2])), 0) + 1;
   const rme: Rme = {
     id: novoId(e, 'rm'), numero: idRme(ano, seq), solicitanteId: solicitante.id, solicitanteNome: solicitante.nome,
-    destino: dados.destino.trim(), necessidadeEm: dados.necessidadeEm, itens: dados.itens.map((i) => ({ ...i })),
+    destino: dados.destino.trim(), necessidadeEm: dados.necessidadeEm,
+    itens: dados.itens.map((i) => ({ tamanhoId: i.tamanhoId, classe: i.classe, categoriaMinima: i.categoriaMinima || undefined, especieId: i.especieId || undefined, quantidade: i.quantidade })),
     situacao: 'aberta', criadoEm: instante(ctx), historico: [evento(ctx, 'emitido', `RME aberta para ${dados.destino.trim()}`)],
   };
   e.rmes.push(rme);
@@ -49,16 +53,23 @@ export function iniciarSeparacao(e: Estado, numero: string, ctx: Ctx): Rme {
   return r;
 }
 
-/** Item (espécie + tamanho) de um fardo, pelo item do contrato. */
+/** Um item de RME por tamanho + classe: é por eles que o fardo se liga ao item. */
+const chaveItem = (i: { tamanhoId: Id; classe: Classe }) => `${i.tamanhoId}|${i.classe}`;
+
+/** Tamanho (pelo item do contrato) e classe de um fardo. */
 function itemDoFardo(e: Estado, fardoId: Id) {
   const f = achar(e.fardos, (x) => x.id === fardoId, `Fardo ${fardoId}`);
   const item = achar(e.contratos.flatMap((c) => c.itens), (i) => i.id === f.itemContratoId, 'Item do contrato');
-  return { fardo: f, especieId: item.especieId, tamanhoId: item.tamanhoId };
+  return { fardo: f, tamanhoId: item.tamanhoId, classe: f.classe };
 }
 
+/** O dormente atende o item: espécie (se pedida) e categoria até a mínima pedida (1 é a melhor; sem mínima, qualquer aprovado). */
+const atende = (d: Dormente, it: ItemRme) => (!it.especieId || d.especieId === it.especieId) && (!it.categoriaMinima || (d.categoria ?? 9) <= it.categoriaMinima);
+
 /**
- * Sugestão: fardos abertos primeiro (do mais antigo ao mais novo), depois os demais do mais antigo ao mais novo,
- * só com dormentes disponíveis (em estoque, sem reserva); dentro do fardo, as menores sequências.
+ * Sugestão: fardos do tamanho e da classe pedidos (qualquer espécie, se a RME não pedir uma), abertos primeiro (do mais
+ * antigo ao mais novo), depois os demais do mais antigo ao mais novo, só com dormentes disponíveis (em estoque, sem
+ * reserva) que atendam à categoria mínima; dentro do fardo, as menores sequências.
  */
 export function sugerirSeparacao(e: Estado, numero: string, ctx: Ctx): SugestaoSeparacao {
   const r = acharRme(e, numero);
@@ -67,9 +78,9 @@ export function sugerirSeparacao(e: Estado, numero: string, ctx: Ctx): SugestaoS
   return {
     itens: r.itens.map((it) => {
       const doItem = candidatos
-        .filter((f) => { const i = itemDoFardo(e, f.id); return i.especieId === it.especieId && i.tamanhoId === it.tamanhoId; })
+        .filter((f) => { const i = itemDoFardo(e, f.id); return i.tamanhoId === it.tamanhoId && i.classe === it.classe && (!it.especieId || f.especieId === it.especieId); })
         .sort((a, b) => Number(b.aberto) - Number(a.aberto) || (a.recebidoEm ?? '').localeCompare(b.recebidoEm ?? '') || a.id.localeCompare(b.id));
-      const livresDo = (id: Id) => dormentesDoFardo(e, id).filter((d) => d.situacao === 'em_estoque').map((d) => d.id).sort();
+      const livresDo = (id: Id) => dormentesDoFardo(e, id).filter((d) => d.situacao === 'em_estoque' && atende(d, it)).map((d) => d.id).sort();
       let falta = it.quantidade;
       const fardos: SugestaoSeparacao['itens'][number]['fardos'] = [];
       for (const f of doItem) {
@@ -78,8 +89,8 @@ export function sugerirSeparacao(e: Estado, numero: string, ctx: Ctx): SugestaoS
         fardos.push({ fardoId: f.id, dormentesIds: pega, aberto: f.aberto, idadeDias: f.idadeDias, localId: f.localId });
         falta -= pega.length;
       }
-      const candidatosDoItem = doItem.map((f) => ({ fardoId: f.id, dormentesIds: livresDo(f.id), aberto: f.aberto, idadeDias: f.idadeDias, localId: f.localId }));
-      return { especieId: it.especieId, tamanhoId: it.tamanhoId, quantidade: it.quantidade, fardos, candidatos: candidatosDoItem, faltam: Math.max(0, falta) };
+      const candidatosDoItem = doItem.map((f) => ({ fardoId: f.id, dormentesIds: livresDo(f.id), aberto: f.aberto, idadeDias: f.idadeDias, localId: f.localId })).filter((f) => f.dormentesIds.length);
+      return { ...it, fardos: fardos.filter((f) => f.dormentesIds.length), candidatos: candidatosDoItem, faltam: Math.max(0, falta) };
     }),
   };
 }
@@ -99,15 +110,17 @@ export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[
   const usados = new Set<Id>();
   const totalPorItem = new Map<string, number>();
   const linhas: SeparacaoFardo[] = separacao.map((s, n) => {
-    const { fardo, especieId, tamanhoId } = itemDoFardo(e, s.fardoId);
-    const k = `${especieId}|${tamanhoId}`;
-    if (!r.itens.some((i) => `${i.especieId}|${i.tamanhoId}` === k)) campos[`separacao.${n}`] = `O fardo ${fardo.id} não é de um item desta RME.`;
+    const { fardo, tamanhoId, classe } = itemDoFardo(e, s.fardoId);
+    const k = chaveItem({ tamanhoId, classe });
+    const it = r.itens.find((i) => chaveItem(i) === k);
+    if (!it) campos[`separacao.${n}`] = `O fardo ${fardo.id} não é do tamanho e da classe de um item desta RME.`;
     const ids = [...new Set(s.dormentesIds.map((x) => x.trim().toUpperCase()))];
     if (!ids.length) campos[`separacao.${n}`] = `Nenhum dormente do fardo ${fardo.id}.`;
     for (const id of ids) {
       const d = e.dormentes.find((x) => x.id === id);
       if (!d || d.fardoId !== fardo.id) campos[`separacao.${n}`] = `O dormente ${id} não é do fardo ${fardo.id}.`;
       else if (d.situacao !== 'em_estoque') campos[`separacao.${n}`] = `O dormente ${id} não está disponível (${d.situacao}).`;
+      else if (it && !atende(d, it)) campos[`separacao.${n}`] = `O dormente ${id} não atende ao item (espécie ou categoria mínima).`;
       else if (usados.has(id)) campos[`separacao.${n}`] = `O dormente ${id} aparece duas vezes.`;
       usados.add(id);
     }
@@ -117,7 +130,7 @@ export function separarRme(e: Estado, numero: string, separacao: DadosSeparacao[
     return { fardoId: fardo.id, dormentesIds: ids, seguiuSugestao, justificativa: seguiuSugestao ? undefined : s.justificativa?.trim() };
   });
   r.itens.forEach((i, n) => {
-    const total = totalPorItem.get(`${i.especieId}|${i.tamanhoId}`) ?? 0;
+    const total = totalPorItem.get(chaveItem(i)) ?? 0;
     if (total !== i.quantidade) campos[`itens.${n}`] = `Separados ${total} de ${i.quantidade}: a quantidade tem de bater com a pedida.`;
   });
   if (Object.keys(campos).length) falha(422, 'Confira a separação.', campos);
