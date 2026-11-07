@@ -15,11 +15,14 @@ export default function Login() {
   const [erro, setErro] = useState<string>();
   const [enviando, setEnviando] = useState(false);
 
+  // No Supabase o login é pelo e-mail cadastrado em Authentication → Users.
+  const porEmail = !env.USE_MOCK && !!env.SUPABASE_URL;
+
   if (usuario) return <Navigate to="/" replace />;
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    const v = { u: u.trim() ? undefined : 'Informe o usuário.', s: s ? undefined : 'Informe a senha.' };
+    const v = { u: u.trim() ? undefined : porEmail ? 'Informe o e-mail.' : 'Informe o usuário.', s: s ? undefined : 'Informe a senha.' };
     setErros(v);
     setErro(undefined);
     if (v.u || v.s) return;
@@ -55,8 +58,8 @@ export default function Login() {
           )}
           {erro && <div className="aviso aviso-critico" role="alert">{erro}</div>}
           <div className="campo">
-            <label htmlFor="usuario">Usuário</label>
-            <input id="usuario" value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" aria-invalid={!!erros.u} maxLength={80} />
+            <label htmlFor="usuario">{porEmail ? 'E-mail' : 'Usuário'}</label>
+            <input id="usuario" type={porEmail ? 'email' : 'text'} value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" aria-invalid={!!erros.u} maxLength={80} />
             {erros.u && <span className="erro-campo">{erros.u}</span>}
           </div>
           <div className="campo">

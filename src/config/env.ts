@@ -5,6 +5,10 @@ export const env = {
   USE_MOCK: import.meta.env.VITE_USE_MOCK === 'true',
   LOGO_URL: (import.meta.env.VITE_LOGO_URL as string | undefined) || '/assets/logo.svg',
   UPLOAD_MAX_MB: Number((import.meta.env.VITE_UPLOAD_MAX_MB as string | undefined) ?? 10) || 10,
+  // Supabase (services/supabase). A chave "anon" é pública por definição: quem protege os dados é a RLS do banco.
+  // Nunca coloque aqui a chave service_role nem a senha do banco.
+  SUPABASE_URL: ((import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '').replace(/\/$/, ''),
+  SUPABASE_ANON_KEY: (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? '',
 };
 
 /**

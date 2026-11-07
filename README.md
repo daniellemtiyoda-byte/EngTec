@@ -5,8 +5,8 @@ Gestão de dormentes ferroviários de madeira.
 Interface web (React + TypeScript + Vite) do sistema de gestão de dormentes de madeira.
 **Escopo:** apenas front-end. Back-end, persistência, autenticação real e visão computacional são de outros integrantes.
 
-> ⚠️ **Estado atual:** navegável com **dados simulados**. Nada aqui indica que o sistema completo esteja operacional:
-> back-end, persistência, autenticação e visão computacional continuam pendentes.
+> ⚠️ **Estado atual:** navegável com **dados simulados** ou com o **banco no Supabase** (`supabase/`, ver
+> [docs/BANCO-DE-DADOS.md](docs/BANCO-DE-DADOS.md)). A API própria do back-end e a visão computacional continuam pendentes.
 
 ## Executar
 
@@ -32,7 +32,9 @@ O logo do Holz Trilho ainda está em desenvolvimento. Quando estiver pronto, col
 | Variável | Função |
 |---|---|
 | `VITE_API_URL` | URL base do back-end (sem barra final) |
-| `VITE_USE_MOCK` | `true` = serviços simulados; ausente ou qualquer outro valor = API real (falha segura) |
+| `VITE_USE_MOCK` | `true` = serviços simulados; ausente ou qualquer outro valor = Supabase (se configurado) ou API real |
+| `VITE_SUPABASE_URL` | URL do projeto no Supabase (Project Settings → API); preenchida, o app usa o banco do Supabase |
+| `VITE_SUPABASE_ANON_KEY` | chave **anon public** do Supabase (pública por definição; nunca a `service_role`) |
 | `VITE_LOGO_URL` | caminho do arquivo do logo |
 | `VITE_UPLOAD_MAX_MB` | limite de upload no navegador (o servidor valida de novo) |
 
@@ -50,14 +52,23 @@ src/
     contracts.ts           interface única `Servicos`
     endpoints.ts           endpoints PROVISÓRIOS (pendentes de confirmação)
     http.ts                único ponto de HTTP + tratamento de erros
-    real/                  implementação HTTP
+    real/                  implementação HTTP (API própria)
+    supabase/              implementação com o banco no Supabase
     mock/                  dados e serviços simulados
     index.ts               escolhe mock ou real
   components/              Layout, ListPage (tabela/filtros/paginação), FormModal, Modal, UploadModal, gráficos, estados, toasts
   contexts/                autenticação (somente memória)
   pages/                   16 telas
 docs/CONTRATOS-API.md      contratos e checklist para o back-end
+docs/BANCO-DE-DADOS.md     banco no Supabase: como aplicar e mapa com os serviços
+supabase/                  migrações, dados iniciais e script de limpeza do banco
 ```
+
+## Usar o banco no Supabase
+
+1. No SQL Editor do projeto, rode em ordem os 4 arquivos de `supabase/migrations/` e depois `supabase/seed.sql`.
+2. Crie os usuários em Authentication → Users e dê os papéis (`insert into usuario_papeis ...`, ver `docs/BANCO-DE-DADOS.md`).
+3. No `.env.local`: `VITE_USE_MOCK=false`, `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`; reinicie o `npm run dev`. O login é pelo e-mail.
 
 ## Integrar um módulo real
 
@@ -82,7 +93,7 @@ sessão apenas em memória (sem `localStorage`); use HTTPS nos ambientes implant
 
 ## Pendências conhecidas
 
-- Back-end, autenticação e visão computacional reais (não existem neste repositório).
+- API própria do back-end e visão computacional reais (não existem neste repositório; o Supabase cobre a persistência e o login).
 - Tela dedicada de registro de contagem/divergências do inventário (serviços prontos).
 - Administração de usuários somente leitura.
 - Testes automatizados.
