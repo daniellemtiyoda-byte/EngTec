@@ -15,7 +15,7 @@ import { SITUACAO_ENTREGA } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import { mensagemSegura } from '../services/http';
+import { mensagemSegura } from '../services/erros';
 import type { Dof, Entrega, NotaFiscal } from '../types/models';
 import { data, dataHora, numero } from '../utils/format';
 

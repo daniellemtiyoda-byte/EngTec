@@ -4,7 +4,7 @@ import { REGRAS_ATA_PADRAO, VIGENCIA_ATA_MESES, dataSP, janelaParcela, somarDias
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import type { DadosParcela } from '../services/contracts';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import type { Contrato, RegrasAta } from '../types/models';
 import { data, numero, paraNumero } from '../utils/format';
 import { Modal } from './Modal';

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAsync } from '../hooks/useAsync';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import type { Categoria, Classe, Rme, TipoDestino } from '../types/models';
 import { CATEGORIAS, TIPO_DESTINO_OPCOES } from '../dominio/opcoes';
 import { ordinalClasse, USO_TAMANHO } from '../dominio/rotulos';

@@ -2,8 +2,13 @@ import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../contexts/AuthContext';
-import { PERFIS, PERFIS_LISTA } from '../dominio/permissoes';
-import { mensagemSegura } from '../services/http';
+import { env } from '../config/env';
+import { PERFIS, PERFIS_LISTA, type Perfil } from '../dominio/permissoes';
+import { mensagemSegura } from '../services/erros';
+
+const SUPABASE = env.FONTE_DADOS === 'supabase';
+/** No Supabase, os atalhos preenchem o e-mail das contas de demonstração (a senha é a definida no painel). */
+const valorDoAtalho = (p: Perfil) => (SUPABASE ? `${p}@example.com` : p);
 
 export default function Login() {
   const { usuario, entrar } = useAuth();
@@ -19,7 +24,7 @@ export default function Login() {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    const v = { u: u.trim() ? undefined : 'Informe o usuário.', s: s ? undefined : 'Informe a senha.' };
+    const v = { u: u.trim() ? undefined : SUPABASE ? 'Informe o e-mail.' : 'Informe o usuário.', s: s ? undefined : 'Informe a senha.' };
     setErros(v);
     setErro(undefined);
     if (v.u || v.s) return;
@@ -50,19 +55,19 @@ export default function Login() {
       <main className="login-lado-form">
         <form className="login-form" onSubmit={enviar} noValidate>
           <h2>Entrar no sistema</h2>
-          {/* Login simulado até a Etapa 9 (Supabase Auth): o nome do usuário escolhe o perfil. */}
+          {/* Simulado: o nome do usuário escolhe o perfil. Supabase: e-mail e senha das contas criadas no painel. */}
           <div className="login-demo">
-            <p>Para entrar, use como usuário o nome de um perfil e qualquer senha:</p>
+            <p>{SUPABASE ? 'Contas de demonstração (use a senha definida para cada uma):' : 'Para entrar, use como usuário o nome de um perfil e qualquer senha:'}</p>
             <div className="login-perfis" role="group" aria-label="Preencher o usuário com um perfil">
               {PERFIS_LISTA.map((p) => (
-                <button key={p} type="button" className="chip" aria-pressed={u === p} onClick={() => { setU(p); setErros((x) => ({ ...x, u: undefined })); }}>{PERFIS[p].rotulo}</button>
+                <button key={p} type="button" className="chip" aria-pressed={u === valorDoAtalho(p)} onClick={() => { setU(valorDoAtalho(p)); setErros((x) => ({ ...x, u: undefined })); }}>{PERFIS[p].rotulo}</button>
               ))}
             </div>
           </div>
           {erro && <div className="aviso aviso-critico" role="alert">{erro}</div>}
           <div className="campo">
-            <label htmlFor="usuario">Usuário</label>
-            <input id="usuario" value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" aria-invalid={!!erros.u} maxLength={80} />
+            <label htmlFor="usuario">{SUPABASE ? 'E-mail' : 'Usuário'}</label>
+            <input id="usuario" type={SUPABASE ? 'email' : 'text'} value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" aria-invalid={!!erros.u} maxLength={120} />
             {erros.u && <span className="erro-campo">{erros.u}</span>}
           </div>
           <div className="campo">

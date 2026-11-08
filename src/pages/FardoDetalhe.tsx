@@ -18,7 +18,7 @@ import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { useTelaPequena } from '../hooks/useTelaPequena';
 import { servicos } from '../services';
-import { ApiError } from '../services/http';
+import { ApiError } from '../services/erros';
 import { cm, data, dataHora, dias, mesAno, numero } from '../utils/format';
 
 type AbaFardo = 'dormentes' | 'origem' | 'movimentacoes' | 'historico';

@@ -16,7 +16,7 @@ import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import type { Dormente, Fardo, MotivoPerda } from '../types/models';
-import { mensagemSegura } from '../services/http';
+import { mensagemSegura } from '../services/erros';
 import { data, dataHora, dias, hojeSP, numero } from '../utils/format';
 
 type AbaInspecao = 'fila' | 'nao_localizados' | 'reprovados';

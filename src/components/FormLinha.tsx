@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import { validarCampos, type Campo } from './FormModal';
 
 interface Props {

@@ -4,7 +4,7 @@ import { classeInferior, classeSugerida } from '../dominio/parametros';
 import { ordinalClasse, TIPO_DESTINO } from '../dominio/rotulos';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import type { Rme, SugestaoSeparacao } from '../types/models';
 import { dias, numero } from '../utils/format';
 import { Badge } from './Badge';

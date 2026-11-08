@@ -48,7 +48,7 @@ A arquitetura da v1 foi aproveitada: camada de serviços com contrato único (`s
 
 | Item | Situação após a Etapa 0 | Próximo passo |
 | --- | --- | --- |
-| `services/http.ts`, `real/index.ts` | `real/` virou stub na Etapa 2 (sem back-end próprio) e `endpoints.ts` saiu | Saem na Etapa 9 (Supabase); `ApiError` e `mensagemSegura` vão para um módulo próprio de erros |
+| `services/http.ts`, `real/index.ts` | `real/` virou stub na Etapa 2 (sem back-end próprio) e `endpoints.ts` saiu | Saíram na Etapa 9 (Supabase); `ApiError` e `mensagemSegura` estão em `services/erros.ts` |
 | `services/index.ts`, `contracts.ts`, `mock/index.ts`, `mock/util.ts`, `mock/data.ts` | Só com `auth` e o usuário de demonstração | Etapa 1: autenticação vira serviço separado; Etapa 2: serviços v2, regras e história de demonstração |
 | `config/env.ts` | Mantido | Etapa 4: `VITE_APP_URL`; Etapa 9: variáveis do Supabase |
 | `types/models.ts` | Só `Origem`, `Paginado`, `ListQuery`, `Usuario` | Etapa 2: modelo v2 (seção 5) |

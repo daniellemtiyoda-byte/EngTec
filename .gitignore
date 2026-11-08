@@ -6,3 +6,5 @@ dist
 inspecao/
 # Documentos de referência do SENAC (PDFs grandes); a especificação fica em docs/ESPECIFICACAO-FUNCIONAL.md
 doc_senac/
+# Configuração local do Claude Code (não vai para o repositório)
+.claude/

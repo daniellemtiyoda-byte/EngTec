@@ -38,7 +38,8 @@ export interface Usuario {
 }
 
 /** Arquivo anexado. No mock só o nome é guardado (sem `url`). */
-export interface Anexo { id: Id; nome: string; tipo: 'pdf' | 'xml' | 'imagem'; url?: string; enviadoEm: string; enviadoPor: string }
+/** `caminho`: onde o arquivo está no bucket privado "anexos" do Supabase (aberto por link temporário, `linkDoAnexo`). */
+export interface Anexo { id: Id; nome: string; tipo: 'pdf' | 'xml' | 'imagem'; url?: string; caminho?: string; enviadoEm: string; enviadoPor: string }
 
 export type TipoEvento =
   | 'criado' | 'alterado' | 'inativado' | 'reativado' | 'cancelado'

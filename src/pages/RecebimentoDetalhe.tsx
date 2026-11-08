@@ -16,7 +16,7 @@ import { SITUACAO_FARDO, TIPO_OCORRENCIA } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import { mensagemSegura } from '../services/http';
+import { mensagemSegura } from '../services/erros';
 import { data, dataHora, m3, numero, pct } from '../utils/format';
 
 type AbaRec = 'fardos' | 'documentos' | 'ocorrencias' | 'historico';

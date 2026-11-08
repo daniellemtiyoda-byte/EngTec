@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { mensagemSegura } from '../services/http';
+import { mensagemSegura } from '../services/erros';
 
 export function Carregando({ linhas = 5 }: { linhas?: number }) {
   return (

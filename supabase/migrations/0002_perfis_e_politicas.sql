@@ -4,8 +4,9 @@
 -- carga inicial (seed.sql) liga as quatro contas de demonstração aos seus perfis pelo e-mail.
 -- As permissões são as mesmas de src/dominio/permissoes.ts. A tela só esconde botões; quem garante é o banco:
 --   · leitura: qualquer usuário ativo com sessão (como o mock);
---   · escrita: nunca direto nas tabelas operacionais, só pelas funções do banco (0005), que conferem a permissão;
---     cadastros, parâmetros e perfis aceitam escrita direta de quem tem a permissão.
+--   · escrita: nunca direto nas tabelas, só pelas funções do banco (0005, 0006), que conferem a permissão, validam
+--     as regras, gravam numa transação só e registram os eventos (histórico e auditoria). Não há política de
+--     inclusão, alteração nem exclusão: sem elas, o acesso direto às tabelas é só de leitura.
 
 create table public.perfis (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -27,6 +28,22 @@ begin
   return new;
 end $$;
 create trigger ao_criar_conta after insert on auth.users for each row execute function public.ao_criar_conta();
+
+-- Contas que já existiam no Auth antes desta migração (ex.: projeto do Supabase reaproveitado da v1) não passaram
+-- pelo gatilho: ganham o perfil agora, com a mesma regra. O seed.sql chama de novo, antes de ligar as contas de
+-- demonstração. Devolve quantos perfis criou.
+create or replace function public.criar_perfis_das_contas() returns integer
+language plpgsql security definer set search_path = public as $$
+declare v_n integer;
+begin
+  insert into public.perfis (id, nome, email)
+  select u.id, coalesce(u.raw_user_meta_data->>'nome', split_part(u.email, '@', 1)), u.email
+  from auth.users u where u.email is not null
+  on conflict do nothing;
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+select public.criar_perfis_das_contas();
 
 -- Permissões de cada perfil (tabela da seção 12 do plano; igual a PERFIS em src/dominio/permissoes.ts).
 create or replace function public.permissoes_do_perfil(p text) returns text[]
@@ -80,62 +97,9 @@ begin
   end loop;
 end $$;
 
--- Cadastros: quem edita cadastros inclui e altera (inativar = alterar `ativo`; não há exclusão).
-do $$
-declare t text;
-begin
-  foreach t in array array['especies','tamanhos','tratamentos','empresas_inspetoras','locais','fornecedores'] loop
-    execute format('create policy %I on public.%I for insert to authenticated with check (public.pode(''cadastros:editar''))', t || '_incluir', t);
-    execute format('create policy %I on public.%I for update to authenticated using (public.pode(''cadastros:editar'')) with check (public.pode(''cadastros:editar''))', t || '_alterar', t);
-  end loop;
-end $$;
-
--- Parâmetros, níveis e feriados: administrador.
-create policy parametros_alterar on public.parametros for update to authenticated using (public.pode('admin')) with check (public.pode('admin'));
-create policy niveis_incluir on public.niveis_estoque for insert to authenticated with check (public.pode('admin'));
-create policy niveis_alterar on public.niveis_estoque for update to authenticated using (public.pode('admin')) with check (public.pode('admin'));
-create policy niveis_excluir on public.niveis_estoque for delete to authenticated using (public.pode('admin'));
-create policy feriados_incluir on public.feriados for insert to authenticated with check (public.pode('admin'));
-create policy feriados_alterar on public.feriados for update to authenticated using (public.pode('admin')) with check (public.pode('admin'));
-create policy feriados_excluir on public.feriados for delete to authenticated using (public.pode('admin'));
-
--- Perfis: cada um lê o seu; o administrador lê todos e muda perfil e situação (as contas nascem no painel).
+-- Perfis: cada um lê o seu; o administrador lê todos (e muda perfil e situação pela função atualizar_usuario).
 alter table public.perfis enable row level security;
 create policy perfis_ler on public.perfis for select to authenticated using (id = auth.uid() or public.pode('admin'));
-create policy perfis_alterar on public.perfis for update to authenticated using (public.pode('admin')) with check (public.pode('admin'));
-
--- Eventos de auditoria dos cadastros, parâmetros e perfis (as funções de 0005 registram os das operações).
-create or replace function public.auditar_cadastro() returns trigger
-language plpgsql security definer set search_path = public as $$
-declare
-  entidade text := case tg_table_name when 'locais' then 'local' when 'fornecedores' then 'fornecedor' when 'perfis' then 'usuario'
-    when 'parametros' then 'parametros' else 'cadastro' end;
-  rotulo text := case tg_table_name when 'especies' then 'Espécie' when 'tamanhos' then 'Tamanho' when 'tratamentos' then 'Tratamento'
-    when 'empresas_inspetoras' then 'Empresa inspetora' when 'locais' then 'Local' when 'fornecedores' then 'Fornecedor'
-    when 'perfis' then 'Usuário' else 'Parâmetros' end;
-  nome text := coalesce(to_jsonb(new)->>'nome_cientifico', to_jsonb(new)->>'codigo', to_jsonb(new)->>'razao_social',
-    to_jsonb(new)->>'nome', to_jsonb(new)->>'preservativo', '');
-  tipo text := 'alterado';
-begin
-  if tg_op = 'INSERT' then tipo := 'criado';
-  elsif (to_jsonb(old)->>'ativo') = 'true' and (to_jsonb(new)->>'ativo') = 'false' then tipo := 'inativado';
-  elsif (to_jsonb(old)->>'ativo') = 'false' and (to_jsonb(new)->>'ativo') = 'true' then tipo := 'reativado';
-  elsif (to_jsonb(old)->>'situacao') = 'ativo' and (to_jsonb(new)->>'situacao') = 'inativo' then tipo := 'inativado';
-  elsif (to_jsonb(old)->>'situacao') = 'inativo' and (to_jsonb(new)->>'situacao') = 'ativo' then tipo := 'reativado';
-  end if;
-  insert into public.eventos (tipo, entidade, entidade_id, descricao, quem)
-  values (tipo, entidade, (to_jsonb(new)->>'id'), rotulo || ' ' || nome || ' ' || case tipo when 'criado' then 'cadastrado'
-    when 'inativado' then 'inativado' when 'reativado' then 'reativado' else 'alterado' end, public.quem());
-  return new;
-end $$;
-
-do $$
-declare t text;
-begin
-  foreach t in array array['especies','tamanhos','tratamentos','empresas_inspetoras','locais','fornecedores','perfis','parametros'] loop
-    execute format('create trigger %I after insert or update on public.%I for each row execute function public.auditar_cadastro()', t || '_auditar', t);
-  end loop;
-end $$;
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Apoio às funções das operações (0005 e 0006)

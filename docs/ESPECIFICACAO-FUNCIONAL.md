@@ -226,7 +226,11 @@ Os indicadores respondem aos que a CPTM pediu no plano de trabalho (tempo de loc
 | DOFs a declarar | DOFs com prazo vencido, em até 1 dia e em até 3 dias |
 | Rastreabilidade | Dormentes baixados com histórico completo do contrato à saída |
 
-**Pergunta em aberto:** obter a Especificação Técnica CPTM AD1956-4 para confirmar o padrão da plaquinha de identificação e a lista de espécies aceitas por classe.
+**Perguntas em aberto**
+
+- Obter a Especificação Técnica CPTM AD1956-4 para confirmar o padrão da plaquinha de identificação e a lista de espécies aceitas por classe.
+- **Cura na entrega:** a CPTM exige que o dormente já chegue curado? E qual prazo vale? Hoje o sistema aceita o dormente em cura e o deixa indisponível por 15 dias para CCA e CCB, contados da data de impregnação da marcação; se a cura for exigida na entrega, o recebimento passa a recusar (ou registrar como ocorrência) o fardo ainda em cura.
+- **Dormente baixado lido no inventário:** hoje é só registrado como inesperado, com justificativa, e continua baixado. Proposta: uma operação "reintegrar ao estoque", só do gestor, com justificativa obrigatória e evento, que devolve o dormente ao estoque no local em que foi lido e avisa que a destinação final já lançada no sistema DOF precisa ser retificada.
 
 **Melhorias futuras**
 

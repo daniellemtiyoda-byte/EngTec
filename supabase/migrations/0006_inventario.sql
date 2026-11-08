@@ -12,14 +12,14 @@ create or replace function public.no_patio(s text) returns boolean
 language sql immutable as $$ select s in ('aguardando_inspecao', 'em_estoque', 'reservado', 'reprovado') $$;
 
 -- Percentual com uma casa (100 quando não havia nada esperado), como no mock.
-create or replace function public.pct(n integer, de integer) returns numeric
+create or replace function public.pct(n numeric, de numeric) returns numeric
 language sql immutable as $$ select case when de = 0 then 100 else round(n * 100.0 / de, 1) end $$;
 
 create or replace function public.codigo_do_local(p_id text) returns text
 language sql stable set search_path = public as $$ select coalesce((select codigo from public.locais where id = p_id), '—') $$;
 
 -- ---------------------------------------------------------------------------------------------------------------
-create or replace function public.abrir_inventario(p_locais text[]) returns public.inventarios
+create or replace function public.abrir_inventario(p_locais text[]) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   v_ids text[] := array(select distinct unnest(coalesce(p_locais, '{}')));
@@ -58,7 +58,7 @@ begin
   perform public.registrar_evento('inventario', v_inv.id, 'criado',
     format('Inventário aberto: %s (%s dormentes esperados)', (select string_agg(public.codigo_do_local(x), ', ') from unnest(v_ids) x),
       (select count(*) from public.inventario_esperados where inventario_id = v_inv.id)), v_inv.numero);
-  return v_inv;
+  return to_jsonb(v_inv.id);
 end $$;
 
 -- ---------------------------------------------------------------------------------------------------------------
@@ -272,7 +272,7 @@ end $$;
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Fechamento: uma transação só. Se qualquer passo falhar, nada é gravado.
-create or replace function public.fechar_inventario(p_id text, p_justificativas jsonb default '{}') returns public.inventarios
+create or replace function public.fechar_inventario(p_id text, p_justificativas jsonb default '{}') returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   v_inv public.inventarios;
@@ -361,7 +361,7 @@ begin
     (select count(*) from jsonb_array_elements(v_res->'diferencas') x where x->>'grupo' = 'local_errado'),
     (select count(*) from jsonb_array_elements(v_res->'diferencas') x where x->>'grupo' = 'nao_encontrado'),
     (select count(*) from jsonb_array_elements(v_res->'diferencas') x where x->>'grupo' = 'inesperado')), v_ref);
-  return v_inv;
+  return to_jsonb(v_inv.id);
 end $$;
 
 -- Último inventário fechado de cada local ativo (relatórios do IBAMA e Inventário para vistoria).

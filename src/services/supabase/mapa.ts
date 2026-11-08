@@ -24,7 +24,6 @@ export const TABELAS = [
 // Estado → linhas
 // ---------------------------------------------------------------------------------------------------------------
 
-const seq = (id: string) => Number(id.slice(-6));
 const n = <T>(v: T | undefined) => (v === undefined ? null : v);
 
 export function paraLinhas(e: Estado): Linhas {
@@ -47,12 +46,9 @@ export function paraLinhas(e: Estado): Linhas {
     a.itens.forEach((i, ordem) => add('ata_itens', { ordem, ata_id: a.id, tamanho_id: i.tamanhoId, quantidade: i.quantidade }));
   }
   for (const c of e.contratos) {
-    const fardos = e.fardos.filter((f) => f.contratoId === c.id).map((f) => seq(f.id));
-    const dormentes = e.dormentes.filter((d) => d.contratoId === c.id).map((d) => seq(d.id));
     add('contratos', {
       id: c.id, numero: c.numero, ata_id: c.ataId, ano: c.ano, data_assinatura: c.dataAssinatura, gestor: c.gestor, situacao: c.situacao,
       motivo_cancelamento: n(c.motivoCancelamento), criado_em: c.criadoEm, criado_por: c.criadoPor,
-      proximo_fardo: Math.max(0, ...fardos) + 1, proximo_dormente: Math.max(0, ...dormentes) + 1,
     });
     c.itens.forEach((i, ordem) => add('contrato_itens', { ordem, id: i.id, contrato_id: c.id, tamanho_id: i.tamanhoId, quantidade: i.quantidade }));
     let ordem = 0;
@@ -199,6 +195,8 @@ const dt = (v: unknown) => (v == null ? undefined : String(v).slice(0, 10));
 const num = (v: unknown) => (v == null ? undefined : Number(v));
 const txt = (v: unknown) => (v == null ? undefined : String(v));
 const lista = (v: unknown) => (v as string[] | null) ?? [];
+/** Número de um id técnico (es0001 → 1); ids de outro formato ficam juntos, em ordem de texto. */
+const ordemDoId = (id: string) => { const m = /^[a-z]+(\d+)$/.exec(id); return m ? Number(m[1]) : 0; };
 const porOrdem = (a: Linha, b: Linha) => Number(a.ordem ?? 0) - Number(b.ordem ?? 0);
 function grupos(linhas: Linha[] = [], chave: string): Map<string, Linha[]> {
   const m = new Map<string, Linha[]>();
@@ -230,7 +228,12 @@ export function deLinhas(L: Linhas, perfis: Linha[] = [], dataBase = ''): Estado
   const invLei = grupos(t('inventario_leituras'), 'inventario_id');
   const invLoc = grupos(t('inventario_locais'), 'inventario_id');
   const invDif = grupos(t('inventario_diferencas'), 'inventario_id');
-  const porId = (a: Linha, b: Linha) => String(a.id).localeCompare(String(b.id));
+  // Ordem das listas = a de criação, como no mock: ids técnicos pelo número (ev9999 antes de ev10000); fardos pela
+  // emissão e dormentes pelo fardo (o fornecedor emite fardo a fardo, cada um com os seus dormentes).
+  const porId = (a: Linha, b: Linha) => ordemDoId(String(a.id)) - ordemDoId(String(b.id)) || String(a.id).localeCompare(String(b.id));
+  const posFardo = new Map([...t('fardos')].sort((a, b) => ordemDoId(String(a.emissao_id ?? '')) - ordemDoId(String(b.emissao_id ?? '')) || String(a.id).localeCompare(String(b.id)))
+    .map((f, i) => [String(f.id), i]));
+  const porFardo = (a: Linha, b: Linha) => (posFardo.get(String(a.fardo_id)) ?? 0) - (posFardo.get(String(b.fardo_id)) ?? 0) || String(a.id).localeCompare(String(b.id));
   const p = t('parametros')[0] ?? {};
 
   return {
@@ -290,7 +293,7 @@ export function deLinhas(L: Linhas, perfis: Linha[] = [], dataBase = ''): Estado
       boletim: (x.boletim ?? undefined) as never, relatorioTecnico: (x.relatorio_tecnico ?? undefined) as never, laudo: (x.laudo ?? undefined) as never,
       criadoEm: ts(x.criado_em)!, criadoPor: String(x.criado_por),
     })),
-    fardos: t('fardos').sort(porId).map((x) => limpo({
+    fardos: t('fardos').sort((a, b) => (posFardo.get(String(a.id)) ?? 0) - (posFardo.get(String(b.id)) ?? 0)).map((x) => limpo({
       id: String(x.id), contratoId: String(x.contrato_id), itemContratoId: String(x.item_contrato_id), especieId: String(x.especie_id),
       classe: Number(x.classe) as 1, tratamentoId: String(x.tratamento_id), usinaTratamento: String(x.usina_tratamento), dataTratamento: dt(x.data_tratamento)!,
       emissaoId: txt(x.emissao_id), quantidadeInicial: Number(x.quantidade_inicial), entregaId: txt(x.entrega_id), recebidoEm: ts(x.recebido_em),
@@ -303,7 +306,7 @@ export function deLinhas(L: Linhas, perfis: Linha[] = [], dataBase = ''): Estado
         comunicadoEm: ts(x.comunicado_em), comunicadoPor: txt(x.comunicado_por), retiradoEm: ts(x.retirado_em), retiradoPor: txt(x.retirado_por),
       }) : undefined,
     })),
-    dormentes: t('dormentes').sort(porId).map((x) => limpo({
+    dormentes: t('dormentes').sort(porFardo).map((x) => limpo({
       id: String(x.id), contratoId: String(x.contrato_id), itemContratoId: String(x.item_contrato_id), fardoId: String(x.fardo_id), especieId: String(x.especie_id),
       classe: Number(x.classe) as 1, tratamentoId: String(x.tratamento_id), usinaTratamento: String(x.usina_tratamento), dataTratamento: dt(x.data_tratamento)!,
       situacao: x.situacao as 'emitido', inspecaoId: txt(x.inspecao_id), categoria: num(x.categoria) as 1 | undefined,

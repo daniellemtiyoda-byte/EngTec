@@ -18,7 +18,7 @@ import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { useTelaPequena } from '../hooks/useTelaPequena';
 import { servicos } from '../services';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import type { Categoria, Inspecao, InspecaoFardo as DadosInspecaoFardo, ResultadoInspecao } from '../types/models';
 import { cm, dataHora, dias, numero } from '../utils/format';
 

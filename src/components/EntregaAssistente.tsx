@@ -4,7 +4,7 @@ import { NIVEL_PRAZO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import type { Entrega, Fardo } from '../types/models';
 import { arquivoInvalido, data, hojeSP, m3, numero, paraNumero } from '../utils/format';
 import { chaveAcessoValida, lerXmlNfe, mesmoCnpj } from '../utils/nfeXml';

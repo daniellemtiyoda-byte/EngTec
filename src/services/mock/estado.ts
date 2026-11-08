@@ -3,7 +3,7 @@ import type {
   Anexo, Ata, Contrato, DestinacaoFinal, Dof, Dormente, Emissao, EmpresaInspetora, EntidadeEvento, Entrega, Especie, Evento, Fardo, Fornecedor, Id, Inspecao, Inventario, ItemContrato, Local,
   Movimentacao, NotaFiscal, ParcelaContrato, Parametros, Perda, Recebimento, Rme, SaldoDofInformado, Tamanho, TipoEvento, Tratamento, Usuario,
 } from '../../types/models';
-import { ApiError } from '../http';
+import { ApiError } from '../erros';
 
 /*
  * Estado do mock: o que um banco guardaria. Os campos calculados dos modelos NÃO ficam aqui; `consultas.ts` os monta.

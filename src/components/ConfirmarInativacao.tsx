@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { mensagemSegura } from '../services/http';
+import { mensagemSegura } from '../services/erros';
 import { ConfirmModal } from './Modal';
 import { useToast } from './Toast';
 

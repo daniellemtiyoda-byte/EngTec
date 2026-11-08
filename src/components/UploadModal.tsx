@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { env } from '../config/env';
-import { mensagemSegura } from '../services/http';
+import { mensagemSegura } from '../services/erros';
 import { arquivoInvalido } from '../utils/format';
 import { Modal } from './Modal';
 

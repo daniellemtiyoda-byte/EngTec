@@ -12,7 +12,7 @@ import { RESULTADO_INSPECAO, rotuloCategoria, rotuloClasse, SITUACAO_DORMENTE, T
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import { ApiError } from '../services/http';
+import { ApiError } from '../services/erros';
 import { MARCA_EVENTO, MOTIVO_PERDA } from '../dominio/rotulos';
 import type { FichaDormente as Ficha } from '../types/models';
 import { cm, data, dataHora, mesAno, metros, urlSegura } from '../utils/format';

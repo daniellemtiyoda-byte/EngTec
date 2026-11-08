@@ -3,7 +3,7 @@ import { RE_FARDO, type CodigoLido } from '../dominio/identificacao';
 import { ordinalClasse, TIPO_LOCAL } from '../dominio/rotulos';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import type { Fardo, FardoDetalhe } from '../types/models';
 import { numero } from '../utils/format';
 import { BadgeDe } from './Badge';

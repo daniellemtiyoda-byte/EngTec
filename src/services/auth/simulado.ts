@@ -1,6 +1,6 @@
 import { PERFIS, PERFIS_LISTA, type Perfil } from '../../dominio/permissoes';
 import type { Usuario } from '../../types/models';
-import { ApiError } from '../http';
+import { ApiError } from '../erros';
 import type { ServicoAuth } from './contrato';
 
 const CHAVE = 'holz:sessao-demo';

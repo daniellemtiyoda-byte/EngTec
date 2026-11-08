@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import { arquivoInvalido, paraNumero } from '../utils/format';
 import { ConfirmModal, Modal } from './Modal';
 

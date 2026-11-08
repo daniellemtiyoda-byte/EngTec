@@ -9,7 +9,7 @@ import { idLocal } from '../dominio/identificacao';
 import { SITUACAO_CADASTRO, TIPO_LOCAL } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { servicos } from '../services';
-import { ApiError } from '../services/http';
+import { ApiError } from '../services/erros';
 import type { Fardo } from '../types/models';
 import { dataHora, dias, numero } from '../utils/format';
 

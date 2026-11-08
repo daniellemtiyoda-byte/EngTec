@@ -13,7 +13,7 @@ import { SITUACAO_EMISSAO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
-import { mensagemSegura } from '../services/http';
+import { mensagemSegura } from '../services/erros';
 import type { Contrato, Emissao } from '../types/models';
 import { data, dataHora, m3, numero, paraNumero } from '../utils/format';
 

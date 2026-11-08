@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import type { DadosOcorrencia, FaltaDormentes } from '../services/contracts';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import type { Entrega, PreviaRecebimento, Recebimento, TipoOcorrencia } from '../types/models';
 import { arquivoInvalido, data, numero, paraNumero } from '../utils/format';
 import { Badge, BadgeDe } from './Badge';

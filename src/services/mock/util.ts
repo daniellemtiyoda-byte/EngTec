@@ -1,5 +1,5 @@
 import type { ListQuery, Paginado } from '../../types/models';
-import { ApiError } from '../http';
+import { ApiError } from '../erros';
 
 /** Modo de teste dos estados da interface, lido do endereço: ?simular=erro (falha) ou ?simular=vazio (listas vazias). */
 export function modoSimulado(): 'erro' | 'vazio' | null {

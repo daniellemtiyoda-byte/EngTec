@@ -7,6 +7,7 @@ import ContratoDetalhe from './pages/ContratoDetalhe';
 import Inspecao from './pages/Inspecao';
 import InspecaoFardo from './pages/InspecaoFardo';
 import Documentos from './pages/Documentos';
+import Configuracoes from './pages/Configuracoes';
 import Contratos from './pages/Contratos';
 import EmConstrucao from './pages/EmConstrucao';
 import Estoque from './pages/Estoque';
@@ -98,7 +99,7 @@ export const ROTAS: Rota[] = [
   { caminho: '/cadastros', tela: Cadastros, rotulo: 'Cadastros', icone: 'building', grupo: 'Cadastros', permissoes: OPERACAO },
   { caminho: '/fornecedores/:id', tela: FornecedorDetalhe, rotulo: 'Fornecedor', icone: 'fabrica', grupo: 'Cadastros', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/usuarios', tela: emConstrucao('Usuários', 11), rotulo: 'Usuários', icone: 'users', grupo: 'Cadastros', permissoes: ['admin'] },
-  { caminho: '/configuracoes', tela: emConstrucao('Configurações', 11), rotulo: 'Configurações', icone: 'gear', grupo: 'Cadastros', permissoes: ['admin'] },
+  { caminho: '/configuracoes', tela: Configuracoes, rotulo: 'Configurações', icone: 'gear', grupo: 'Cadastros', permissoes: ['admin'] },
   // Interna: valida os padrões de lista e de objeto com dados fixos.
   { caminho: '/vitrine', tela: Vitrine, rotulo: 'Vitrine', icone: 'layers', grupo: 'Início', permissoes: ['admin'], foraDoMenu: true },
 ];

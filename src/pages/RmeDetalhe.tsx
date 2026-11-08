@@ -19,7 +19,7 @@ import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { useTelaPequena } from '../hooks/useTelaPequena';
 import { servicos } from '../services';
-import { ApiError, mensagemSegura } from '../services/http';
+import { ApiError, mensagemSegura } from '../services/erros';
 import type { Rme } from '../types/models';
 import { data, dataHora, numero } from '../utils/format';
 
