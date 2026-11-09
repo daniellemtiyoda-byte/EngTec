@@ -17,6 +17,7 @@ do modo simulado e valem no banco: o front esconder botões é só UX.
 | `supabase/migrations/0005_operacoes.sql` | uma função `security definer` por operação do app, com as mesmas regras, mensagens e eventos do modo simulado, numa transação só |
 | `supabase/migrations/0006_inventario.sql` | inventário físico por leitura de QR: abrir, ler, prévia e fechar |
 | `supabase/migrations/0007_demonstracao.sql` | modelo da demonstração, `deslocar_datas`, `carregar_demonstracao` (datas do dia em que roda) e `reiniciar_demonstracao` (só administrador) |
+| `supabase/migrations/0008_privilegios.sql` | privilégios explícitos, segunda camada além da RLS (ideia do banco do Erik): `anon` sem nada; `authenticated` só com `select` nas tabelas e views e `execute` só nas funções que o app chama e nas auxiliares de leitura das views e das políticas; objetos criados depois não ficam abertos a `anon` |
 | `supabase/seed.sql` | **gerado** por `npm run seed`: o modelo da história de demonstração (a mesma do modo simulado, mesmos IDs), a ligação das contas `<perfil>@example.com` aos perfis e a carga |
 | `supabase/seed_1.sql`, `seed_2.sql` | plano B, o mesmo conteúdo do `seed.sql` em duas partes, para o editor SQL que recusar os ~530 KB do arquivo inteiro |
 
@@ -45,7 +46,7 @@ No projeto do Supabase (o mesmo da v1), nesta ordem:
    ```
 
    Ele apaga as tabelas, o gatilho e as políticas de Storage da v1. As contas do Auth e os buckets antigos ficam.
-3. **Migrações:** no SQL Editor, um arquivo por vez, em ordem: `0001_tabelas.sql` a `0007_demonstracao.sql`. Cada
+3. **Migrações:** no SQL Editor, um arquivo por vez, em ordem: `0001_tabelas.sql` a `0008_privilegios.sql`. Cada
    um deve terminar sem erro. A `0002` já cria o perfil (requisitante) das contas que existiam no Auth.
 4. **Contas de demonstração:** Authentication › Users › **Add user › Create new user**, com **Auto Confirm User**
    marcado: `administrador@example.com`, `almoxarife@example.com`, `gestor@example.com`, `requisitante@example.com`
@@ -104,6 +105,13 @@ ficha sem novo login) e "Sair" a apaga. Sem `VITE_FONTE_DADOS`, o app volta ao m
 - **Escrita:** `rpc('<função>', argumentos)`, uma função por operação (nomes em `src/services/montagem.ts`). A função
   confere a permissão, valida as regras, grava numa transação só e registra os eventos. Não há política de inclusão,
   alteração nem exclusão nas tabelas: o acesso direto é só de leitura.
+- **Privilégios (0008), segunda camada:** mesmo que uma política RLS falte, `anon` não tem nenhum privilégio no
+  `public` e `authenticated` só tem `select` nas tabelas e views. O `execute` vai só às funções que o app chama e às
+  auxiliares que rodam como o usuário (as das views, das políticas e da `exportar_estado`: `ativo`, `pode`, `agora`,
+  `hoje`, `dia_sp`, `dia_util`, `somar_dias_uteis`, `nivel_prazo`, `liberacao_cura`). As internas ficam fechadas.
+  **Função nova:** se o app a chama, `grant execute ... to authenticated` na migração dela; se é interna, `revoke`
+  (o padrão do Supabase abre função nova a `authenticated`). O teste `privilegios.test.ts` confere a lista contra o
+  código do app.
 - **Erros de regra:** código `P0<status>` com DETAIL `{ status, campos }`, convertido em `ApiError` (mesma mensagem e
   mesmos campos do modo simulado).
 - **Arquivos:** enviados antes ao bucket `anexos` (`<pasta>/<uuid>/<arquivo>`); a função recebe `{ nome, tipo,
@@ -113,7 +121,7 @@ ficha sem novo login) e "Sair" a apaga. Sem `VITE_FONTE_DADOS`, o app volta ao m
 
 `npm test` aplica as migrações num Postgres em memória (PGlite, com o mínimo do Supabase) e roda a mesma suíte de
 regras do modo simulado contra as funções do banco, as views × as consultas do app, o mapa ida e volta e a carga:
-o seed em dia com a história, o banco igual ao que o modo simulado geraria em cada um de 15 dias seguidos, as contas
+os privilégios (anon sem nada, authenticated só leitura, funções liberadas = as do app), o seed em dia com a história, o banco igual ao que o modo simulado geraria em cada um de 15 dias seguidos, as contas
 que já existiam antes das migrações, a parada quando falta uma conta de demonstração e o plano B em duas partes.
 
 ## Pendências

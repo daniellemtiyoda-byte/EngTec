@@ -36,12 +36,12 @@ describe('views do banco × consultas do app', () => {
     const locais = await ler<Record<string, unknown>>(`select id, ocupacao, fardos from public.v_locais order by id`);
     expect(locais).toEqual(e.locais.map((l) => localView(e, l, hoje)).map((l) => ({ id: l.id, ocupacao: l.ocupacao, fardos: l.fardos })));
 
-    const dofs = await ler<Record<string, unknown>>(`select id, prazo_declaracao::text, dias_para_prazo, nivel_prazo, situacao_declaracao, pode_declarar from public.v_dofs order by public.ordem_id(id)`);
+    const dofs = await ler<Record<string, unknown>>(`select id, prazo_declaracao::text, dias_para_prazo, nivel_prazo, situacao_declaracao, pode_declarar from public.v_dofs order by substring(id from '[0-9]+$')::bigint`);
     expect(dofs).toEqual(e.dofs.map((d) => dofView(e, d, hoje)).map((d) => ({
       id: d.id, prazo_declaracao: d.prazoDeclaracao, dias_para_prazo: d.diasParaPrazo, nivel_prazo: d.nivelPrazo, situacao_declaracao: d.situacaoDeclaracao, pode_declarar: d.podeDeclarar,
     })));
 
-    const entregas = await ler<Record<string, unknown>>(`select id, prazo_laudo::text, pode_emitir_laudo, etapa from public.v_entregas order by public.ordem_id(id)`);
+    const entregas = await ler<Record<string, unknown>>(`select id, prazo_laudo::text, pode_emitir_laudo, etapa from public.v_entregas order by substring(id from '[0-9]+$')::bigint`);
     expect(entregas).toEqual(e.entregas.map((x) => entregaView(e, x, hoje)).map((x) => ({ id: x.id, prazo_laudo: x.prazoLaudo ?? null, pode_emitir_laudo: x.podeEmitirLaudo, etapa: x.etapa })));
 
     const estoque = await ler<Record<string, unknown>>(`select classe, tamanho_id, em_estoque, em_cura, liberacao_cura::text, aguardando_inspecao, reservado, nao_localizado, minimo, maximo, situacao

@@ -84,7 +84,7 @@ Passo a passo no projeto do Supabase (o mesmo da v1, que já tem contas no Auth)
 1. Desligar o cadastro aberto: Authentication › Sign In / Providers › **Allow new users to sign up** desmarcado.
 2. Banco já usado pela v1: rodar no SQL Editor o `reset.sql` do Erik (o texto está em `docs/BANCO-DE-DADOS.md`), que
    apaga o esquema `public`, o gatilho e as políticas de Storage da v1. Contas e buckets antigos ficam.
-3. Rodar no SQL Editor as migrações `0001` a `0007`, um arquivo por vez, em ordem.
+3. Rodar no SQL Editor as migrações `0001` a `0008`, um arquivo por vez, em ordem.
 4. Criar as quatro contas em Authentication › Users › Add user, com **Auto Confirm User**: `administrador@example.com`,
    `almoxarife@example.com`, `gestor@example.com` e `requisitante@example.com`.
 5. Rodar `supabase/seed.sql` (se o editor recusar o tamanho, `seed_1.sql` e depois `seed_2.sql`). Se faltar alguma

@@ -22,6 +22,7 @@ const SUPABASE_MINIMO = `
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
   create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid);
   alter table storage.objects enable row level security;
+  grant select, insert, update, delete on storage.objects to authenticated;
   grant usage on schema public, auth, storage to anon, authenticated;
   -- O Supabase dá aos papéis acesso a tudo o que for criado em public (quem decide são as políticas RLS e as funções);
   -- as migrações tiram o que não deve ficar aberto (revoke).
