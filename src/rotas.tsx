@@ -19,6 +19,7 @@ import FornecedorDetalhe from './pages/FornecedorDetalhe';
 import LocalDetalhe from './pages/LocalDetalhe';
 import Locais from './pages/Locais';
 import Painel from './pages/Painel';
+import Relatorios from './pages/Relatorios';
 import Inventarios from './pages/Inventarios';
 import InventarioDetalhe from './pages/InventarioDetalhe';
 import Movimentacoes from './pages/Movimentacoes';
@@ -72,6 +73,7 @@ const OPERACAO: Permissao[] = ['operacao:consultar'];
  */
 export const ROTAS: Rota[] = [
   { caminho: '/', tela: Painel, rotulo: 'Painel', icone: 'grid', grupo: 'Início', fim: true },
+  { caminho: '/relatorios', tela: Relatorios, rotulo: 'Relatórios', icone: 'clipboard', grupo: 'Início', permissoes: OPERACAO },
   { caminho: '/contratos', tela: Contratos, rotulo: 'Contratos', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO },
   { caminho: '/contratos/:numero', tela: ContratoDetalhe, rotulo: 'Contrato', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/simulador', tela: Simulador, rotulo: 'Simulador do fornecedor', icone: 'fabrica', grupo: 'Suprimento', permissoes: ['simulador:usar'], demo: true },
