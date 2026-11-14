@@ -480,7 +480,11 @@ span.codigo { font-weight: 600; color: var(--texto); }
 /* Leitor de QR */
 .leitor { display: flex; flex-direction: column; gap: var(--esp-3); }
 .leitor-camera { position: relative; background: #000; border-radius: var(--raio-grande); overflow: hidden; aspect-ratio: 4 / 3; max-height: 60vh; display: grid; place-items: center; }
-.leitor-camera video { width: 100%; height: 100%; object-fit: cover; }
+.leitor-camera video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Safari/iOS: sem altura definida (aspect-ratio), height:100% do vídeo cai no tamanho do fluxo (retrato 3:4) e a câmera sai cortada; o vídeo
+   absoluto preenche o contêiner. O isolamento corrige o canto arredondado + overflow no WebKit. */
+.leitor-camera { isolation: isolate; }
+.leitor-camera .leitor-lanterna, .leitor-camera .leitor-estado { z-index: 2; }
 .leitor-mira { position: absolute; inset: 18% 22%; border: 3px solid rgba(255, 255, 255, .9); border-radius: var(--raio-grande); box-shadow: 0 0 0 9999px rgba(0, 0, 0, .35); }
 .leitor-estado { position: absolute; inset: auto var(--esp-4); color: var(--texto-inverso); text-align: center; font-size: var(--fs-16); }
 .leitor-lanterna { position: absolute; right: var(--esp-3); bottom: var(--esp-3); }
@@ -700,3 +704,13 @@ span.codigo { font-weight: 600; color: var(--texto); }
 .inventario-grupo h3 { display: flex; align-items: center; gap: var(--esp-2); font-size: var(--fs-md, 16px); margin-bottom: var(--esp-2); }
 .inventario-grupo li { padding: var(--esp-2) 0; border-bottom: 1px solid var(--borda); }
 .inventario-grupo li p { margin: 2px 0 0; }
+
+/* Só Safari/iOS (WebKit no toque): a barra do navegador faz 100vh passar da área visível; dvh acompanha a barra. A câmera fica fixa no
+   topo do corpo da janela e a lista dos esperados e o "Digitar código" rolam por baixo, sem a câmera sair da tela. Chrome e computador não mudam. */
+@supports (-webkit-touch-callout: none) {
+  .leitor-camera { max-height: 50vh; max-height: 50dvh; position: sticky; top: 0; z-index: 3; }
+  .leitor-camera.leitor-camera-reduzida { max-height: 30vh; max-height: 30dvh; }
+  .modal-corpo:has(> .leitor) { padding-top: 0; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+  .leitor { gap: var(--esp-3); }
+  .leitor-camera { margin-top: var(--esp-3); }
+}

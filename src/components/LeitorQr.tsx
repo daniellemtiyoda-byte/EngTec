@@ -172,7 +172,7 @@ export function LeitorQr({ aberto, aoFechar, modo = 'navegar', continuo, aoLer, 
     <Modal titulo={titulo} aberto={aberto} aoFechar={fechar} largo>
       <div className="leitor">
         <div className={`leitor-camera${cameraReduzida ? ' leitor-camera-reduzida' : ''}`}>
-          <video ref={video} playsInline muted aria-label="Imagem da câmera" />
+          <video ref={video} playsInline muted autoPlay aria-label="Imagem da câmera" />
           {estado === 'ativa' && <div className="leitor-mira" aria-hidden="true" />}
           {estado === 'iniciando' && <p className="leitor-estado">Abrindo a câmera…</p>}
           {estado !== 'ativa' && estado !== 'iniciando' && <p className="leitor-estado" role="alert">{MENSAGEM_CAMERA[estado]}</p>}

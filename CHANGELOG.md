@@ -5,6 +5,13 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Corrigido
+- 2026-11-14: **Melhoria 2: câmera do LeitorQr cortada no Safari do iPhone (só apresentação).**
+  - **Causa principal:** a altura do contêiner vem do `aspect-ratio` e o `<video>` usava `height: 100%`; no WebKit essa porcentagem não resolve e o vídeo assume o tamanho do fluxo (retrato 3:4), estourando o contêiner e sendo cortado pelo `overflow: hidden`. Agora o vídeo é absoluto (`inset: 0`), igual ao tamanho do contêiner (no computador e no Chrome o resultado visual é o mesmo).
+  - **Outras causas:** `max-height` em `vh` (a barra do Safari faz o `vh` passar da área visível); canto arredondado com `overflow` e vídeo sem camada própria (`isolation: isolate`); faltava `autoPlay` no `<video>` (já tinha `playsInline` e `muted`); no modal de tela cheia, a câmera rolava para fora junto com a lista dos esperados.
+  - **Só no iOS** (`@supports (-webkit-touch-callout: none)`): câmera em `dvh` com `vh` de reserva (50 %; 30 % na `cameraReduzida` da inspeção), fixa no topo do corpo da janela (`sticky`), com a lista (`children`), "Digitar código" e o aviso rolando por baixo; respeita a área segura embaixo. Constraints do `getUserMedia`, lógica de leitura e a mira (centralizada no contêiner, `inset: 18% 22%`) não mudaram.
+  - Arquivos: `src/styles.css`, `src/components/LeitorQr.tsx`.
+
 ### Alterado
 - 2026-11-14: **Melhoria 7, revisão: a sugestão é de uma carga, sem fardos de 1 e com o emitido lido da parcela gravada (só front).**
   - **Carga:** `CARGA_PADRAO_FARDOS` (`parametros.ts`, **provisório: 3, a CPTM vai confirmar**). Falta maior que 3 fardos do padrão → 3 × 14 com "Entrega parcial da parcela: faltam N" (ex.: AR00224-01 com 3.000 a emitir → 3 × 14, faltam 2.958). Falta que cabe em uma carga: divisão exata (40 → 4 × 10, pode passar de 3 fardos porque o limite é em dormentes).
