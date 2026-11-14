@@ -147,6 +147,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar
                 <option value="">Selecione…</option>
                 {parcelasComSaldo.map((p) => <option key={p.numero} value={p.numero}>{p.numero}ª · emitido {numero(emitidoNaParcela(p.numero))} de {numero(p.quantidade)} · até {data(p.fim)}</option>)}
               </select>
+              {daParcela && <span className="ajuda">Entregar até {data(daParcela.fim)} em {contrato.localEntrega || 'local não informado no contrato'}.</span>}
               {!parcelasComSaldo.length && <span className="ajuda">Nenhuma parcela com saldo a emitir. Para repor reprovados, marque Reentrega.</span>}
               <label className="caixa"><input type="checkbox" checked={reentrega} onChange={(e) => { setReentrega(e.target.checked); setParcela(''); setQtd({}); }} /> Reentrega (reposição de reprovados)</label>
             </>
@@ -197,6 +198,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar
       {passo === 2 && contrato && (
         <div className="resumo-revisao">
           <p>Contrato <span className="mono">{contrato.numero}</span> · {cad.nomeFornecedor(contrato.fornecedorId)} · {parcela}ª parcela{reentrega && ' · reentrega'}</p>
+          <p className="mudo">Entregar em {contrato.localEntrega || 'local não informado no contrato'}{daParcela && <>, até {data(daParcela.fim)}</>}.</p>
           <ul>
             {linhas.filter((l) => l.fardos > 0).map((l) => <li key={l.item.id}>{cad.descreverTamanho(l.item.tamanhoId)}: {textoDivisao(l.fardos, l.por)} ({numero(l.total)} dormentes)</li>)}
           </ul>

@@ -294,12 +294,13 @@ export function criarContrato(e: Estado, dados: DadosContrato, ctx: Ctx): Contra
   if (!DATA.test(dados.dataAssinatura ?? '')) campos.dataAssinatura = 'Informe a data de assinatura.';
   else if (ata && (dados.dataAssinatura < ata.vigenciaInicio || dados.dataAssinatura > ata.vigenciaFim)) campos.dataAssinatura = `A ata ${ata.numero} vale de ${ata.vigenciaInicio} a ${ata.vigenciaFim}.`;
   if (!dados.gestor?.trim()) campos.gestor = 'Informe o gestor do contrato.';
+  if (!dados.localEntrega?.trim()) campos.localEntrega = 'Informe o local de entrega.';
   exigirCampos(campos);
   exigirFornecedorLiberado(e, ata!.fornecedorId, ctx, 'ataId');
   const porTamanho = validarCronograma(e, ata!, dados.parcelas, campos, ctx);
   exigirCampos(campos, 'Confira o cronograma: as regras da ata não foram atendidas.');
   const reg: ContratoReg = {
-    id: novoId(e, 'ct'), numero, ataId: ata!.id, ano: dados.ano, dataAssinatura: dados.dataAssinatura, gestor: dados.gestor.trim(), situacao: 'vigente',
+    id: novoId(e, 'ct'), numero, ataId: ata!.id, ano: dados.ano, dataAssinatura: dados.dataAssinatura, gestor: dados.gestor.trim(), localEntrega: dados.localEntrega.trim(), situacao: 'vigente',
     itens: [...porTamanho].filter(([, q]) => q > 0).map(([tamanhoId, quantidade]) => ({ id: novoId(e, 'ic'), tamanhoId, quantidade })),
     parcelas: parcelasReg(dados.parcelas), criadoEm: instante(ctx), criadoPor: ctx.quem,
   };
@@ -314,6 +315,7 @@ export function atualizarContrato(e: Estado, numero: string, dados: DadosAtualiz
   if (reg.situacao === 'cancelado') falha(409, `O contrato ${numero} está cancelado.`);
   const campos: Record<string, string> = {};
   if (dados.gestor !== undefined && !dados.gestor.trim()) campos.gestor = 'Informe o gestor do contrato.';
+  if (dados.localEntrega !== undefined && !dados.localEntrega.trim()) campos.localEntrega = 'Informe o local de entrega.';
   let porTamanho: Map<Id, number> | undefined;
   if (dados.parcelas) {
     const ata = achar(e.atas, (a) => a.id === reg.ataId, 'Ata');
@@ -330,6 +332,7 @@ export function atualizarContrato(e: Estado, numero: string, dados: DadosAtualiz
   }
   exigirCampos(campos, 'Confira o cronograma: as regras da ata não foram atendidas.');
   if (dados.gestor !== undefined) reg.gestor = dados.gestor.trim();
+  if (dados.localEntrega !== undefined) reg.localEntrega = dados.localEntrega.trim();
   if (dados.parcelas && porTamanho) {
     reg.parcelas = parcelasReg(dados.parcelas);
     for (const [tamanhoId, quantidade] of porTamanho) {

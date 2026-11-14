@@ -133,7 +133,7 @@ O banco tem dois níveis de detalhe, o fardo e o dormente, e todo dormente apont
 | Local | Código, descrição, tipo, capacidade em dormentes, QR | Fardos guardados |
 | Usuário | Nome, e-mail, perfil, ativo | Todo registro guarda quem fez |
 | Ata | Número, fornecedor, vigência (início e fim próprios; 12 meses é só a sugestão), regras próprias (pedido mínimo, número de parcelas, mínimo e máximo por parcela, janela de entrega de cada parcela), quantidades registradas por tamanho (ao menos uma); situação vigente, a iniciar ou vencida, calculada pela data; editável até o primeiro contrato | Contratos |
-| Contrato | Número, ata, data de assinatura, gestor, situação (o fornecedor vem da ata); não existe AF: cada pedido é um contrato | Itens, parcelas, entregas, fardos, dormentes, NFs |
+| Contrato | Número, ata, data de assinatura, gestor, local de entrega, situação (o fornecedor vem da ata); vigência calculada pelo fim da última parcela; não existe AF: cada pedido é um contrato | Itens, parcelas, entregas, fardos, dormentes, NFs |
 | Item do contrato | Tamanho (código de material CPTM) e quantidade em unidades; sem espécie, classe nem tratamento | Contrato, dormentes |
 | Parcela | Número, quantidade por tamanho; janela de entrega e situação calculadas pela assinatura e pelas regras da ata | Contrato, entregas |
 | Entrega | NF, DOF, parcela, reentrega, Boletim de Inspeção, Relatório Técnico, Laudo Técnico, fardos esperados, situação | Contrato, NF, DOF, fardos, recebimento |

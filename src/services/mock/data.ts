@@ -34,6 +34,8 @@ import { sequenciaDe } from '../../dominio/identificacao';
 /** Nome dos usuários de demonstração, igual ao do login simulado (services/auth/simulado.ts). */
 export const nomeDemo = (p: Perfil) => `${PERFIS[p].rotulo} (demonstração)`;
 export const usuarioDemo = (p: Perfil): Usuario => ({ id: `demo-${p}`, nome: nomeDemo(p), email: `${p}@exemplo.invalid`, perfil: p, permissoes: PERFIS[p].permissoes, ativo: true });
+/** Local de entrega dos contratos da demonstração (fictício). */
+const LOCAL_ENTREGA = 'Almoxarifado de via permanente · pátio de dormentes';
 
 export function criarDados(agoraReal: Date = new Date()): Estado {
   const base = dataSP(agoraReal);
@@ -110,7 +112,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
     itens: [{ tamanhoId: t006234.id, quantidade: 500 }, { tamanhoId: t006222.id, quantidade: 100 }],
   }, adm());
   em(160);
-  const c5 = criarContrato(e, { numero: 'AR00311-02', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -160), gestor: 'Gestor Exemplo 2', parcelas: cronograma([[t006222.id, 28]]) }, adm());
+  const c5 = criarContrato(e, { numero: 'AR00311-02', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -160), gestor: 'Gestor Exemplo 2', localEntrega: LOCAL_ENTREGA, parcelas: cronograma([[t006222.id, 28]]) }, adm());
   const [ic5] = c5.itens;
 
   e.parametros.niveis = [
@@ -166,7 +168,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
 
   em(130);
   // AR00311-01: assinado há 130 dias. A 1ª parcela chegou com atraso e a 2ª está ATRASADA (o caso proposital do alerta).
-  const c3 = criarContrato(e, { numero: 'AR00311-01', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -130), gestor: 'Gestor Exemplo 2', parcelas: cronograma([[t006234.id, 42]], [[t006234.id, 28]]) }, adm());
+  const c3 = criarContrato(e, { numero: 'AR00311-01', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -130), gestor: 'Gestor Exemplo 2', localEntrega: LOCAL_ENTREGA, parcelas: cronograma([[t006234.id, 42]], [[t006234.id, 28]]) }, adm());
   const [ic3] = c3.itens;
 
   const lancarDestinacao = (rme: string) => { for (const d of e.destinacoes.filter((x) => x.rmeNumero === rme)) marcarDestinacaoLancada(e, d.id, alm()); };
@@ -177,12 +179,12 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   em(40);
   // AR00224-01 e -02 assinados há 40 dias: as parcelas estão dentro do prazo.
   const c1 = criarContrato(e, {
-    numero: 'AR00224-01', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -40), gestor: 'Gestor Exemplo 1',
+    numero: 'AR00224-01', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -40), gestor: 'Gestor Exemplo 1', localEntrega: LOCAL_ENTREGA,
     parcelas: cronograma([[t006234.id, 3000]], [[t006234.id, 2600], [t006219.id, 400]]),
   }, adm());
   const [ic1, ic2] = c1.itens; // 006234 e 006219
   const c2 = criarContrato(e, {
-    numero: 'AR00224-02', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -40), gestor: 'Gestor Exemplo 1',
+    numero: 'AR00224-02', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -40), gestor: 'Gestor Exemplo 1', localEntrega: LOCAL_ENTREGA,
     parcelas: cronograma([[t006234.id, 3000]], [[t006220.id, 1500], [t006221.id, 1500]]),
   }, adm());
 
@@ -236,7 +238,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
 
   // ---------- Entregas em andamento ----------
   em(12);
-  const c4 = criarContrato(e, { numero: 'AR00311-03', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -12), gestor: 'Gestor Exemplo 2', parcelas: cronograma([[t006234.id, 28]]) }, adm());
+  const c4 = criarContrato(e, { numero: 'AR00311-03', ataId: ataB.id, ano, dataAssinatura: somarDias(base, -12), gestor: 'Gestor Exemplo 2', localEntrega: LOCAL_ENTREGA, parcelas: cronograma([[t006234.id, 28]]) }, adm());
   const [ic4] = c4.itens;
   // E8: DOF vencida sem declaração; recebida, um fardo em inspeção pela metade e outro aguardando.
   const e8 = gerar(10, c4.id, 1, [{ itemContratoId: ic4.id, fardos: 2 }], 7);
@@ -256,7 +258,7 @@ export function criarDados(agoraReal: Date = new Date()): Estado {
   const r4 = abrir(6, 'Linha 10 · Trecho Mauá', 'principal_pesado', t006234.id, 1, 10);
   em(5); iniciarSeparacao(e, r4, alm()); separarSugestao(r4);
   em(5);
-  criarContrato(e, { numero: 'AR00224-03', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -5), gestor: 'Gestor Exemplo 3', parcelas: cronograma([[t006234.id, 6000]]) }, adm());
+  criarContrato(e, { numero: 'AR00224-03', ataId: ataA.id, ano, dataAssinatura: somarDias(base, -5), gestor: 'Gestor Exemplo 3', localEntrega: LOCAL_ENTREGA, parcelas: cronograma([[t006234.id, 6000]]) }, adm());
   const r5 = abrir(4, 'Linha 11 · Trecho Mogi das Cruzes', 'principal_pesado', t006234.id, 1, 20);
   em(3); iniciarSeparacao(e, r5, alm());
   abrir(2, 'Linha 7 · Desvio de Francisco Morato (AMV)', 'desvio', t006219.id, 2, 6);

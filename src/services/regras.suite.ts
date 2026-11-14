@@ -618,7 +618,7 @@ export function regrasDosServicos(montar: Montar, tempoMs?: number) {
       const ata = (await s.atas.listar()).items.find((a) => a.numero === 'AR00224')!;
       const tamanhos = (await s.tamanhos.listar({ pageSize: 50 })).items;
       const t = (codigo: string) => tamanhos.find((x) => x.codigo === codigo)!.id;
-      const base = { numero: 'AR00224-04', ataId: ata.id, ano: 2026, dataAssinatura: '2026-11-06', gestor: 'Gestor Exemplo 4' };
+      const base = { numero: 'AR00224-04', ataId: ata.id, ano: 2026, dataAssinatura: '2026-11-06', gestor: 'Gestor Exemplo 4', localEntrega: 'Almoxarifado de via permanente' };
       const p = (...itens: [string, number][]) => ({ itens: itens.map(([codigo, quantidade]) => ({ tamanhoId: t(codigo), quantidade })) });
       await falhaCom(s.contratos.criar({ ...base, parcelas: [p(['006234', 2000]), p(['006234', 4000])] }), 422, 'parcelas.0');
       await falhaCom(s.contratos.criar({ ...base, parcelas: [p(['006234', 3000])] }), 422, 'parcelas'); // abaixo do pedido mínimo
@@ -713,12 +713,17 @@ export function regrasDosServicos(montar: Montar, tempoMs?: number) {
       expect([editada.numero, editada.regras.parcelaMaxima, editada.itens.map((i) => i.quantidade)]).toEqual(['AR00998', 40, [80, 20]]);
       // O contrato segue as regras da ata: parcela acima da máxima (40), tamanho fora da ata e o saldo dela.
       const p = (...itens: [string, number][]) => ({ itens: itens.map(([codigo, quantidade]) => ({ tamanhoId: t(codigo), quantidade })) });
-      const ct = { numero: 'AR00998-01', ataId: ata.id, ano: 2026, dataAssinatura: '2026-11-06', gestor: 'Gestor Exemplo 9' };
+      const ct = { numero: 'AR00998-01', ataId: ata.id, ano: 2026, dataAssinatura: '2026-11-06', gestor: 'Gestor Exemplo 9', localEntrega: 'Almoxarifado de via permanente' };
       await falhaCom(s.contratos.criar({ ...ct, parcelas: [p(['006234', 45])] }), 422, 'parcelas.0');
       await falhaCom(s.contratos.criar({ ...ct, parcelas: [p(['006219', 20])] }), 422, 'parcelas');
       await falhaCom(s.contratos.criar({ ...ct, parcelas: [p(['006234', 10]), p(['006234', 10]), p(['006234', 10])] }), 422, 'parcelas');
+      // Local de entrega obrigatório; a vigência do contrato é o fim da última parcela.
+      await falhaCom(s.contratos.criar({ ...ct, localEntrega: ' ', parcelas: [p(['006234', 20]), p(['006222', 10])] }), 422, 'localEntrega');
       const c = await s.contratos.criar({ ...ct, parcelas: [p(['006234', 20]), p(['006222', 10])] });
       expect(c.parcelas.map((x) => [x.inicio, x.fim])).toEqual([['2026-11-06', '2026-12-06'], ['2026-12-07', '2027-01-05']]);
+      expect([c.localEntrega, c.vigenciaFim]).toEqual(['Almoxarifado de via permanente', '2027-01-05']);
+      expect((await s.contratos.atualizar('AR00998-01', { localEntrega: 'Pátio B' })).localEntrega).toBe('Pátio B');
+      await falhaCom(s.contratos.atualizar('AR00998-01', { localEntrega: '' }), 422, 'localEntrega');
       // Depois do primeiro contrato, a ata não muda mais (nem com o contrato cancelado).
       const depois = await s.atas.obter('AR00998');
       expect([depois.editavel, depois.contratos, depois.itens[0].saldo]).toEqual([false, 1, 60]);

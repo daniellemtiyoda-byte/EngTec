@@ -42,6 +42,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
   const [ano, setAno] = useState(String(new Date().getFullYear()));
   const [dataAssinatura, setAssinatura] = useState(hoje);
   const [gestor, setGestor] = useState('');
+  const [localEntrega, setLocalEntrega] = useState('');
   const [parcelas, setParcelas] = useState<LinhaParcela[]>([parcelaVazia()]);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string>();
@@ -52,10 +53,10 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
     if (!aberto) return;
     setErros({}); setErroGeral(undefined);
     if (contrato) {
-      setAtaId(contrato.ataId); setNumero(contrato.numero); setAno(String(contrato.ano)); setAssinatura(contrato.dataAssinatura); setGestor(contrato.gestor);
+      setAtaId(contrato.ataId); setNumero(contrato.numero); setAno(String(contrato.ano)); setAssinatura(contrato.dataAssinatura); setGestor(contrato.gestor); setLocalEntrega(contrato.localEntrega);
       setParcelas(contrato.parcelas.map((p) => ({ chave: proximaChave++, itens: p.itens.map((i) => ({ chave: proximaChave++, tamanhoId: i.tamanhoId, quantidade: String(i.quantidade) })) })));
     } else {
-      setAtaId(''); setNumero(''); setAno(String(new Date().getFullYear())); setAssinatura(hoje); setGestor(''); setParcelas([parcelaVazia()]);
+      setAtaId(''); setNumero(''); setAno(String(new Date().getFullYear())); setAssinatura(hoje); setGestor(''); setLocalEntrega(''); setParcelas([parcelaVazia()]);
     }
   }, [aberto, contrato]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,6 +91,9 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
     if (editando || !ata || !todosContratos) return;
     setNumero(proximoNumeroContrato(ata.numero, contratosDaAta));
     setGestor(gestorSugerido(contratosDaAta));
+    // Local de entrega: o do contrato mais recente da ata (editável).
+    const ultimo = [...contratosDaAta].sort((x, y) => y.dataAssinatura.localeCompare(x.dataAssinatura))[0];
+    setLocalEntrega(ultimo?.localEntrega ?? '');
   }, [numeroAta, todosContratos]); // eslint-disable-line react-hooks/exhaustive-deps
   const avisoSequencia = editando ? undefined : avisoSequenciaContrato(numeroContrato, numeroAta, contratosDaAta);
 
@@ -109,6 +113,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
       if (!dataAssinatura) e.dataAssinatura = 'Informe a data de assinatura.';
     }
     if (!gestor.trim()) e.gestor = 'Informe o gestor do contrato.';
+    if (!localEntrega.trim()) e.localEntrega = 'Informe o local de entrega.';
     parcelas.forEach((p, n) => {
       p.itens.forEach((i, k) => {
         if (!i.tamanhoId) e[`parcelas.${n}.${k}`] = 'Escolha o tamanho.';
@@ -134,9 +139,9 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
     try {
       let salvo: Contrato;
       if (contrato) {
-        salvo = await servicos.contratos.atualizar(contrato.numero, { gestor: gestor.trim(), parcelas: paraParcelas() });
+        salvo = await servicos.contratos.atualizar(contrato.numero, { gestor: gestor.trim(), localEntrega: localEntrega.trim(), parcelas: paraParcelas() });
       } else {
-        salvo = await servicos.contratos.criar({ numero: numeroContrato.trim().toUpperCase(), ataId, ano: Number(ano), dataAssinatura, gestor: gestor.trim(), parcelas: paraParcelas() });
+        salvo = await servicos.contratos.criar({ numero: numeroContrato.trim().toUpperCase(), ataId, ano: Number(ano), dataAssinatura, gestor: gestor.trim(), localEntrega: localEntrega.trim(), parcelas: paraParcelas() });
       }
       aoSalvar(salvo);
     } catch (err) {
@@ -212,6 +217,12 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
               {erro('ano')}
             </div>
           </div>
+          <div className="campo">
+            <label htmlFor={`${formId}-local`}>Local de entrega<span className="obrig" aria-hidden="true"> *</span></label>
+            <input id={`${formId}-local`} value={localEntrega} maxLength={160} placeholder="Ex.: Almoxarifado de via permanente" onChange={(e) => setLocalEntrega(e.target.value)} {...invalido('localEntrega')} />
+            <span className="ajuda">Onde o fornecedor entrega os dormentes. Aparece para ele no Simulador.</span>
+            {erro('localEntrega')}
+          </div>
         </fieldset>
 
         <fieldset className="secao-formulario">
@@ -262,6 +273,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
           <div className="parcela-rodape">
             <button type="button" className="btn btn-sec btn-peq" disabled={parcelas.length >= regras.maxParcelas} onClick={() => setParcelas((l) => [...l, parcelaVazia()])}>+ Parcela</button>
             <span className={total < regras.pedidoMinimo ? 'texto-critico' : 'mudo'}>Total do contrato: <strong>{numero(total)}</strong> dormentes (mínimo {numero(regras.pedidoMinimo)})</span>
+            {ata && dataAssinatura && <span className="mudo">Vigência do contrato: até <strong>{data(janelaParcela(dataAssinatura, regras, parcelas.length).fim)}</strong> (fim da última parcela)</span>}
           </div>
           {editando && <p className="ajuda">Nenhum tamanho pode ficar abaixo do que já foi emitido, descontados os reprovados.</p>}
         </fieldset>

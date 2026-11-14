@@ -85,6 +85,8 @@ export default function ContratoDetalhe() {
           <FatoChave rotulo="Ata" valor={<span className="mono">{ata?.numero ?? '—'}</span>} para={ata ? `/atas/${ata.numero}` : undefined} />
           <FatoChave rotulo="Assinatura" valor={data(c.dataAssinatura)} />
           <FatoChave rotulo="Gestor" valor={c.gestor} />
+          <FatoChave rotulo="Vigência" valor={`até ${data(c.vigenciaFim)}`} />
+          <FatoChave rotulo="Local de entrega" valor={c.localEntrega || '—'} />
           <FatoChave rotulo="Contratado" valor={numero(t.contratado)} />
           <FatoChave rotulo="Recebido" valor={numero(t.recebidos)} />
           <FatoChave rotulo="Aprovado" valor={numero(t.aprovados)} />

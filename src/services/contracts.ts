@@ -41,9 +41,9 @@ export interface DadosAta { numero: string; fornecedorId: Id; vigenciaInicio: st
 export type DadosAtualizacaoAta = Omit<DadosAta, 'numero'>;
 /** Parcela do cronograma: quantidade por tamanho. Os itens do contrato são a soma das parcelas. */
 export interface DadosParcela { itens: { tamanhoId: Id; quantidade: number }[] }
-export interface DadosContrato { numero: string; ataId: Id; ano: number; dataAssinatura: string; gestor: string; parcelas: DadosParcela[] }
+export interface DadosContrato { numero: string; ataId: Id; ano: number; dataAssinatura: string; gestor: string; localEntrega: string; parcelas: DadosParcela[] }
 /** Novo cronograma: nenhum item pode ficar abaixo do já emitido (descontados os reprovados). */
-export interface DadosAtualizacaoContrato { gestor?: string; parcelas?: DadosParcela[] }
+export interface DadosAtualizacaoContrato { gestor?: string; localEntrega?: string; parcelas?: DadosParcela[] }
 
 /** `comDocumentos`: com NF e DOF já cadastradas (entrega a caminho); sem, só os fardos (a CPTM cadastra NF e DOF pelo XML). */
 /** `reentrega`: reposição de reprovados (só aceita depois da retirada deles). */

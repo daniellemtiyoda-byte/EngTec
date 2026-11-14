@@ -224,6 +224,8 @@ export interface Contrato {
   dataAssinatura: string;
   /** Gestor do contrato na CPTM (na demonstração, nomes fictícios). */
   gestor: string;
+  /** Onde o fornecedor entrega os dormentes (texto livre; vazio nos contratos antigos). */
+  localEntrega: string;
   parcelas: ParcelaContrato[];
   /** Gravado: vigente ou cancelado. "Concluído" é calculado (todos os itens aprovados e nada pendente na entrada). */
   situacao: SituacaoContrato;
@@ -233,6 +235,8 @@ export interface Contrato {
   criadoPor: string;
   // calculados:
   parcelasAtrasadas: number;
+  /** Vigência do contrato: o fim da janela de entrega da última parcela (assinatura + regra da ata). */
+  vigenciaFim: string;
   /** 15 dias após o laudo da última entrega, quando o contrato está concluído. */
   recebimentoDefinitivoEm?: string;
 }

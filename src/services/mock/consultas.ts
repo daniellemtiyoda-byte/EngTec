@@ -159,6 +159,7 @@ export function contratoView(e: Estado, c: ContratoReg, hoje: string): Contrato 
   return {
     ...c, fornecedorId: ata.fornecedorId, itens, situacao, parcelas,
     parcelasAtrasadas: situacao === 'vigente' ? parcelas.filter((p) => p.situacao === 'atrasada').length : 0, recebimentoDefinitivoEm,
+    vigenciaFim: janelaParcela(c.dataAssinatura, ata.regras, Math.max(1, c.parcelas.length)).fim,
   };
 }
 

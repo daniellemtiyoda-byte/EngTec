@@ -15,7 +15,7 @@ export type LocalReg = Omit<Local, 'ocupacao' | 'fardos'>;
 export type AtaReg = Omit<Ata, 'itens' | 'vigente' | 'situacao' | 'diasParaVencer' | 'contratos' | 'editavel'> & { itens: { tamanhoId: Id; quantidade: number }[] };
 export type ItemContratoReg = Pick<ItemContrato, 'id' | 'tamanhoId' | 'quantidade'>;
 export type ParcelaReg = Pick<ParcelaContrato, 'numero' | 'itens'>;
-export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao' | 'parcelas' | 'parcelasAtrasadas' | 'recebimentoDefinitivoEm'> & {
+export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao' | 'parcelas' | 'parcelasAtrasadas' | 'vigenciaFim' | 'recebimentoDefinitivoEm'> & {
   situacao: 'vigente' | 'cancelado'; itens: ItemContratoReg[]; parcelas: ParcelaReg[];
 };
 export type FardoReg = Omit<Fardo, 'saldo' | 'disponivel' | 'reservados' | 'emCuraAte' | 'situacao' | 'aberto' | 'idadeDias' | 'acimaLimiteDias' | 'progressoInspecao'>;
@@ -60,7 +60,7 @@ export interface Estado {
   contadores: Record<string, number>;
 }
 
-export const VERSAO_ESTADO = 11;
+export const VERSAO_ESTADO = 12;
 
 /** Contexto de cada operação: o relógio (injetável, para a história e os testes serem determinísticos) e quem faz. */
 export interface Ctx { agora: () => Date; quem: string }

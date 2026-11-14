@@ -47,7 +47,7 @@ export function paraLinhas(e: Estado): Linhas {
   }
   for (const c of e.contratos) {
     add('contratos', {
-      id: c.id, numero: c.numero, ata_id: c.ataId, ano: c.ano, data_assinatura: c.dataAssinatura, gestor: c.gestor, situacao: c.situacao,
+      id: c.id, numero: c.numero, ata_id: c.ataId, ano: c.ano, data_assinatura: c.dataAssinatura, gestor: c.gestor, local_entrega: c.localEntrega, situacao: c.situacao,
       motivo_cancelamento: n(c.motivoCancelamento), criado_em: c.criadoEm, criado_por: c.criadoPor,
     });
     c.itens.forEach((i, ordem) => add('contrato_itens', { ordem, id: i.id, contrato_id: c.id, tamanho_id: i.tamanhoId, quantidade: i.quantidade }));
@@ -265,7 +265,7 @@ export function deLinhas(L: Linhas, perfis: Linha[] = [], dataBase = ''): Estado
         pa.itens.push({ tamanhoId: String(l.tamanho_id), quantidade: Number(l.quantidade) });
       }
       return limpo({
-        id: String(x.id), numero: String(x.numero), ataId: String(x.ata_id), ano: Number(x.ano), dataAssinatura: dt(x.data_assinatura)!, gestor: String(x.gestor),
+        id: String(x.id), numero: String(x.numero), ataId: String(x.ata_id), ano: Number(x.ano), dataAssinatura: dt(x.data_assinatura)!, gestor: String(x.gestor), localEntrega: String(x.local_entrega ?? ''),
         situacao: x.situacao as 'vigente', motivoCancelamento: txt(x.motivo_cancelamento),
         itens: (ctItens.get(String(x.id)) ?? []).map((i) => ({ id: String(i.id), tamanhoId: String(i.tamanho_id), quantidade: Number(i.quantidade) })),
         parcelas, criadoEm: ts(x.criado_em)!, criadoPor: String(x.criado_por),
