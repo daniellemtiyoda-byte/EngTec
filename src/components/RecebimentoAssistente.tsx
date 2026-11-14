@@ -8,6 +8,8 @@ import type { DadosOcorrencia, FaltaDormentes } from '../services/contracts';
 import { ApiError, mensagemSegura } from '../services/erros';
 import type { Entrega, PreviaRecebimento, Recebimento, TipoOcorrencia } from '../types/models';
 import { arquivoInvalido, data, numero, paraNumero } from '../utils/format';
+import { reduzirParaJpeg } from '../utils/imagem';
+import { env } from '../config/env';
 import { Badge, BadgeDe } from './Badge';
 import { EntregaAssistente } from './EntregaAssistente';
 import { Contador } from './Contador';
@@ -124,6 +126,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
     }
     if (p === 3 && !localId) e.localEsperaId = 'Escolha o local de espera.';
     if (p === 4 && previa?.exigeJustificativa && !justificativa.trim()) e.justificativaDivergencia = 'Justificativa obrigatória.';
+    if (p === 4 && canhoto) { const inv = arquivoInvalido(canhoto, EXTENSOES_FOTO); if (inv) e.canhoto = inv; }
     return e;
   }
 
@@ -149,10 +152,38 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
     if (Object.keys(e).length || !entrega) return;
     setEnviando(true); setErroGeral(undefined);
     try {
-      const declaradas: DadosOcorrencia[] = conforme ? [] : ocorrencias.map((o) => ({
-        tipo: o.tipo, descricao: o.descricao, fardoId: o.fardoId || undefined, quantidade: o.tipo === 'falta' ? paraNumero(o.quantidade, true) : undefined, fotos: o.fotos,
+      // Converte fotos e canhoto para JPEG ≤ 1600 px uma a uma (não em paralelo), para rotear o erro ao campo certo.
+      const camposConversao: Record<string, string> = {};
+
+      let canhotoComprimido: File | undefined;
+      if (canhoto) {
+        try { canhotoComprimido = await reduzirParaJpeg(canhoto, env.UPLOAD_MAX_MB); }
+        catch (err) { camposConversao.canhoto = mensagemSegura(err); }
+      }
+
+      const fotosConvertidas: File[][] = [];
+      for (let n = 0; n < ocorrencias.length; n++) {
+        const fotos: File[] = [];
+        for (const f of ocorrencias[n].fotos) {
+          try { fotos.push(await reduzirParaJpeg(f, env.UPLOAD_MAX_MB)); }
+          catch (err) { camposConversao[`ocorrencias.${n}`] = mensagemSegura(err); break; }
+        }
+        fotosConvertidas.push(fotos);
+      }
+
+      if (Object.keys(camposConversao).length) {
+        setErros((prev) => ({ ...prev, ...camposConversao }));
+        const primeiro = Object.keys(camposConversao)[0];
+        if (primeiro) setPasso(passoDoCampo(primeiro));
+        return; // finally chama setEnviando(false)
+      }
+
+      const declaradas: DadosOcorrencia[] = conforme ? [] : ocorrencias.map((o, n) => ({
+        tipo: o.tipo, descricao: o.descricao, fardoId: o.fardoId || undefined,
+        quantidade: o.tipo === 'falta' ? paraNumero(o.quantidade, true) : undefined,
+        fotos: fotosConvertidas[n],
       }));
-      const r = await servicos.recebimentos.receber(entrega.id, { fardosLidos: lidos, ocorrencias: declaradas, localEsperaId: localId, justificativaDivergencia: justificativa, canhoto });
+      const r = await servicos.recebimentos.receber(entrega.id, { fardosLidos: lidos, ocorrencias: declaradas, localEsperaId: localId, justificativaDivergencia: justificativa, canhoto: canhotoComprimido });
       aoReceber(r);
     } catch (err) {
       if (err instanceof ApiError && err.detalhes) {
@@ -255,6 +286,7 @@ export function RecebimentoAssistente({ aberto, cad, entregaId, aoFechar, aoRece
             <div className="campo">
               <label htmlFor="rec-canhoto">Canhoto da NF assinado (foto, opcional)</label>
               <input id="rec-canhoto" type="file" accept="image/*" capture="environment" onChange={(e) => setCanhoto(e.target.files?.[0])} />
+              {erro('canhoto')}
               <span className="ajuda">Este é o recebimento provisório. O definitivo vem com o Laudo Técnico, depois da inspeção (até 20 dias úteis).</span>
             </div>
             <div className="opcoes-ata" role="radiogroup" aria-label="Conferência">

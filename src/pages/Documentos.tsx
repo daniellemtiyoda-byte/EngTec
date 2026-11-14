@@ -18,6 +18,7 @@ import { servicos } from '../services';
 import { mensagemSegura } from '../services/erros';
 import type { Dof, Entrega, NotaFiscal } from '../types/models';
 import { data, dataHora, numero } from '../utils/format';
+import { BotaoAnexo } from '../components/BotaoAnexo';
 
 type AbaDoc = 'a_caminho' | 'dofs' | 'declarados' | 'nfs';
 const ABAS: AbaDoc[] = ['a_caminho', 'dofs', 'declarados', 'nfs'];
@@ -89,7 +90,7 @@ export default function Documentos() {
     { chave: 'emissao', titulo: 'Emissão', ordenavel: true, render: (n) => data(n.emissao) },
     { chave: 'itens', titulo: 'Dormentes', alinhar: 'right', render: (n) => numero(n.itens.reduce((s, i) => s + i.quantidade, 0)) },
     { chave: 'chaveAcesso', titulo: 'Chave de acesso', opcional: true, render: (n) => <span className="mono">{n.chaveAcesso}</span> },
-    { chave: 'xml', titulo: 'XML', opcional: true, render: (n) => n.xml?.nome ?? '—' },
+    { chave: 'xml', titulo: 'XML', opcional: true, render: (n) => n.xml ? <BotaoAnexo anexo={n.xml} /> : '—' },
   ];
 
   async function confirmarDeclaracao() {

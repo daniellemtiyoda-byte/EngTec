@@ -30,14 +30,31 @@ export function bancoSupabase(): Banco {
     },
     async enviar(caminho, arquivo) {
       const { error } = await clienteSupabase().storage.from('anexos').upload(caminho, arquivo, { contentType: arquivo.type || undefined, upsert: false });
-      if (error) throw new ApiError(422, `Não foi possível enviar o arquivo ${arquivo.name}: ${error.message}`);
+      if (error) throw new ApiError(422, traduzirErroStorage(error.message, arquivo.name));
     },
   };
 }
 
-/** Link temporário (1 hora) para abrir um anexo do bucket privado. */
+/** Link temporário (5 minutos) para abrir um anexo do bucket privado. */
 export async function linkDoAnexo(caminho: string): Promise<string> {
-  const { data, error } = await clienteSupabase().storage.from('anexos').createSignedUrl(caminho, 3600);
+  const { data, error } = await clienteSupabase().storage.from('anexos').createSignedUrl(caminho, 300);
   if (error || !data) throw new ApiError(404, 'Não foi possível abrir o arquivo.');
   return data.signedUrl;
+}
+
+/**
+ * Traduz a mensagem de erro do Supabase Storage para o português.
+ * Nunca expõe a mensagem técnica original: só o tamanho, o tipo ou a mensagem genérica com o código.
+ */
+export function traduzirErroStorage(mensagem: string, nomeArquivo: string): string {
+  const m = mensagem.toLowerCase();
+  if (m.includes('exceeded') || m.includes('maximum allowed size') || m.includes('payload too large') || m.includes('too large')) {
+    return `${nomeArquivo} é maior que o limite permitido.`;
+  }
+  if (m.includes('mime type') || m.includes('not supported') || m.includes('invalid mime') || m.includes('content type')) {
+    return `Tipo de arquivo não permitido: ${nomeArquivo}.`;
+  }
+  // Genérico: inclui o código quando há um, sem a mensagem técnica.
+  const codigo = /^[A-Z0-9_]{2,30}$/i.test(mensagem.trim()) ? ` (código ${mensagem.trim()})` : '';
+  return `Não foi possível enviar ${nomeArquivo}${codigo}. Tente novamente.`;
 }

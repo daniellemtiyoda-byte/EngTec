@@ -5,6 +5,16 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-11-14: **Etapa 9: anexos no Supabase — botão "Abrir", compressão de fotos e erros em português.**
+  - **Abrir:** botão em todo lugar que exibe um arquivo com `caminho` no bucket privado (`BotaoAnexo`): XML da NF (tabela "Todas as NFs" em Documentos), PDF da DOF, boletim, relatório técnico, canhoto da NF e fotos de ocorrências (tela do recebimento). O link assinado é gerado no clique (5 min, era 1 h). Safari: `window.open('', '_blank')` chamado de forma síncrona antes do `await` para o pop-up não ser bloqueado; se falhar, fecha a janela e mostra toast. Modo simulado (`caminho` ausente): só o nome, sem botão.
+  - **Compressão de fotos:** utilitário `reduzirParaJpeg` (`src/utils/imagem.ts`): reduz para JPEG ≤ 1600 px (qualidade 0,85) antes do envio, usando `createImageBitmap` + canvas. Fallback para o original quando o navegador não decodifica (ex.: HEIC no Chrome/Windows), recusando com mensagem clara se o original exceder o limite. HEIC e HEIF aceitos. Fotos convertidas uma a uma: se falhar numa, o erro vai para o campo daquela foto (canhoto ou a ocorrência certa), sem perder os outros dados. O arquivo sobe com extensão `.jpg` e tipo `image/jpeg` (ex.: `IMG_1234.HEIC` → `IMG_1234.jpg`).
+  - **Validação do canhoto no front:** o canhoto agora é validado como as fotos de ocorrência (tipo e tamanho).
+  - **Erros do Storage em português:** `traduzirErroStorage` em `cliente.ts` converte tamanho excedido e tipo não aceito para mensagens claras; o resto vira a mensagem genérica com o código. Nunca expõe a mensagem técnica original em inglês.
+  - **Caminhos reais documentados:** o padrão real é `entregas/<uuid>/<nome>` para o cadastro e `entregas/<idEntrega>/<uuid>/<nome>` para o recebimento (difere do `<entidade>/<id>/<arquivo>` documentado antes). Órfãos no bucket (upload sem insert; Reiniciar) registrados como pendência de baixa prioridade em `docs/BANCO-DE-DADOS.md`.
+  - Testes: `imagem.test.ts` (9 casos: tipo inválido, HEIC por MIME e extensão, fallback ok/erro, caminho feliz com proporção e HEIC→.jpg) e `cliente.test.ts` (4 casos para `traduzirErroStorage`).
+  - Arquivos: `src/utils/imagem.ts`, `src/utils/imagem.test.ts`, `src/services/supabase/cliente.ts`, `src/services/supabase/cliente.test.ts`, `src/components/BotaoAnexo.tsx`, `src/components/RecebimentoAssistente.tsx`, `src/pages/RecebimentoDetalhe.tsx`, `src/pages/Documentos.tsx`, `docs/BANCO-DE-DADOS.md`, `CLAUDE.md`.
+
 ### Alterado
 - 2026-11-14: **Fluxo de trabalho: commit e push a cada alteração aprovada.** Antes, o commit vinha no fim da etapa; agora, assim que a Dani aprova explicitamente uma alteração, ela é registrada no `CHANGELOG.md`, conferida com `npm run build` e `npm test` sem erros e vai para `origin/v2-qrcode` (nunca para `upstream`). Com migração nova, pergunta-se antes se ela já rodou no SQL Editor, pois o push publica na Vercel, que usa o Supabase real. Arquivo: `CLAUDE.md`.
 

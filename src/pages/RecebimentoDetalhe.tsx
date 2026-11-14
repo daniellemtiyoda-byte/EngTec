@@ -18,6 +18,7 @@ import { useCadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import { mensagemSegura } from '../services/erros';
 import { data, dataHora, m3, numero, pct } from '../utils/format';
+import { BotaoAnexo } from '../components/BotaoAnexo';
 
 type AbaRec = 'fardos' | 'documentos' | 'ocorrencias' | 'historico';
 
@@ -132,15 +133,15 @@ export default function RecebimentoDetalhe() {
               <dl className="detalhes">
                 <dt>NF</dt><dd>{nf ? `${nf.numero} · série ${nf.serie} · emitida em ${data(nf.emissao)}` : '—'}</dd>
                 <dt>Chave</dt><dd className="mono quebra-palavra">{nf?.chaveAcesso}</dd>
-                <dt>XML</dt><dd>{nf?.xml?.nome ?? 'Digitada (sem XML)'}</dd>
+                <dt>XML</dt><dd>{nf?.xml ? <BotaoAnexo anexo={nf.xml} /> : 'Digitada (sem XML)'}</dd>
                 <dt>DOF</dt><dd>{dof ? `${dof.numero} · validade ${data(dof.validade)}` : '—'}</dd>
                 <dt>Prazo de declaração</dt><dd>{dof ? <PrazoDof prazo={dof.prazoDeclaracao} nivel={dof.nivelPrazo} declarado={!!dof.declarado} /> : '—'}</dd>
                 <dt>Declaração</dt><dd>{dof?.declarado ? `${dataHora(dof.declarado.quando)} · ${dof.declarado.quem}` : 'Ainda não declarada'}</dd>
-                <dt>PDF da DOF</dt><dd>{dof?.pdf?.nome ?? '—'}</dd>
-                <dt>Boletim de Inspeção</dt><dd>{entrega?.boletim ? `${entrega.boletim.numero} · ${data(entrega.boletim.data)} · ${cad.nomeEmpresa(entrega.boletim.empresaInspetoraId)}${entrega.boletim.arquivo ? ` · ${entrega.boletim.arquivo.nome}` : ''}` : '—'}</dd>
+                <dt>PDF da DOF</dt><dd>{dof?.pdf ? <BotaoAnexo anexo={dof.pdf} /> : '—'}</dd>
+                <dt>Boletim de Inspeção</dt><dd>{entrega?.boletim ? <>{entrega.boletim.numero} · {data(entrega.boletim.data)} · {cad.nomeEmpresa(entrega.boletim.empresaInspetoraId)}{entrega.boletim.arquivo ? <> · <BotaoAnexo anexo={entrega.boletim.arquivo} /></> : ''}</> : '—'}</dd>
                 {entrega?.boletim?.itens.length ? <><dt>Aprovados no boletim</dt><dd>{entrega.boletim.itens.map((i) => `${cad.descreverTamanho(i.tamanhoId)} · ${cad.nomeEspecie(i.especieId)}: ${numero(i.quantidade)}`).join('; ')}</dd></> : null}
-                <dt>Relatório Técnico</dt><dd>{entrega?.relatorioTecnico ? `${entrega.relatorioTecnico.numero} · ${data(entrega.relatorioTecnico.data)}${entrega.relatorioTecnico.arquivo ? ` · ${entrega.relatorioTecnico.arquivo.nome}` : ''}` : '—'}</dd>
-                <dt>Canhoto da NF</dt><dd>{rec.canhoto?.nome ?? 'Sem foto'} (recebimento provisório em {dataHora(rec.recebidoEm)})</dd>
+                <dt>Relatório Técnico</dt><dd>{entrega?.relatorioTecnico ? <>{entrega.relatorioTecnico.numero} · {data(entrega.relatorioTecnico.data)}{entrega.relatorioTecnico.arquivo ? <> · <BotaoAnexo anexo={entrega.relatorioTecnico.arquivo} /></> : ''}</> : '—'}</dd>
+                <dt>Canhoto da NF</dt><dd>{rec.canhoto ? <><BotaoAnexo anexo={rec.canhoto} /> (recebimento provisório em {dataHora(rec.recebidoEm)})</> : <>Sem foto (recebimento provisório em {dataHora(rec.recebidoEm)})</>}</dd>
                 <dt>Laudo Técnico</dt><dd>{entrega?.laudo
                   ? `${entrega.laudo.numero} · ${dataHora(entrega.laudo.emitidoEm)} · ${entrega.laudo.emitidoPor} · ${numero(entrega.laudo.aprovados)} aprovados, ${numero(entrega.laudo.reprovados)} reprovados`
                   : entrega?.prazoLaudo ? `A emitir até ${data(entrega.prazoLaudo)} (20 dias úteis da entrega)` : '—'}</dd>
@@ -156,7 +157,7 @@ export default function RecebimentoDetalhe() {
                 <li key={n}>
                   <BadgeDe mapa={TIPO_OCORRENCIA} valor={o.tipo} /> {o.fardoId && <span className="mono">{o.fardoId}</span>} {o.quantidade ? <Badge tom="laranja">{numero(o.quantidade)} dormente(s) faltando</Badge> : null} {o.automatica && <Badge tom="cinza">registrada pelo sistema</Badge>}
                   <p>{o.descricao}</p>
-                  {o.fotos.length > 0 && <p className="mudo">Fotos: {o.fotos.map((f) => f.nome).join(', ')}</p>}
+                  {o.fotos.length > 0 && <p className="mudo">Fotos: {o.fotos.map((f, i) => <span key={f.id ?? i}>{i > 0 && ', '}<BotaoAnexo anexo={f} /></span>)}</p>}
                 </li>
               ))}
             </ul>

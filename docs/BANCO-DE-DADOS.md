@@ -122,8 +122,14 @@ ficha sem novo login) e "Sair" a apaga. Sem `VITE_FONTE_DADOS`, o app volta ao m
   PostgREST (por isso o `seed.sql` roda e o mesmo `carregar_demonstracao` falhava pelo app) e o PGlite dos testes não
   tem a extensão. Comando que é mesmo para todas as linhas leva `where true`. `TRUNCATE` não é barrado. O teste
   `safeupdate.test.ts` lê o código final de cada função do banco e falha se achar um sem WHERE.
-- **Arquivos:** enviados antes ao bucket `anexos` (`<pasta>/<uuid>/<arquivo>`); a função recebe `{ nome, tipo,
-  caminho }`. Para abrir, o app pede um link temporário de 1 h.
+- **Arquivos:** enviados antes ao bucket `anexos`; a função recebe `{ nome, tipo, caminho }`. O caminho real é
+  `entregas/<uuid>/<nome>` para o cadastro da NF/DOF (o `uuid` é gerado pelo front, sem o id da entrega no
+  caminho) e `entregas/<idEntrega>/<uuid>/<nome>` para o recebimento (canhoto, fotos de ocorrência). Para abrir,
+  o app gera um link assinado de **5 minutos** no clique ("Abrir"). O bucket não tem política de exclusão: arquivos
+  enviados não podem ser apagados pelo app. Dois cenários deixam **arquivos órfãos** no bucket sem registro em
+  `public.anexos`: (a) o upload terminou mas a função do banco falhou (cada tentativa gera um caminho novo); (b)
+  "Reiniciar dados de demonstração" esvazia a tabela `anexos` sem apagar os objetos do bucket (exigiria service
+  role, que não fica no front). Ambos são aceitos como pendência de baixa prioridade.
 
 ## Testes
 
@@ -139,3 +145,7 @@ Como o PGlite não tem o `pg_safeupdate`, `safeupdate.test.ts` confere estaticam
 - Integração com o sistema de inspeção e com o Sinaflor: fora do protótipo.
 - Parâmetros editáveis (Etapa 11); Painel, alertas e Relatórios do IBAMA (Etapa 10).
 - Medidas dos tamanhos, limites da inspeção e prazos seguem provisórios até a CPTM confirmar.
+- **(baixa prioridade)** O banco aceita qualquer caminho enviado pelo app: a `anexo_novo` não verifica se o objeto
+  existe no bucket nem se o caminho pertence à entidade. Uma checagem futura exigiria a service role.
+- **(baixa prioridade)** Limpeza de arquivos órfãos no bucket (upload sem insert, e após Reiniciar): requer Edge
+  Function com service role.
