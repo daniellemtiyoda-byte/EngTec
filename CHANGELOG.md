@@ -5,6 +5,9 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Alterado
+- 2026-11-14: **Fluxo de trabalho: commit e push a cada alteração aprovada.** Antes, o commit vinha no fim da etapa; agora, assim que a Dani aprova explicitamente uma alteração, ela é registrada no `CHANGELOG.md`, conferida com `npm run build` e `npm test` sem erros e vai para `origin/v2-qrcode` (nunca para `upstream`). Com migração nova, pergunta-se antes se ela já rodou no SQL Editor, pois o push publica na Vercel, que usa o Supabase real. Arquivo: `CLAUDE.md`.
+
 ### Corrigido
 - 2026-11-14: **Etapa 9: "Reiniciar dados de demonstração" falhava no Supabase com `21000 UPDATE requires a WHERE clause` (`0009_safeupdate.sql`).**
   - **Por quê:** o PostgREST do Supabase carrega o `pg_safeupdate`, que recusa UPDATE e DELETE sem WHERE em qualquer comando da requisição, mesmo dentro de funções `security definer`. O PGlite dos testes não tem a extensão e o `seed.sql` roda pelo SQL Editor, fora do PostgREST, por isso nada acusou antes.
