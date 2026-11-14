@@ -16,6 +16,7 @@ describe('rotaDoCodigo', () => {
 describe('destinoBusca', () => {
   it('código vai ao objeto, número de NF a NF e DOF, texto livre aos contratos', () => {
     expect(destinoBusca(' AR00224-01-F001 ')).toBe('/f/AR00224-01-F001');
+    expect(destinoBusca('ar00224')).toBe('/atas/AR00224');
     expect(destinoBusca('4507')).toBe('/documentos?q=4507');
     expect(destinoBusca('NF 4507')).toBe('/documentos?q=4507');
     expect(destinoBusca('Madeireira')).toBe('/contratos?q=Madeireira');

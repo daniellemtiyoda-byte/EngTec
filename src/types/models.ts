@@ -151,7 +151,13 @@ export interface RegrasAta { pedidoMinimo: number; maxParcelas: number; parcelaM
 /** Quantidade registrada na ata por tamanho; contratado e saldo são calculados pelos contratos não cancelados. */
 export interface ItemAta { tamanhoId: Id; quantidade: number; contratado: number; saldo: number }
 
-/** Ata de registro de preços: fornecedor, vigência (12 meses), regras e as quantidades registradas. Não existe AF: cada pedido é um contrato. */
+/** Vigência da ata pela data de hoje: ainda não começou, vale ou já venceu. */
+export type SituacaoAta = 'a_iniciar' | 'vigente' | 'vencida';
+
+/**
+ * Ata de registro de preços: fornecedor, vigência, regras de fornecimento e as quantidades registradas, tudo próprio de
+ * cada ata. Não existe AF: cada pedido é um contrato. Editável até o primeiro contrato (cancelado também conta).
+ */
 export interface Ata {
   id: Id;
   numero: string;
@@ -160,8 +166,15 @@ export interface Ata {
   vigenciaFim: string;
   regras: RegrasAta;
   itens: ItemAta[];
-  // calculado:
+  // calculados:
   vigente: boolean;
+  situacao: SituacaoAta;
+  /** Dias até o fim da vigência (negativo depois de vencida). */
+  diasParaVencer: number;
+  /** Contratos da ata, inclusive cancelados. */
+  contratos: number;
+  /** Sem nenhum contrato: regras, vigência e itens ainda podem mudar. */
+  editavel: boolean;
 }
 
 export type SituacaoContrato = 'vigente' | 'concluido' | 'cancelado';

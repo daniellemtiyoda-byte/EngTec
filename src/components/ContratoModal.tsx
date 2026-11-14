@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from 'react';
 import { avisoSequenciaContrato, gestorSugerido, proximoNumeroContrato } from '../dominio/contratos';
-import { RE_ATA, RE_CONTRATO } from '../dominio/identificacao';
-import { REGRAS_ATA_PADRAO, VIGENCIA_ATA_MESES, dataSP, janelaParcela, somarDias, somarMeses } from '../dominio/parametros';
+import { Link } from 'react-router-dom';
+import { RE_CONTRATO } from '../dominio/identificacao';
+import { REGRAS_ATA_PADRAO, dataSP, janelaParcela } from '../dominio/parametros';
 import type { Cadastros } from '../hooks/useCadastros';
 import { servicos } from '../services';
 import type { DadosParcela } from '../services/contracts';
@@ -27,8 +28,8 @@ const parcelaVazia = (): LinhaParcela => ({ chave: proximaChave++, itens: [itemV
 
 /**
  * Novo contrato e edição (seção 9.3 do plano), conforme os documentos da CPTM: não existe AF, cada pedido é um contrato
- * sob a ata. A ata (escolhida ou criada aqui) traz o fornecedor, a vigência de 12 meses e as regras (pedido mínimo,
- * número e tamanho das parcelas, prazos). O contrato tem data de assinatura, gestor e o cronograma: as parcelas, cada
+ * sob a ata. A ata (cadastrada antes, em Atas, e vigente) traz o fornecedor, os tamanhos registrados e as regras dela
+ * (pedido mínimo, número e tamanho das parcelas, prazos). O contrato tem data de assinatura, gestor e o cronograma: as parcelas, cada
  * uma com a quantidade por tamanho (código de material CPTM). Os itens do contrato são a soma das parcelas; a tela
  * mostra a janela de cada parcela e o total, e o serviço valida as regras da ata.
  */
@@ -36,9 +37,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
   const formId = useId();
   const editando = !!contrato;
   const hoje = dataSP(new Date());
-  const [modoAta, setModoAta] = useState<'existente' | 'nova'>('existente');
   const [ataId, setAtaId] = useState('');
-  const [novaAta, setNovaAta] = useState({ numero: '', fornecedorId: '', vigenciaInicio: '' });
   const [numeroContrato, setNumero] = useState('');
   const [ano, setAno] = useState(String(new Date().getFullYear()));
   const [dataAssinatura, setAssinatura] = useState(hoje);
@@ -51,7 +50,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
 
   useEffect(() => {
     if (!aberto) return;
-    setErros({}); setErroGeral(undefined); setModoAta('existente'); setNovaAta({ numero: '', fornecedorId: '', vigenciaInicio: hoje });
+    setErros({}); setErroGeral(undefined);
     if (contrato) {
       setAtaId(contrato.ataId); setNumero(contrato.numero); setAno(String(contrato.ano)); setAssinatura(contrato.dataAssinatura); setGestor(contrato.gestor);
       setParcelas(contrato.parcelas.map((p) => ({ chave: proximaChave++, itens: p.itens.map((i) => ({ chave: proximaChave++, tamanhoId: i.tamanhoId, quantidade: String(i.quantidade) })) })));
@@ -62,13 +61,14 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
 
   const listas = cad.listas;
   const liberado = (fornecedorId: string) => { const f = cad.fornecedores.get(fornecedorId); return !!f && f.situacao === 'ativo' && !f.bloqueado; };
-  const ata = modoAta === 'existente' ? cad.atas.get(ataId) : undefined;
+  const ata = cad.atas.get(ataId);
+  // Sem ata escolhida, as regras padrão só servem para a validação da tela, que já pede a ata.
   const regras: RegrasAta = ata?.regras ?? REGRAS_ATA_PADRAO;
-  const fornecedorId = modoAta === 'nova' ? novaAta.fornecedorId : ata?.fornecedorId ?? '';
-  const fornecedor = cad.fornecedores.get(fornecedorId);
-  const numeroAta = modoAta === 'nova' ? novaAta.numero.trim().toUpperCase() : ata?.numero ?? '';
-  const fimNovaAta = novaAta.vigenciaInicio ? somarDias(somarMeses(novaAta.vigenciaInicio, VIGENCIA_ATA_MESES), -1) : '';
-  // Tamanhos: com ata existente que registra quantidades, os dela; senão, todos os ativos.
+  const fornecedor = cad.fornecedores.get(ata?.fornecedorId ?? '');
+  const numeroAta = ata?.numero ?? '';
+  // Atas para novo contrato: vigentes e de fornecedor liberado.
+  const atasDisponiveis = (listas?.atas ?? []).filter((a) => a.vigente && liberado(a.fornecedorId));
+  // Tamanhos: os registrados na ata (ata antiga sem itens: todos os ativos).
   const tamanhos = (listas?.tamanhos ?? []).filter((t) => (t.ativo || contrato?.itens.some((i) => i.tamanhoId === t.id)) && (!ata?.itens.length || ata.itens.some((i) => i.tamanhoId === t.id)));
   const saldoAta = (tamanhoId: string) => {
     const i = ata?.itens.find((x) => x.tamanhoId === tamanhoId);
@@ -85,16 +85,12 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
   const contratosDaAta = ata ? (todosContratos ?? []).filter((c) => c.ataId === ata.id) : [];
 
   // Ao escolher a ata, o número do contrato vem com a próxima sequência e o gestor com o do contrato mais recente
-  // (editáveis). Ata nova ou sem contratos: número só com o prefixo da ata e gestor vazio.
+  // (editáveis). Ata sem contratos: a sequência começa em 01 e o gestor fica vazio.
   useEffect(() => {
-    if (editando) return;
-    if (modoAta === 'existente' && ata && todosContratos) {
-      setNumero(proximoNumeroContrato(ata.numero, contratosDaAta));
-      setGestor(gestorSugerido(contratosDaAta));
-    } else if (numeroAta && (!numeroContrato || !numeroContrato.startsWith(`${numeroAta}-`))) {
-      setNumero(`${numeroAta}-`);
-    }
-  }, [numeroAta, modoAta, todosContratos]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (editando || !ata || !todosContratos) return;
+    setNumero(proximoNumeroContrato(ata.numero, contratosDaAta));
+    setGestor(gestorSugerido(contratosDaAta));
+  }, [numeroAta, todosContratos]); // eslint-disable-line react-hooks/exhaustive-deps
   const avisoSequencia = editando ? undefined : avisoSequenciaContrato(numeroContrato, numeroAta, contratosDaAta);
 
   const somaParcela = (p: LinhaParcela) => p.itens.reduce((t, i) => t + (paraNumero(i.quantidade, true) || 0), 0);
@@ -105,12 +101,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
   function validar(): Record<string, string> {
     const e: Record<string, string> = {};
     if (!editando) {
-      if (modoAta === 'existente' && !ataId) e.ataId = 'Escolha a ata.';
-      if (modoAta === 'nova') {
-        if (!RE_ATA.test(numeroAta)) e['ata.numero'] = 'Número no formato AA00000 (ex. AR00224).';
-        if (!novaAta.fornecedorId) e['ata.fornecedorId'] = 'Escolha o fornecedor.';
-        if (!novaAta.vigenciaInicio) e['ata.vigenciaInicio'] = 'Informe o início da vigência.';
-      }
+      if (!ataId) e.ataId = 'Escolha a ata.';
       const n = numeroContrato.trim().toUpperCase();
       if (!RE_CONTRATO.test(n)) e.numero = 'Número no formato AA00000-00 (ex. AR00224-01).';
       else if (numeroAta && !n.startsWith(`${numeroAta}-`)) e.numero = `O contrato começa pelo número da ata (${numeroAta}-).`;
@@ -145,18 +136,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
       if (contrato) {
         salvo = await servicos.contratos.atualizar(contrato.numero, { gestor: gestor.trim(), parcelas: paraParcelas() });
       } else {
-        let idAta = ataId;
-        if (modoAta === 'nova') {
-          try {
-            idAta = (await servicos.atas.criar({ ...novaAta, numero: numeroAta })).id;
-          } catch (err) {
-            // Erros da ata voltam com os nomes dos campos da ata.
-            if (err instanceof ApiError && err.detalhes) throw new ApiError(err.status, err.message, Object.fromEntries(Object.entries(err.detalhes).map(([k, v]) => [`ata.${k}`, v])));
-            throw err;
-          }
-          setModoAta('existente'); setAtaId(idAta); cad.recarregar();
-        }
-        salvo = await servicos.contratos.criar({ numero: numeroContrato.trim().toUpperCase(), ataId: idAta, ano: Number(ano), dataAssinatura, gestor: gestor.trim(), parcelas: paraParcelas() });
+        salvo = await servicos.contratos.criar({ numero: numeroContrato.trim().toUpperCase(), ataId, ano: Number(ano), dataAssinatura, gestor: gestor.trim(), parcelas: paraParcelas() });
       }
       aoSalvar(salvo);
     } catch (err) {
@@ -188,55 +168,22 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
             <p>Ata {numeroAta} · {fornecedor?.razaoSocial ?? '—'}</p>
           ) : (
             <>
-              <div className="opcoes-ata" role="radiogroup" aria-label="Ata">
-                <label className="caixa"><input type="radio" name={`${formId}-ata`} checked={modoAta === 'existente'} onChange={() => setModoAta('existente')} /> Ata já cadastrada</label>
-                <label className="caixa"><input type="radio" name={`${formId}-ata`} checked={modoAta === 'nova'} onChange={() => setModoAta('nova')} /> Nova ata</label>
+              <div className="campo">
+                <label htmlFor={`${formId}-ataId`}>Ata<span className="obrig" aria-hidden="true"> *</span></label>
+                <select id={`${formId}-ataId`} value={ataId} onChange={(e) => setAtaId(e.target.value)} {...invalido('ataId')}>
+                  <option value="">Selecione…</option>
+                  {atasDisponiveis.map((a) => <option key={a.id} value={a.id}>{a.numero} · {cad.nomeFornecedor(a.fornecedorId)} · até {data(a.vigenciaFim)}</option>)}
+                </select>
+                <span className="ajuda">Só atas vigentes, de fornecedor liberado. A ata é cadastrada antes, em <Link to="/atas">Atas</Link>.</span>
+                {erro('ataId')}
               </div>
-              {modoAta === 'existente' ? (
-                <div className="campo">
-                  <label htmlFor={`${formId}-ataId`}>Ata<span className="obrig" aria-hidden="true"> *</span></label>
-                  <select id={`${formId}-ataId`} value={ataId} onChange={(e) => setAtaId(e.target.value)} {...invalido('ataId')}>
-                    <option value="">Selecione…</option>
-                    {(listas?.atas ?? []).map((a) => (
-                      <option key={a.id} value={a.id} disabled={!liberado(a.fornecedorId) || !a.vigente}>
-                        {a.numero} · {cad.nomeFornecedor(a.fornecedorId)} · até {data(a.vigenciaFim)}
-                        {!liberado(a.fornecedorId) ? ' (fornecedor bloqueado ou inativo)' : !a.vigente ? ' (fora da vigência)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {erro('ataId')}
-                </div>
-              ) : (
-                <div className="linha-campos-2">
-                  <div className="campo">
-                    <label htmlFor={`${formId}-ata-numero`}>Número da ata<span className="obrig" aria-hidden="true"> *</span></label>
-                    <input id={`${formId}-ata-numero`} value={novaAta.numero} maxLength={7} placeholder="AR00224" onChange={(e) => setNovaAta((a) => ({ ...a, numero: e.target.value }))} {...invalido('ata.numero')} />
-                    {erro('ata.numero')}
-                  </div>
-                  <div className="campo">
-                    <label htmlFor={`${formId}-ata-forn`}>Fornecedor<span className="obrig" aria-hidden="true"> *</span></label>
-                    <select id={`${formId}-ata-forn`} value={novaAta.fornecedorId} onChange={(e) => setNovaAta((a) => ({ ...a, fornecedorId: e.target.value }))} {...invalido('ata.fornecedorId')}>
-                      <option value="">Selecione…</option>
-                      {(listas?.fornecedores ?? []).filter((f) => liberado(f.id)).map((f) => <option key={f.id} value={f.id}>{f.razaoSocial}</option>)}
-                    </select>
-                    <span className="ajuda">Fornecedor inativo ou com CTF vencido não aparece.</span>
-                    {erro('ata.fornecedorId')}
-                  </div>
-                  <div className="campo">
-                    <label htmlFor={`${formId}-ata-ini`}>Início da vigência<span className="obrig" aria-hidden="true"> *</span></label>
-                    <input id={`${formId}-ata-ini`} type="date" value={novaAta.vigenciaInicio} onChange={(e) => setNovaAta((a) => ({ ...a, vigenciaInicio: e.target.value }))} {...invalido('ata.vigenciaInicio')} />
-                    {fimNovaAta && <span className="ajuda">Vigência de {VIGENCIA_ATA_MESES} meses: até {data(fimNovaAta)}.</span>}
-                    {erro('ata.vigenciaInicio')}
-                  </div>
-                </div>
-              )}
               {fornecedor && <p className="mudo">Fornecedor do contrato (vem da ata): <strong>{fornecedor.razaoSocial}</strong></p>}
             </>
           )}
-          <p className="ajuda">
-            Regras da ata: pedido mínimo de {numero(regras.pedidoMinimo)} dormentes; até {regras.maxParcelas} parcelas de {numero(regras.parcelaMinima)} a {numero(regras.parcelaMaxima)},
-            com prazos contados da assinatura ({prazos.map(([de, ate], n) => `${n + 1}ª: ${n === 0 ? `até ${ate}` : `${de} a ${ate}`} dias`).join('; ')}).
-          </p>
+          {ata && <p className="ajuda">
+            Regras da ata {ata.numero}: pedido mínimo de {numero(regras.pedidoMinimo)} dormentes; até {regras.maxParcelas} parcelas de {numero(regras.parcelaMinima)} a {numero(regras.parcelaMaxima)},
+            com prazos contados da assinatura ({prazos.slice(0, regras.maxParcelas).map(([de, ate], n) => `${n + 1}ª: ${n === 0 ? `até ${ate}` : `${de} a ${ate}`} dias`).join('; ')}).
+          </p>}
         </fieldset>
 
         <fieldset className="secao-formulario">

@@ -706,15 +706,9 @@ span.codigo { font-weight: 600; color: var(--texto); }
 .lista-regras dt { color: var(--texto-2); min-width: 14rem; }
 .lista-regras dd { margin: 0; font-weight: 600; }
 
-/* Regras da ata: janela de entrega de cada parcela, em dias da assinatura. */
-.janela-ata { display: grid; grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--esp-2); align-items: end; }
-.janela-ata > strong { padding-bottom: var(--esp-2); }
-.janela-ata .erro-campo { grid-column: 1 / -1; }
 @media (max-width: 760px) {
   .parcela-item { grid-template-columns: 1fr 110px; }
   .parcela-item > .btn { grid-column: 1 / -1; justify-self: start; }
-  .janela-ata { grid-template-columns: 1fr 1fr; }
-  .janela-ata > strong, .janela-ata > .btn { grid-column: 1 / -1; justify-self: start; }
 }
 
 /* Inventário: grupos do resultado (local errado, não encontrado, inesperado). */

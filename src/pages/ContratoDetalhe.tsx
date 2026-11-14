@@ -82,7 +82,7 @@ export default function ContratoDetalhe() {
         </>}
         fatos={<>
           <FatoChave rotulo="Fornecedor" valor={cad.nomeFornecedor(c.fornecedorId)} para={`/fornecedores/${c.fornecedorId}`} />
-          <FatoChave rotulo="Ata" valor={<span className="mono">{ata?.numero ?? '—'}</span>} />
+          <FatoChave rotulo="Ata" valor={<span className="mono">{ata?.numero ?? '—'}</span>} para={ata ? `/atas/${ata.numero}` : undefined} />
           <FatoChave rotulo="Assinatura" valor={data(c.dataAssinatura)} />
           <FatoChave rotulo="Gestor" valor={c.gestor} />
           <FatoChave rotulo="Contratado" valor={numero(t.contratado)} />

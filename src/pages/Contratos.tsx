@@ -39,7 +39,7 @@ export default function Contratos() {
 
   const colunas: Coluna<Contrato>[] = [
     { chave: 'numero', titulo: 'Contrato', ordenavel: true, render: (c) => <IdCodigo id={c.numero} para={`/contratos/${c.numero}`} /> },
-    { chave: 'ataId', titulo: 'Ata', render: (c) => <span className="mono">{cad.numeroAta(c.ataId)}</span> },
+    { chave: 'ataId', titulo: 'Ata', render: (c) => <Link className="mono" to={`/atas/${cad.numeroAta(c.ataId)}`}>{cad.numeroAta(c.ataId)}</Link> },
     { chave: 'fornecedorId', titulo: 'Fornecedor', quebrar: true, render: (c) => <Link to={`/fornecedores/${c.fornecedorId}`}>{cad.nomeFornecedor(c.fornecedorId)}</Link> },
     { chave: 'itens', titulo: 'Itens', quebrar: true, render: (c) => c.itens.filter((i) => i.quantidade > 0).map((i) => `${cad.descreverTamanho(i.tamanhoId)} (${numero(i.quantidade)})`).join('; ') },
     {

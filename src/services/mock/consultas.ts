@@ -56,9 +56,12 @@ export function volumeDoItem(e: Estado, itemContratoId: Id): number {
 
 /** Ata com o contratado e o saldo por tamanho (contratos não cancelados) e se está vigente hoje. */
 export function ataView(e: Estado, a: AtaReg, hoje: string): Ata {
-  const contratos = e.contratos.filter((c) => c.ataId === a.id && c.situacao !== 'cancelado');
+  const todos = e.contratos.filter((c) => c.ataId === a.id);
+  const contratos = todos.filter((c) => c.situacao !== 'cancelado');
+  const situacao = hoje < a.vigenciaInicio ? 'a_iniciar' : hoje > a.vigenciaFim ? 'vencida' : 'vigente';
   return {
-    ...a, vigente: a.vigenciaInicio <= hoje && hoje <= a.vigenciaFim,
+    ...a, vigente: situacao === 'vigente', situacao, diasParaVencer: diasEntre(hoje, a.vigenciaFim),
+    contratos: todos.length, editavel: todos.length === 0,
     itens: a.itens.map((i) => {
       const contratado = contratos.flatMap((c) => c.itens).filter((x) => x.tamanhoId === i.tamanhoId).reduce((t, x) => t + x.quantidade, 0);
       return { ...i, contratado, saldo: i.quantidade - contratado };

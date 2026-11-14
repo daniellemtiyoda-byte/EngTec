@@ -35,7 +35,10 @@ export interface DadosEmpresaInspetora { nome: string; cnpj?: string }
 export interface DadosLocal { codigo: string; descricao: string; tipo: Local['tipo']; capacidade: number }
 
 /** Sem `vigenciaFim`, a vigência é de 12 meses; sem `regras`, as padrão (REGRAS_ATA_PADRAO); `itens`: quantidades registradas por tamanho. */
-export interface DadosAta { numero: string; fornecedorId: Id; vigenciaInicio: string; vigenciaFim?: string; regras?: Partial<RegrasAta>; itens?: { tamanhoId: Id; quantidade: number }[] }
+/** Itens obrigatórios (ao menos um): a ata registra cada tamanho e o teto de cada um. */
+export interface DadosAta { numero: string; fornecedorId: Id; vigenciaInicio: string; vigenciaFim?: string; regras?: Partial<RegrasAta>; itens: { tamanhoId: Id; quantidade: number }[] }
+/** Edição da ata (o número não muda): só enquanto ela não tem contrato. */
+export type DadosAtualizacaoAta = Omit<DadosAta, 'numero'>;
 /** Parcela do cronograma: quantidade por tamanho. Os itens do contrato são a soma das parcelas. */
 export interface DadosParcela { itens: { tamanhoId: Id; quantidade: number }[] }
 export interface DadosContrato { numero: string; ataId: Id; ano: number; dataAssinatura: string; gestor: string; parcelas: DadosParcela[] }
@@ -105,7 +108,7 @@ export interface Servicos {
   /** As contas são criadas no painel do Supabase; aqui só perfil e situação. */
   usuarios: ServicoLista<Usuario> & { atualizar(id: Id, dados: { perfil?: Usuario['perfil']; ativo?: boolean }): Promise<Usuario> };
 
-  atas: ServicoLista<Ata> & { criar(dados: DadosAta): Promise<Ata> };
+  atas: ServicoLista<Ata> & { obter(numero: string): Promise<Ata>; criar(dados: DadosAta): Promise<Ata>; atualizar(numero: string, dados: DadosAtualizacaoAta): Promise<Ata> };
   /** `filters.especieId` traz os contratos que têm item da espécie. */
   contratos: ServicoLista<Contrato> & {
     obter(numero: string): Promise<Contrato>;

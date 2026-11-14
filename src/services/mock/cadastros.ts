@@ -2,7 +2,7 @@ import { RE_ATA, RE_CODIGO_LOCAL, RE_CONTRATO } from '../../dominio/identificaca
 import { REGRAS_ATA_PADRAO, VIGENCIA_ATA_MESES, somarDias, somarMeses } from '../../dominio/parametros';
 import type { EmpresaInspetora, Especie, Id, RegrasAta, Tratamento } from '../../types/models';
 import type {
-  DadosAta, DadosAtualizacaoContrato, DadosContrato, DadosEmpresaInspetora, DadosEspecie, DadosFornecedor, DadosLocal, DadosParcela, DadosTamanho, DadosTratamento,
+  DadosAta, DadosAtualizacaoAta, DadosAtualizacaoContrato, DadosContrato, DadosEmpresaInspetora, DadosEspecie, DadosFornecedor, DadosLocal, DadosParcela, DadosTamanho, DadosTratamento,
 } from '../contracts';
 import { ataView, contratoView, fornecedorView, localView } from './consultas';
 import {
@@ -180,20 +180,25 @@ function regrasDaAta(r: Partial<RegrasAta> | undefined, campos: Record<string, s
   if (!inteiro(regras.maxParcelas) || regras.maxParcelas > regras.prazosParcelas.length) campos['regras.maxParcelas'] = `De 1 a ${regras.prazosParcelas.length} parcelas.`;
   if (!inteiro(regras.parcelaMinima)) campos['regras.parcelaMinima'] = 'Parcela mínima em dormentes, maior que zero.';
   if (!inteiro(regras.parcelaMaxima) || regras.parcelaMaxima < regras.parcelaMinima) campos['regras.parcelaMaxima'] = 'A parcela máxima não pode ser menor que a mínima.';
+  // Janelas de entrega em dias da assinatura: a 1ª começa em 0 ou depois, cada uma termina depois de começar e a seguinte
+  // começa depois do fim da anterior.
+  let fimAnterior = -1;
+  regras.prazosParcelas.forEach(([de, ate], n) => {
+    if (!Number.isInteger(de) || !Number.isInteger(ate) || de < 0 || ate < de) campos[`regras.prazosParcelas.${n}`] = 'Janela em dias da assinatura: o fim não vem antes do início.';
+    else if (de <= fimAnterior) campos[`regras.prazosParcelas.${n}`] = `A ${n + 1}ª parcela começa depois do fim da anterior (dia ${fimAnterior}).`;
+    fimAnterior = Number.isInteger(ate) ? ate : fimAnterior;
+  });
   return regras;
 }
 
-/** Ata de registro de preços: fornecedor liberado, vigência de 12 meses (padrão), regras e quantidades registradas por tamanho. */
-export function criarAta(e: Estado, dados: DadosAta, ctx: Ctx): AtaReg {
-  const numero = (dados.numero ?? '').trim().toUpperCase();
-  const campos: Record<string, string> = {};
-  if (!RE_ATA.test(numero)) campos.numero = 'Número no formato AA00000 (ex. AR00224).';
-  else if (e.atas.some((a) => a.numero === numero)) campos.numero = 'Ata já cadastrada.';
+/** Vigência, regras e itens da ata (cadastro e edição): itens obrigatórios, um por tamanho ativo, com quantidade. */
+function dadosDaAta(e: Estado, dados: DadosAtualizacaoAta, campos: Record<string, string>) {
   if (!DATA.test(dados.vigenciaInicio ?? '')) campos.vigenciaInicio = 'Informe o início da vigência.';
   const vigenciaFim = dados.vigenciaFim || (DATA.test(dados.vigenciaInicio ?? '') ? somarDias(somarMeses(dados.vigenciaInicio, VIGENCIA_ATA_MESES), -1) : '');
   if (!DATA.test(vigenciaFim)) campos.vigenciaFim = 'Informe o fim da vigência.';
-  else if (vigenciaFim < dados.vigenciaInicio) campos.vigenciaFim = 'O fim vem depois do início.';
+  else if (vigenciaFim <= dados.vigenciaInicio) campos.vigenciaFim = 'O fim vem depois do início.';
   const regras = regrasDaAta(dados.regras, campos);
+  if (!dados.itens?.length) campos.itens = 'Registre ao menos um tamanho com a quantidade.';
   const vistos = new Set<Id>();
   (dados.itens ?? []).forEach((i, n) => {
     if (!e.tamanhos.some((t) => t.id === i.tamanhoId && t.ativo)) campos[`itens.${n}`] = 'Escolha um tamanho ativo.';
@@ -201,14 +206,38 @@ export function criarAta(e: Estado, dados: DadosAta, ctx: Ctx): AtaReg {
     else if (!Number.isInteger(i.quantidade) || i.quantidade <= 0) campos[`itens.${n}`] = 'Quantidade registrada em unidades, maior que zero.';
     vistos.add(i.tamanhoId);
   });
+  return { vigenciaFim, regras, itens: (dados.itens ?? []).map((i) => ({ tamanhoId: i.tamanhoId, quantidade: i.quantidade })) };
+}
+
+/** Ata de registro de preços: fornecedor liberado, vigência (12 meses sugeridos), regras próprias e os itens registrados. */
+export function criarAta(e: Estado, dados: DadosAta, ctx: Ctx): AtaReg {
+  const numero = (dados.numero ?? '').trim().toUpperCase();
+  const campos: Record<string, string> = {};
+  if (!RE_ATA.test(numero)) campos.numero = 'Número no formato AA00000 (ex. AR00224).';
+  else if (e.atas.some((a) => a.numero === numero)) campos.numero = 'Ata já cadastrada.';
+  const v = dadosDaAta(e, dados, campos);
   exigirCampos(campos);
   exigirFornecedorLiberado(e, dados.fornecedorId, ctx, 'fornecedorId');
-  const ata: AtaReg = {
-    id: novoId(e, 'at'), numero, fornecedorId: dados.fornecedorId, vigenciaInicio: dados.vigenciaInicio, vigenciaFim, regras,
-    itens: (dados.itens ?? []).map((i) => ({ tamanhoId: i.tamanhoId, quantidade: i.quantidade })),
-  };
+  const ata: AtaReg = { id: novoId(e, 'at'), numero, fornecedorId: dados.fornecedorId, vigenciaInicio: dados.vigenciaInicio, ...v };
   e.atas.push(ata);
   registrar(e, ctx, 'ata', ata.id, 'criado', `Ata ${ata.numero} cadastrada (vigência até ${ata.vigenciaFim})`, ata.numero);
+  return ata;
+}
+
+/**
+ * Edição da ata (fornecedor, vigência, regras e itens; o número não muda) só enquanto ela não tem contrato, cancelado
+ * também: o primeiro contrato é o momento em que as regras são validadas e passam a valer.
+ */
+export function atualizarAta(e: Estado, numero: string, dados: DadosAtualizacaoAta, ctx: Ctx): AtaReg {
+  const ata = achar(e.atas, (a) => a.numero === (numero ?? '').trim().toUpperCase(), `Ata ${numero}`);
+  const n = e.contratos.filter((c) => c.ataId === ata.id).length;
+  if (n) falha(409, `A ata ${ata.numero} já tem ${n === 1 ? 'um contrato' : `${n} contratos`}: regras, vigência e itens não mudam mais.`);
+  const campos: Record<string, string> = {};
+  const v = dadosDaAta(e, dados, campos);
+  exigirCampos(campos);
+  exigirFornecedorLiberado(e, dados.fornecedorId, ctx, 'fornecedorId');
+  Object.assign(ata, { fornecedorId: dados.fornecedorId, vigenciaInicio: dados.vigenciaInicio, ...v });
+  registrar(e, ctx, 'ata', ata.id, 'alterado', `Ata ${ata.numero} alterada (vigência até ${ata.vigenciaFim})`, ata.numero);
   return ata;
 }
 

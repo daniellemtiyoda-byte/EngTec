@@ -2,6 +2,8 @@ import type { ComponentType } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import type { NomeIcone } from './components/Icone';
 import type { Permissao } from './dominio/permissoes';
+import AtaDetalhe from './pages/AtaDetalhe';
+import Atas from './pages/Atas';
 import Cadastros from './pages/Cadastros';
 import ContratoDetalhe from './pages/ContratoDetalhe';
 import Inspecao from './pages/Inspecao';
@@ -75,6 +77,9 @@ const OPERACAO: Permissao[] = ['operacao:consultar'];
 export const ROTAS: Rota[] = [
   { caminho: '/', tela: Painel, rotulo: 'Painel', icone: 'grid', grupo: 'Início', fim: true },
   { caminho: '/relatorios', tela: Relatorios, rotulo: 'Relatórios', icone: 'clipboard', grupo: 'Início', permissoes: OPERACAO },
+  // Ata antes do contrato: o contrato nasce de uma ata vigente e segue as regras dela.
+  { caminho: '/atas', tela: Atas, rotulo: 'Atas', icone: 'layers', grupo: 'Suprimento', permissoes: OPERACAO },
+  { caminho: '/atas/:numero', tela: AtaDetalhe, rotulo: 'Ata', icone: 'layers', grupo: 'Suprimento', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/contratos', tela: Contratos, rotulo: 'Contratos', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO },
   { caminho: '/contratos/:numero', tela: ContratoDetalhe, rotulo: 'Contrato', icone: 'contrato', grupo: 'Suprimento', permissoes: OPERACAO, foraDoMenu: true },
   { caminho: '/simulador', tela: Simulador, rotulo: 'Simulador do fornecedor', icone: 'fabrica', grupo: 'Suprimento', permissoes: ['simulador:usar'], demo: true },

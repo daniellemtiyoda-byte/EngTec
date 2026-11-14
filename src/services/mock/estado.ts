@@ -12,7 +12,7 @@ import { ApiError } from '../erros';
 export type FornecedorReg = Omit<Fornecedor, 'bloqueado'>;
 export type TamanhoReg = Omit<Tamanho, 'volumeM3'>;
 export type LocalReg = Omit<Local, 'ocupacao' | 'fardos'>;
-export type AtaReg = Omit<Ata, 'itens' | 'vigente'> & { itens: { tamanhoId: Id; quantidade: number }[] };
+export type AtaReg = Omit<Ata, 'itens' | 'vigente' | 'situacao' | 'diasParaVencer' | 'contratos' | 'editavel'> & { itens: { tamanhoId: Id; quantidade: number }[] };
 export type ItemContratoReg = Pick<ItemContrato, 'id' | 'tamanhoId' | 'quantidade'>;
 export type ParcelaReg = Pick<ParcelaContrato, 'numero' | 'itens'>;
 export type ContratoReg = Omit<Contrato, 'fornecedorId' | 'itens' | 'situacao' | 'parcelas' | 'parcelasAtrasadas' | 'recebimentoDefinitivoEm'> & {

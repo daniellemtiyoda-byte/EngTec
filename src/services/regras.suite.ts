@@ -640,7 +640,8 @@ export function regrasDosServicos(montar: Montar, tempoMs?: number) {
     it('ata: vigência de 12 meses e regras padrão; empresa inspetora vem do boletim, só ativa', async () => {
       const { s } = await montar('administrador');
       const fA = (await s.fornecedores.listar()).items.find((f) => f.razaoSocial.startsWith('Madeireira'))!;
-      const ata = await s.atas.criar({ numero: 'AR00999', fornecedorId: fA.id, vigenciaInicio: '2026-11-06' });
+      const t006234 = (await s.tamanhos.listar({ pageSize: 50 })).items.find((x) => x.codigo === '006234')!.id;
+      const ata = await s.atas.criar({ numero: 'AR00999', fornecedorId: fA.id, vigenciaInicio: '2026-11-06', itens: [{ tamanhoId: t006234, quantidade: 100 }] });
       expect([ata.vigenciaFim, ata.regras.pedidoMinimo, ata.regras.prazosParcelas[1]]).toEqual(['2027-11-05', 6000, [91, 120]]);
       await falhaCom(s.empresasInspetoras.criar({ nome: 'ufv' }), 422, 'nome');
       await falhaCom(s.empresasInspetoras.criar({ nome: 'Nova', cnpj: '123' }), 422, 'cnpj');
@@ -691,7 +692,42 @@ export function regrasDosServicos(montar: Montar, tempoMs?: number) {
       const { s } = await montar('administrador');
       const bloqueado = (await s.fornecedores.listar()).items.find((f) => f.bloqueado)!;
       expect(bloqueado.razaoSocial).toBe('Serraria Exemplo C Ltda.');
-      await falhaCom(s.atas.criar({ numero: 'AR00999', fornecedorId: bloqueado.id, vigenciaInicio: '2026-11-06' }), 422, 'fornecedorId');
+      const t006234 = (await s.tamanhos.listar({ pageSize: 50 })).items.find((x) => x.codigo === '006234')!.id;
+      await falhaCom(s.atas.criar({ numero: 'AR00999', fornecedorId: bloqueado.id, vigenciaInicio: '2026-11-06', itens: [{ tamanhoId: t006234, quantidade: 100 }] }), 422, 'fornecedorId');
+    });
+    it('ata: regras, vigência e itens próprios; itens obrigatórios; editável só até o primeiro contrato', async () => {
+      const { s, invariantes } = await montar('administrador');
+      const fA = (await s.fornecedores.listar()).items.find((f) => f.razaoSocial.startsWith('Madeireira'))!;
+      const tamanhos = (await s.tamanhos.listar({ pageSize: 50 })).items;
+      const t = (codigo: string) => tamanhos.find((x) => x.codigo === codigo)!.id;
+      const regras = { pedidoMinimo: 20, maxParcelas: 2, parcelaMinima: 10, parcelaMaxima: 50, prazosParcelas: [[0, 30], [31, 60]] as [number, number][] };
+      const base = { numero: 'AR00998', fornecedorId: fA.id, vigenciaInicio: '2026-11-01', vigenciaFim: '2027-04-30', regras };
+      // Sem itens, janela fora de ordem e vigência ao contrário são recusados.
+      await falhaCom(s.atas.criar({ ...base, itens: [] }), 422, 'itens');
+      await falhaCom(s.atas.criar({ ...base, regras: { ...regras, prazosParcelas: [[0, 30], [20, 60]] }, itens: [{ tamanhoId: t('006234'), quantidade: 100 }] }), 422, 'regras.prazosParcelas.1');
+      await falhaCom(s.atas.criar({ ...base, vigenciaFim: '2026-10-01', itens: [{ tamanhoId: t('006234'), quantidade: 100 }] }), 422, 'vigenciaFim');
+      const ata = await s.atas.criar({ ...base, itens: [{ tamanhoId: t('006234'), quantidade: 100 }] });
+      expect([ata.situacao, ata.editavel, ata.contratos, ata.regras.pedidoMinimo, ata.vigenciaFim]).toEqual(['vigente', true, 0, 20, '2027-04-30']);
+      // Sem contrato, tudo muda (menos o número).
+      const editada = await s.atas.atualizar('AR00998', { ...base, regras: { ...regras, parcelaMaxima: 40 }, itens: [{ tamanhoId: t('006234'), quantidade: 80 }, { tamanhoId: t('006222'), quantidade: 20 }] });
+      expect([editada.numero, editada.regras.parcelaMaxima, editada.itens.map((i) => i.quantidade)]).toEqual(['AR00998', 40, [80, 20]]);
+      // O contrato segue as regras da ata: parcela acima da máxima (40), tamanho fora da ata e o saldo dela.
+      const p = (...itens: [string, number][]) => ({ itens: itens.map(([codigo, quantidade]) => ({ tamanhoId: t(codigo), quantidade })) });
+      const ct = { numero: 'AR00998-01', ataId: ata.id, ano: 2026, dataAssinatura: '2026-11-06', gestor: 'Gestor Exemplo 9' };
+      await falhaCom(s.contratos.criar({ ...ct, parcelas: [p(['006234', 45])] }), 422, 'parcelas.0');
+      await falhaCom(s.contratos.criar({ ...ct, parcelas: [p(['006219', 20])] }), 422, 'parcelas');
+      await falhaCom(s.contratos.criar({ ...ct, parcelas: [p(['006234', 10]), p(['006234', 10]), p(['006234', 10])] }), 422, 'parcelas');
+      const c = await s.contratos.criar({ ...ct, parcelas: [p(['006234', 20]), p(['006222', 10])] });
+      expect(c.parcelas.map((x) => [x.inicio, x.fim])).toEqual([['2026-11-06', '2026-12-06'], ['2026-12-07', '2027-01-05']]);
+      // Depois do primeiro contrato, a ata não muda mais (nem com o contrato cancelado).
+      const depois = await s.atas.obter('AR00998');
+      expect([depois.editavel, depois.contratos, depois.itens[0].saldo]).toEqual([false, 1, 60]);
+      await falhaCom(s.atas.atualizar('AR00998', { ...base, itens: [{ tamanhoId: t('006234'), quantidade: 500 }] }), 409);
+      await s.contratos.cancelar('AR00998-01', 'Teste');
+      await falhaCom(s.atas.atualizar('AR00998', { ...base, itens: [{ tamanhoId: t('006234'), quantidade: 500 }] }), 409);
+      // Situação pela data: a AR00224 da demonstração está vigente.
+      expect((await s.atas.obter('AR00224')).situacao).toBe('vigente');
+      expect(await invariantes()).toEqual([]);
     });
     it('local: código único, que não muda depois, e ID do QR lido como LOC-código', async () => {
       const { s } = await montar('administrador');

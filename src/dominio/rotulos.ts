@@ -1,5 +1,5 @@
 import type {
-  NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEmissao, SituacaoEntrega,
+  NivelAlerta, NivelPrazo, ResultadoInspecao, SituacaoAta, SituacaoCadastro, SituacaoContrato, SituacaoDormente, SituacaoEmissao, SituacaoEntrega,
   SituacaoFardo, SituacaoParcela, SituacaoRme, SituacaoSaldo, TipoDestino, TipoEvento, MotivoPerda, SituacaoInventario, GrupoDiferenca, TipoLocal, TipoMovimentacao, TipoOcorrencia, UsoTamanho,
 } from '../types/models';
 
@@ -42,6 +42,12 @@ export const SITUACAO_ENTREGA: Rotulos<SituacaoEntrega> = {
 export const SITUACAO_EMISSAO: Rotulos<SituacaoEmissao> = {
   aguardando_documentos: ['laranja', 'Aguardando NF e DOF'],
   ...SITUACAO_ENTREGA,
+};
+
+export const SITUACAO_ATA: Rotulos<SituacaoAta> = {
+  vigente: ['verde', 'Vigente'],
+  a_iniciar: ['azul', 'A iniciar'],
+  vencida: ['cinza', 'Vencida'],
 };
 
 export const SITUACAO_CONTRATO: Rotulos<SituacaoContrato> = {

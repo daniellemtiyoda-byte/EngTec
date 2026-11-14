@@ -19,6 +19,7 @@ do modo simulado e valem no banco: o front esconder botões é só UX.
 | `supabase/migrations/0007_demonstracao.sql` | modelo da demonstração, `deslocar_datas`, `carregar_demonstracao` (datas do dia em que roda) e `reiniciar_demonstracao` (só administrador) |
 | `supabase/migrations/0008_privilegios.sql` | privilégios explícitos, segunda camada além da RLS (ideia do banco do Erik): `anon` sem nada; `authenticated` só com `select` nas tabelas e views e `execute` só nas funções que o app chama e nas auxiliares de leitura das views e das políticas; objetos criados depois não ficam abertos a `anon` |
 | `supabase/migrations/0009_safeupdate.sql` | WHERE em todo UPDATE e DELETE das funções (o PostgREST do Supabase usa o `pg_safeupdate`, ver abaixo): `recalcular_chaves` (usada pelo reiniciar), `separar_rme` e `atualizar_parametros`, com os mesmos privilégios |
+| `supabase/migrations/0010_atas.sql` | Atas com regras e itens próprios: `criar_ata` exige ao menos um item e valida as janelas de entrega; `atualizar_ata` (nova) edita fornecedor, vigência, regras e itens só enquanto a ata não tem contrato; `dados_da_ata` (interna) |
 | `supabase/seed.sql` | **gerado** por `npm run seed`: o modelo da história de demonstração (a mesma do modo simulado, mesmos IDs), a ligação das contas `<perfil>@example.com` aos perfis e a carga |
 | `supabase/seed_1.sql`, `seed_2.sql` | plano B, o mesmo conteúdo do `seed.sql` em duas partes, para o editor SQL que recusar os ~530 KB do arquivo inteiro |
 
@@ -47,7 +48,7 @@ No projeto do Supabase (o mesmo da v1), nesta ordem:
    ```
 
    Ele apaga as tabelas, o gatilho e as políticas de Storage da v1. As contas do Auth e os buckets antigos ficam.
-3. **Migrações:** no SQL Editor, um arquivo por vez, em ordem: `0001_tabelas.sql` a `0009_safeupdate.sql`. Cada
+3. **Migrações:** no SQL Editor, um arquivo por vez, em ordem: `0001_tabelas.sql` a `0010_atas.sql`. Cada
    um deve terminar sem erro. A `0002` já cria o perfil (requisitante) das contas que existiam no Auth.
 4. **Contas de demonstração:** Authentication › Users › **Add user › Create new user**, com **Auto Confirm User**
    marcado: `administrador@example.com`, `almoxarife@example.com`, `gestor@example.com`, `requisitante@example.com`

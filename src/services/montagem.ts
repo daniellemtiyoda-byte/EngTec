@@ -3,7 +3,7 @@ import { PERFIS, type Permissao } from '../dominio/permissoes';
 import type { Id, ListQuery, Parametros, SaldoItem, Usuario } from '../types/models';
 import type { ArquivosEntrega, Servicos } from './contracts';
 import {
-  alterarAtivo, atualizarContrato, cancelarContrato, criarAta, criarContrato, inativarLocal, reativarLocal, salvarEmpresaInspetora, salvarEspecie, salvarFornecedor, salvarLocal,
+  alterarAtivo, atualizarContrato, cancelarContrato, criarAta, atualizarAta, criarContrato, inativarLocal, reativarLocal, salvarEmpresaInspetora, salvarEspecie, salvarFornecedor, salvarLocal,
   salvarTamanho, salvarTratamento, situacaoFornecedor,
 } from './mock/cadastros';
 import {
@@ -146,7 +146,9 @@ export function montarServicos(m: Motor): Servicos {
 
     atas: {
       listar: (q) => ler((e) => paginar(e.atas.map((a) => ataView(e, a, dia())), q)),
+      obter: (numero) => ler((e) => ataView(e, achar(e.atas, (a) => a.numero === numero.trim().toUpperCase(), `Ata ${numero}`), dia())),
       criar: (d) => escrever(['contratos:editar'], op('criar_ata', { p_dados: d }), (e, ctx) => criarAta(e, d, ctx).id, (e, k) => ataView(e, achar(e.atas, (a) => a.id === k, 'Ata'), dia())),
+      atualizar: (numero, d) => escrever(['contratos:editar'], op('atualizar_ata', { p_numero: numero, p_dados: d }), (e, ctx) => atualizarAta(e, numero, d, ctx).id, (e, k) => ataView(e, achar(e.atas, (a) => a.id === k, 'Ata'), dia())),
     },
     contratos: {
       listar: (q = {}) => ler((e) => {
