@@ -5,6 +5,15 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-11-14: **Melhoria 7 (base), Simulador › Emitir fardos: divisão sugerida em fardos iguais (só front; `DadosEmissao` e `emitir_fardos` não mudam).**
+  - Ao escolher a parcela, cada tamanho vem com fardos × dormentes por fardo sugeridos pelo que falta emitir na parcela (`sugerirDivisao`: maior número por fardo ≤ padrão que divide o total exatamente; 40 com padrão 14 → 4 × 10; 42 → 3 × 14). Campos continuam editáveis; aviso curto quando o divisor fica abaixo da metade do padrão (ex. total primo) ou passa de 50 fardos.
+  - Cada item mostra a quantidade da parcela, o já emitido nela e o que falta; o saldo do contrato fica como informação secundária.
+  - Padrão por tamanho em `DORMENTES_POR_FARDO_POR_CODIGO` (`parametros.ts`), **provisório: 14 para todos, a CPTM vai confirmar**; tamanho fora da tabela usa o parâmetro das Configurações.
+  - O emitido por parcela não é guardado no contrato: `faltaEmitirNaParcela` supõe que as emissões líquidas preenchem as parcelas em ordem e limita ao saldo a emitir.
+  - **Fica para a versão com banco:** divisão desigual (ex. 14, 14 e 12 em vez de 4 × 10), porque exige mudar `DadosEmissao` e `emitir_fardos` (hoje um item = N fardos iguais) e uma migração.
+  - Testes em `parametros.test.ts` e `contratos.test.ts`. Arquivos: `parametros.ts`, `contratos.ts`, `Simulador.tsx`, `styles.css`.
+
 ### Alterado
 - 2026-11-14: **Categoria A, B, C também no texto dos eventos, só na exibição.** `textoDoEvento` (`rotulos.ts`) troca "categoria 1/2/3" pela letra em `linhaDoEvento` (`LinhaTempo.tsx`); o evento gravado e o seed não mudam. Teste em `rotulos.test.ts`.
 

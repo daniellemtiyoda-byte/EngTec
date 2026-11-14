@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   categoriaDoIndice, diasEntre, diferencaVolumePct, foraDaTolerancia, nivelPrazo, prazoDeclaracao,
-  resultadoDoVeredito, situacaoSaldo, somarDias, unidadesDeM3, volumeM3, somarDiasUteis, diasUteisEntre, FERIADOS_PADRAO,
+  resultadoDoVeredito, situacaoSaldo, sugerirDivisao, somarDias, unidadesDeM3, volumeM3, somarDiasUteis, diasUteisEntre, FERIADOS_PADRAO,
 } from './parametros';
 
 describe('inspeção (provisório)', () => {
@@ -74,5 +74,32 @@ describe('dias úteis com feriados', () => {
     expect(FERIADOS_PADRAO).toHaveLength(26);
     expect(FERIADOS_PADRAO.find((f) => f.data === '2026-04-03')?.nome).toBe('Sexta-feira Santa');
     expect(FERIADOS_PADRAO.find((f) => f.data === '2027-05-27')?.nome).toBe('Corpus Christi');
+  });
+});
+
+describe('sugerirDivisao', () => {
+  it('divisão exata no padrão', () => {
+    expect(sugerirDivisao(42, 14)).toEqual({ fardos: 3, dormentesPorFardo: 14 });
+    expect(sugerirDivisao(14, 14)).toEqual({ fardos: 1, dormentesPorFardo: 14 });
+  });
+  it('40 com padrão 14 → 4 × 10, sem aviso', () => {
+    expect(sugerirDivisao(40, 14)).toEqual({ fardos: 4, dormentesPorFardo: 10 });
+  });
+  it('total primo cai em fardos de 1 e traz aviso', () => {
+    const d = sugerirDivisao(43, 14);
+    expect(d.fardos).toBe(43);
+    expect(d.dormentesPorFardo).toBe(1);
+    expect(d.aviso).toMatch(/43 dormentes/);
+  });
+  it('divisor abaixo da metade do padrão avisa; na metade, não', () => {
+    expect(sugerirDivisao(26, 14).aviso).toBeUndefined(); // 13 × 2
+    expect(sugerirDivisao(38, 14).aviso).toBeDefined(); // 19 × 2 → d = 2
+  });
+  it('total menor que o padrão vira um fardo só; zero não gera fardos', () => {
+    expect(sugerirDivisao(9, 14)).toEqual({ fardos: 1, dormentesPorFardo: 9 });
+    expect(sugerirDivisao(0, 14).fardos).toBe(0);
+  });
+  it('avisa quando passa de 50 fardos', () => {
+    expect(sugerirDivisao(1400, 14).aviso).toMatch(/máximo de 50/);
   });
 });

@@ -518,6 +518,7 @@ span.codigo { font-weight: 600; color: var(--texto); }
 /* Simulador */
 .itens-simulador { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-3); }
 .itens-simulador li { display: grid; grid-template-columns: 1.4fr auto auto 1fr; gap: var(--esp-3); align-items: center; border: 1px solid var(--borda); border-radius: var(--raio); padding: var(--esp-3); }
+.itens-simulador li .aviso-divisao { grid-column: 1 / -1; font-size: .875em; }
 .itens-simulador li.invalido { border-color: var(--critico); }
 .itens-simulador li > div { display: flex; flex-direction: column; }
 .campo-contador { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-13); color: var(--texto-2); }

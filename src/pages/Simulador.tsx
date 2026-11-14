@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BadgeDe, SeloDemo } from '../components/Badge';
 import { CabecalhoPagina } from '../components/Cabecalhos';
 import { Contador } from '../components/Contador';
-import { tamanhosDaParcela } from '../dominio/contratos';
+import { faltaEmitirNaParcela, tamanhosDaParcela } from '../dominio/contratos';
+import { DORMENTES_POR_FARDO_POR_CODIGO, MAX_DORMENTES_POR_FARDO, MAX_FARDOS_POR_ITEM, sugerirDivisao } from '../dominio/parametros';
 import { Aviso } from '../components/Estados';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { Modal } from '../components/Modal';
@@ -42,7 +43,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
   const cad = useCadastros();
   const [passo, setPasso] = useState(0);
   const [contratoId, setContratoId] = useState('');
-  const [qtd, setQtd] = useState<Record<string, { fardos: string; porFardo: string }>>({});
+  const [qtd, setQtd] = useState<Record<string, { fardos: string; porFardo: string; aviso?: string }>>({});
   const [comDocumentos, setComDocumentos] = useState(true);
   const [parcela, setParcela] = useState('');
   const [reentrega, setReentrega] = useState(false);
@@ -56,13 +57,26 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const contrato = contratos.find((c) => c.id === contratoId);
+  const padraoDoTamanho = (tamanhoId: string) => DORMENTES_POR_FARDO_POR_CODIGO[cad.codigoTamanho(tamanhoId)] ?? porFardo;
+
+  /** Ao escolher a parcela, cada item já vem com a divisão sugerida do que falta emitir nela (editável). */
+  function escolherParcela(numeroParcela: string) {
+    setParcela(numeroParcela);
+    const sugestao: typeof qtd = {};
+    for (const { item } of tamanhosDaParcela(contrato, numeroParcela)) {
+      const falta = faltaEmitirNaParcela(contrato, numeroParcela, item.tamanhoId).falta;
+      const d = sugerirDivisao(falta, padraoDoTamanho(item.tamanhoId));
+      sugestao[item.id] = { fardos: String(d.fardos), porFardo: String(d.dormentesPorFardo), aviso: d.aviso };
+    }
+    setQtd(sugestao);
+  }
   const daParcela = contrato?.parcelas.find((p) => String(p.numero) === parcela);
   // Só os tamanhos da parcela escolhida.
   const linhas = tamanhosDaParcela(contrato, parcela).map(({ item: i }) => {
-    const q = qtd[i.id] ?? { fardos: '0', porFardo: String(porFardo) };
+    const q = qtd[i.id] ?? { fardos: '0', porFardo: String(padraoDoTamanho(i.tamanhoId)) };
     const fardos = paraNumero(q.fardos, true) || 0;
     const por = paraNumero(q.porFardo, true) || 0;
-    return { item: i, q, fardos, por, total: fardos * por, passou: fardos * por > i.saldoAEmitir };
+    return { item: i, q, fardos, por, parcela: faltaEmitirNaParcela(contrato, parcela, i.tamanhoId), total: fardos * por, passou: fardos * por > i.saldoAEmitir };
   });
   const totalFardos = linhas.reduce((s, l) => s + l.fardos, 0);
   const totalDormentes = linhas.reduce((s, l) => s + l.total, 0);
@@ -73,7 +87,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
     if (passo === 0 && !daParcela) { setErro('Escolha a parcela do cronograma.'); return; }
     if (passo === 1) {
       if (!totalFardos) { setErro('Informe ao menos um fardo.'); return; }
-      if (linhas.some((l) => l.fardos > 0 && (l.por < 1 || l.por > 50))) { setErro('De 1 a 50 dormentes por fardo.'); return; }
+      if (linhas.some((l) => l.fardos > 0 && (l.por < 1 || l.por > MAX_DORMENTES_POR_FARDO))) { setErro(`De 1 a ${MAX_DORMENTES_POR_FARDO} dormentes por fardo.`); return; }
       if (linhas.some((l) => l.passou)) { setErro('Algum item passa do saldo a emitir (contratado menos emitidos não reprovados).'); return; }
     }
     setPasso((p) => p + 1);
@@ -110,7 +124,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
       {passo === 0 && (
         <div className="campo">
           <label htmlFor="sim-contrato">Contrato vigente<span className="obrig" aria-hidden="true"> *</span></label>
-          <select id="sim-contrato" value={contratoId} onChange={(e) => { setContratoId(e.target.value); setParcela(''); }}>
+          <select id="sim-contrato" value={contratoId} onChange={(e) => { setContratoId(e.target.value); setParcela(''); setQtd({}); }}>
             <option value="">Selecione…</option>
             {contratos.map((c) => <option key={c.id} value={c.id}>{c.numero} · {cad.nomeFornecedor(c.fornecedorId)}</option>)}
           </select>
@@ -118,7 +132,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
           {contrato && (
             <>
               <label htmlFor="sim-parcela">Parcela do cronograma<span className="obrig" aria-hidden="true"> *</span></label>
-              <select id="sim-parcela" value={parcela} onChange={(e) => setParcela(e.target.value)}>
+              <select id="sim-parcela" value={parcela} onChange={(e) => escolherParcela(e.target.value)}>
                 <option value="">Selecione…</option>
                 {contrato.parcelas.map((p) => <option key={p.numero} value={p.numero}>{p.numero}ª · {numero(p.recebidos)} de {numero(p.quantidade)} · até {data(p.fim)}</option>)}
               </select>
@@ -133,15 +147,17 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
             <li key={l.item.id} className={l.passou ? 'invalido' : undefined}>
               <div>
                 <strong>{cad.descreverTamanho(l.item.tamanhoId)}</strong>
-                <span className="mudo">Saldo a emitir: {numero(l.item.saldoAEmitir)} de {numero(l.item.quantidade)}</span>
+                <span className="mudo">Parcela: {numero(l.parcela.quantidade)} · já emitido {numero(l.parcela.emitido)} · falta {numero(l.parcela.falta)}</span>
+                <span className="mudo">Contrato: saldo a emitir {numero(l.item.saldoAEmitir)} de {numero(l.item.quantidade)}</span>
               </div>
               <label className="campo-contador"><span>Fardos</span>
-                <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: fardos`} valor={l.q.fardos} min={0} max={50} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, fardos: v } }))} />
+                <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: fardos`} valor={l.q.fardos} min={0} max={MAX_FARDOS_POR_ITEM} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, fardos: v, aviso: undefined } }))} />
               </label>
               <label className="campo-contador"><span>Dormentes por fardo</span>
-                <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: dormentes por fardo`} valor={l.q.porFardo} min={1} max={50} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, porFardo: v } }))} />
+                <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: dormentes por fardo`} valor={l.q.porFardo} min={1} max={MAX_DORMENTES_POR_FARDO} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, porFardo: v, aviso: undefined } }))} />
               </label>
               <span className={l.passou ? 'texto-critico' : 'mudo'}>{numero(l.total)} dormentes{l.passou && ' · passa do saldo a emitir'}</span>
+              {l.q.aviso && <span className="mudo aviso-divisao">{l.q.aviso}</span>}
             </li>
           ))}
         </ul>

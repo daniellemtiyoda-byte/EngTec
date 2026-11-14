@@ -14,6 +14,14 @@ export const ALERTA_DOF_DIAS_PADRAO: [number, number] = [3, 1];
 /** PROVISÓRIO, a confirmar com o time da inspeção: índice ≥ 80 → categoria 1 (A); ≥ 50 → 2 (B); abaixo → 3 (C). */
 export const LIMITES_CATEGORIA_PADRAO: [number, number] = [80, 50];
 export const DORMENTES_POR_FARDO_PADRAO = 14;
+/**
+ * PROVISÓRIO: a CPTM vai confirmar quantos dormentes cabem num fardo de cada tamanho. Chave = código do tamanho (material
+ * CPTM); tamanho fora da tabela usa o parâmetro "dormentes por fardo" das Configurações.
+ */
+export const DORMENTES_POR_FARDO_POR_CODIGO: Record<string, number> = {
+  '006234': 14, '006219': 14, '006220': 14, '006221': 14, '006222': 14,
+  '006223': 14, '006224': 14, '006225': 14, '006226': 14, '006227': 14, '006228': 14, '006231': 14,
+};
 /** CTF Ibama vencendo em até tantos dias aparece em atenção (o vencido bloqueia o fornecedor). */
 export const DIAS_AVISO_CTF = 30;
 
@@ -217,4 +225,28 @@ export function situacaoSaldo(disponivel: number, minimo: number, maximo: number
   if (disponivel < minimo) return 'falta';
   if (disponivel > maximo) return 'excesso';
   return 'ok';
+}
+
+/** Máximo de dormentes por fardo e de fardos por item aceitos na emissão. */
+export const MAX_DORMENTES_POR_FARDO = 50;
+export const MAX_FARDOS_POR_ITEM = 50;
+
+export interface DivisaoEmFardos { fardos: number; dormentesPorFardo: number; aviso?: string }
+
+/**
+ * Sugere a divisão de `total` dormentes em fardos iguais: o maior número de dormentes por fardo, até `padrao`, que divide
+ * o total exatamente (40 com padrão 14 → 4 × 10; 42 → 3 × 14). Total menor que o padrão: um fardo só. Se o melhor divisor
+ * ficar abaixo da metade do padrão (ex. total primo), devolve também um aviso para a tela. Total 0: sem fardos.
+ */
+export function sugerirDivisao(total: number, padrao: number): DivisaoEmFardos {
+  if (!Number.isInteger(total) || total <= 0) return { fardos: 0, dormentesPorFardo: Math.max(1, Math.floor(padrao) || 1) };
+  const p = Math.max(1, Math.floor(padrao) || 1);
+  if (total <= p) return { fardos: 1, dormentesPorFardo: total };
+  let d = p;
+  while (total % d !== 0) d--;
+  const fardos = total / d;
+  const avisos: string[] = [];
+  if (d < p / 2) avisos.push(`${total} dormentes só se dividem em fardos iguais de ${d}; ajuste o total ou o número por fardo se preferir.`);
+  if (fardos > MAX_FARDOS_POR_ITEM) avisos.push(`Dá ${fardos} fardos, acima do máximo de ${MAX_FARDOS_POR_ITEM} por item.`);
+  return { fardos, dormentesPorFardo: d, ...(avisos.length ? { aviso: avisos.join(' ') } : {}) };
 }

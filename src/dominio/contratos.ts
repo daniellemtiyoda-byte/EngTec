@@ -41,3 +41,19 @@ export function tamanhosDaParcela(contrato: Pick<Contrato, 'itens' | 'parcelas'>
   if (!contrato || !p) return [];
   return contrato.itens.filter((i) => p.itens.some((x) => x.tamanhoId === i.tamanhoId)).map((item) => ({ item, saldo: item.saldoAEmitir }));
 }
+
+/**
+ * Quanto falta emitir de um tamanho na parcela. O contrato não guarda o emitido por parcela, então se supõe que as
+ * emissões líquidas (quantidade − saldo a emitir) preenchem as parcelas em ordem; o resultado nunca passa do saldo a emitir.
+ */
+export function faltaEmitirNaParcela(contrato: Pick<Contrato, 'itens' | 'parcelas'> | undefined, numeroParcela: number | string | undefined, tamanhoId: string): { quantidade: number; emitido: number; falta: number } {
+  const item = contrato?.itens.find((i) => i.tamanhoId === tamanhoId);
+  const parcelas = [...(contrato?.parcelas ?? [])].sort((a, b) => a.numero - b.numero);
+  const alvo = parcelas.find((p) => String(p.numero) === String(numeroParcela));
+  if (!item || !alvo) return { quantidade: 0, emitido: 0, falta: 0 };
+  const quantidade = alvo.itens.find((x) => x.tamanhoId === tamanhoId)?.quantidade ?? 0;
+  const liquido = Math.max(0, item.quantidade - item.saldoAEmitir);
+  const antes = parcelas.filter((p) => p.numero < alvo.numero).reduce((s, p) => s + (p.itens.find((x) => x.tamanhoId === tamanhoId)?.quantidade ?? 0), 0);
+  const emitido = Math.min(quantidade, Math.max(0, liquido - antes));
+  return { quantidade, emitido, falta: Math.max(0, Math.min(quantidade - emitido, item.saldoAEmitir)) };
+}

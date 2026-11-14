@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Contrato, ItemContrato } from '../types/models';
-import { avisoSequenciaContrato, gestorSugerido, maiorSequenciaDaAta, proximoNumeroContrato, tamanhosDaParcela } from './contratos';
+import { avisoSequenciaContrato, faltaEmitirNaParcela, gestorSugerido, maiorSequenciaDaAta, proximoNumeroContrato, tamanhosDaParcela } from './contratos';
 
 const c = (numero: string, dataAssinatura: string, gestor: string) => ({ numero, dataAssinatura, gestor });
 
@@ -49,5 +49,19 @@ describe('tamanhos da parcela', () => {
   it('sem parcela ou contrato: vazio', () => {
     expect(tamanhosDaParcela(contrato, '')).toEqual([]);
     expect(tamanhosDaParcela(undefined, '1')).toEqual([]);
+  });
+});
+
+describe('faltaEmitirNaParcela', () => {
+  const contrato = {
+    itens: [{ id: 'i1', tamanhoId: 't1', quantidade: 100, emitidos: 0, recebidos: 0, aprovados: 0, reprovados: 0, saldoAEmitir: 70 }],
+    parcelas: [{ numero: 1, itens: [{ tamanhoId: 't1', quantidade: 60 }] }, { numero: 2, itens: [{ tamanhoId: 't1', quantidade: 40 }] }],
+  } as unknown as Pick<Contrato, 'itens' | 'parcelas'>;
+  it('as emissões preenchem as parcelas em ordem', () => {
+    expect(faltaEmitirNaParcela(contrato, 1, 't1')).toEqual({ quantidade: 60, emitido: 30, falta: 30 });
+    expect(faltaEmitirNaParcela(contrato, 2, 't1')).toEqual({ quantidade: 40, emitido: 0, falta: 40 });
+  });
+  it('tamanho fora da parcela: zero', () => {
+    expect(faltaEmitirNaParcela(contrato, 1, 'x')).toEqual({ quantidade: 0, emitido: 0, falta: 0 });
   });
 });
