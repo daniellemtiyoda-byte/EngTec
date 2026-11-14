@@ -124,7 +124,7 @@ a.btn { display: inline-block; text-decoration: none; }
 .modal { background: #fff; border-radius: 8px; width: 100%; max-width: 560px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,.35); }
 .modal-topo { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--borda); }
 .modal-topo h2 { font-size: 18px; color: var(--cor-menu); }
-.modal-corpo { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.modal-corpo { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .modal-rodape { padding: 12px 18px; border-top: 1px solid var(--borda); display: flex; justify-content: flex-end; gap: 8px; }
 .campo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .campo label, .campo .rotulo-campo { font-weight: 600; font-size: 14px; }
@@ -284,12 +284,15 @@ a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
 .contador-campo button:disabled { color: var(--borda-forte); cursor: default; }
 .contador-campo input { width: 56px; border: 0; text-align: center; font-size: 16px; font-weight: 700; }
 @media (max-width: 760px) {
-  .modal-fundo:has(> .modal-largo) { padding: 0; }
-  .modal-largo { max-width: none; width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
-  /* Tela cheia: o conteúdo rola e os botões ficam no rodapé, ao alcance do polegar. */
+  /* Tela cheia (iOS Safari): troca grid por flex e usa dvh para evitar que 100% resolva
+     para o tamanho do conteúdo em vez da viewport; min-height: 0 deixa o corpo rolar. */
+  .modal-fundo:has(> .modal-largo) { padding: 0; display: flex; align-items: stretch; }
+  .modal-largo { max-width: none; width: 100%; border-radius: 0; max-height: none;
+    height: 100vh; height: 100dvh; }  /* dvh encolhe com a chrome do Safari; 100vh é fallback */
   .modal-largo { display: flex; flex-direction: column; }
-  .modal-largo .modal-corpo { flex: 1; overflow-y: auto; }
-  .modal-largo .modal-rodape { margin-top: auto; border-top: 1px solid var(--borda); }
+  .modal-largo .modal-corpo { flex: 1; min-height: 0; overflow-y: auto;
+    -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .modal-largo .modal-rodape { flex-shrink: 0; border-top: 1px solid var(--borda); }
   .modal-largo .modal-rodape { padding: 10px 12px; }
   .modal-largo .modal-rodape .btn { flex: 1; padding: 12px; font-size: 16px; }
   .contador-campo button { width: 48px; min-height: 48px; }

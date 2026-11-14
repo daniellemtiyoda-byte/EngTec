@@ -5,6 +5,12 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Corrigido
+- 2026-11-14: **Modal largo no celular (iPhone Safari): conteúdo não rolava e o botão de confirmar ficava fora da tela.**
+  - **Por quê:** três camadas combinadas: (1) `.modal-fundo` usava `display: grid; place-items: center`, que não repassa altura ao filho — trocado por `display: flex; align-items: stretch`; (2) `height: 100%` no `.modal-largo` resolvia para a altura do conteúdo em vez da viewport — corrigido para `100dvh` (encolhe com a chrome do Safari) com `100vh` como fallback; (3) `.modal-corpo` como filho flex sem `min-height: 0` bloqueava o `overflow-y: auto` — adicionado `min-height: 0` tanto na regra base quanto no bloco mobile. `overscroll-behavior: contain` e `-webkit-overflow-scrolling: touch` para rolagem nativa no iOS. Rodapé com `flex-shrink: 0` para ficar fixo. O resultado esperado (descrito no CLAUDE.md) — conteúdo rola, botões fixos no rodapé — passa a valer em iOS Safari.
+  - Afeta: `EntregaAssistente` e `RecebimentoAssistente` (ambos usam `Modal largo`).
+  - Arquivo: `src/styles.css`.
+
 ### Adicionado
 - 2026-11-14: **Etapa 9: anexos no Supabase — botão "Abrir", compressão de fotos e erros em português.**
   - **Abrir:** botão em todo lugar que exibe um arquivo com `caminho` no bucket privado (`BotaoAnexo`): XML da NF (tabela "Todas as NFs" em Documentos), PDF da DOF, boletim, relatório técnico, canhoto da NF e fotos de ocorrências (tela do recebimento). O link assinado é gerado no clique (5 min, era 1 h). Safari: `window.open('', '_blank')` chamado de forma síncrona antes do `await` para o pop-up não ser bloqueado; se falhar, fecha a janela e mostra toast. Modo simulado (`caminho` ausente): só o nome, sem botão.
