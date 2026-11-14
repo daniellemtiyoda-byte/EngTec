@@ -7,7 +7,7 @@ import { servicos } from '../services';
 import { ApiError, mensagemSegura } from '../services/erros';
 import type { Entrega, Fardo } from '../types/models';
 import { arquivoInvalido, data, hojeSP, m3, numero, paraNumero } from '../utils/format';
-import { chaveAcessoValida, lerXmlNfe, mesmoCnpj } from '../utils/nfeXml';
+import { chaveAcessoValida, lerXmlNfe, mesmoCnpj, tamanhoDoItemNfe } from '../utils/nfeXml';
 import { BadgeDe } from './Badge';
 import { Modal } from './Modal';
 import { ProgressoPassos } from './Passos';
@@ -16,7 +16,7 @@ const PASSOS = ['Nota fiscal', 'DOF', 'Boletim e relatório', 'Fardos da entrega
 /** Erros do serviço levam de volta ao passo do campo. */
 const passoDoCampo = (k: string) => (k.startsWith('dof') ? 1 : k.startsWith('boletim') || k.startsWith('relatorio') ? 2 : k.startsWith('fardos') ? 3 : 0);
 
-interface LinhaNf { chave: number; descricao?: string; itemContratoId: string; quantidade: string; volume: string; volumeManual: boolean }
+interface LinhaNf { chave: number; descricao?: string; tamanhoXmlId?: string; itemContratoId: string; quantidade: string; volume: string; volumeManual: boolean }
 interface LinhaDof { especieId: string; volume: string }
 interface LinhaBoletim { chave: number; tamanhoId: string; especieId: string; quantidade: string }
 let seq = 1;
@@ -100,7 +100,8 @@ export function EntregaAssistente({ aberto, cad, origem = 'cadastro', aoFechar, 
       const contratoId = doFornecedor.length === 1 ? doFornecedor[0].id : '';
       setNf({ numero: d.numero, serie: d.serie || '1', chaveAcesso: d.chaveAcesso ?? '', emissao: d.emissao, contratoId });
       const unico = doFornecedor.length === 1 && doFornecedor[0].itens.length === 1 ? doFornecedor[0].itens[0].id : '';
-      setItens(d.itens.map((i) => ({ chave: seq++, descricao: i.descricao, itemContratoId: unico, quantidade: String(Math.round(i.quantidade)), volume: '', volumeManual: false })));
+      const tamanhosCad = Array.from(cad.tamanhos.values());
+      setItens(d.itens.map((i) => ({ chave: seq++, descricao: i.descricao, tamanhoXmlId: tamanhoDoItemNfe(i, tamanhosCad), itemContratoId: unico, quantidade: String(Math.round(i.quantidade)), volume: '', volumeManual: false })));
       if (d.dofSugerido) setDof((x) => ({ ...x, numero: d.dofSugerido! }));
       setXml(arquivo);
       setAvisoXml(forn
@@ -112,7 +113,14 @@ export function EntregaAssistente({ aberto, cad, origem = 'cadastro', aoFechar, 
   }
 
   // Ao escolher o contrato (ou importar), recalcula os volumes automáticos.
-  useEffect(() => { setItens((l) => l.map((i) => (i.volumeManual ? i : { ...i, volume: volumeCalculado(i.itemContratoId, i.quantidade) }))); }, [nf.contratoId, contratos.dados]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Liga o item do XML ao item do contrato de mesmo tamanho (sem sobrescrever o que a pessoa escolheu).
+  useEffect(() => {
+    setItens((l) => l.map((i0) => {
+      const ligado = i0.itemContratoId || (i0.tamanhoXmlId ? contrato?.itens.find((it) => it.tamanhoId === i0.tamanhoXmlId)?.id ?? '' : '');
+      const i = { ...i0, itemContratoId: ligado };
+      return i.volumeManual ? i : { ...i, volume: volumeCalculado(i.itemContratoId, i.quantidade) };
+    }));
+  }, [nf.contratoId, contratos.dados]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function validarNf(): Record<string, string> {
     const e: Record<string, string> = {};

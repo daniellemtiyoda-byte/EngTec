@@ -5,6 +5,13 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Corrigido
+- 2026-11-14: **Importação do XML da NF-e: quantidade lida só no formato da NF-e e item ligado ao tamanho do contrato.**
+  - **Quantidade (`qCom`):** conferido com `docs/exemplos/nfe-exemplo.xml` ("98.0000", "28.0000") e com o XML do Simulador ("14.0000", "42.0000"...): o ponto é decimal e `lerXmlNfe` já lia 98, 28, 14, 42; **não consegui reproduzir 21000 a partir de um `qCom` de 21**. Para o erro nunca passar calado, `lerQuantidadeNfe` aceita só dígitos com ponto decimal opcional e recusa vírgula, milhar ("1.050.000"), expoente e vazio com a mensagem "Quantidade inválida no XML" (antes `Number()` aceitava "" como 0 e "1e3" como 1000).
+  - **Ligação ao tamanho (antes inexistente):** o item do XML só era preenchido quando o contrato tinha um único item. Agora `tamanhoDoItemNfe` liga pelo código de material de 6 dígitos (cProd ou descrição, ex. "MATERIAL CPTM 006234") ou pelas medidas ("24X17X280 CM" ou "240X170X2800 MM", em qualquer ordem) quando só um tamanho combina; ao escolher o contrato, o assistente seleciona o item de contrato desse tamanho (sem trocar o que a pessoa já escolheu). Na dúvida, fica em branco.
+  - Testes (`nfeXml.test.ts`, 9): inteiro, casas decimais, recusas, exemplo e XML de todas as emissões do Simulador (ponto, quatro casas, nunca vírgula, igual à quantidade da NF), "24X17X280 CM" = 006234 (2,80 m), "24X17X400 CM" = 006224, mm do Simulador. `lerXmlNfe` em si precisa de DOM e os testes rodam em Node, então o XML é conferido por regex e as funções puras.
+  - Arquivos: `src/utils/nfeXml.ts`, `src/utils/nfeXml.test.ts`, `src/components/EntregaAssistente.tsx`.
+
 ### Adicionado
 - 2026-11-14: **NF e DOF: ação "Ver documentos" em todas as abas, abrindo modal com os anexos da entrega.**
   - Em todas as quatro abas (A caminho, DOFs a declarar, Declarados, Todas as NFs), qualquer perfil com acesso à tela tem a ação "Ver documentos" na linha. O modal (largo, rola no celular com a correção iOS) busca a entrega, a NF e a DOF associadas ao `entregaId` da linha e exibe: dados básicos (NF, DOF, contrato, parcela) e os quatro arquivos com `BotaoAnexo` — XML da NF, PDF da DOF, boletim de inspeção e relatório técnico (ausentes aparecem como "—").
