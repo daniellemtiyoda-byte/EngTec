@@ -13,7 +13,7 @@ import { useToast } from '../components/Toast';
 import { PROTOCOLO_INSPECTOR } from '../config/env';
 import { useAuth } from '../contexts/AuthContext';
 import { linkQr, RE_FARDO, type CodigoLido } from '../dominio/identificacao';
-import { ordinalClasse, RESULTADO_INSPECAO, rotuloCategoria, SITUACAO_FARDO } from '../dominio/rotulos';
+import { ordinalClasse, letraCategoria, RESULTADO_INSPECAO, rotuloCategoria, SITUACAO_FARDO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
 import { useCadastros } from '../hooks/useCadastros';
 import { useTelaPequena } from '../hooks/useTelaPequena';
@@ -166,7 +166,7 @@ export default function InspecaoFardo() {
               <p className="decisao-pergunta">Categoria do aprovado</p>
               <div className="decisao-botoes decisao-categorias">
                 {([1, 2, 3] as Categoria[]).map((c) => (
-                  <button key={c} type="button" className="btn btn-grande btn-acao" disabled={gravando} onClick={() => void registrar('aprovado', c)}>{c}</button>
+                  <button key={c} type="button" className="btn btn-grande btn-acao" disabled={gravando} onClick={() => void registrar('aprovado', c)} aria-label={rotuloCategoria(c)}>{letraCategoria(c)}</button>
                 ))}
               </div>
               <button type="button" className="btn btn-sec" disabled={gravando} onClick={() => setAprovando(false)}>Voltar</button>

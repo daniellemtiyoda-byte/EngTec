@@ -318,7 +318,7 @@ export function montarServicos(m: Motor): Servicos {
         const [atencao, critico] = p.alertaDofDias;
         if (!Number.isInteger(atencao) || !Number.isInteger(critico) || critico < 0 || atencao < critico) campos.alertaDofDias = 'O alerta de atenção vem antes (ou junto) do crítico.';
         const [l1, l2] = p.limitesCategoria;
-        if (!(l2 > 0 && l2 < l1 && l1 <= 100)) campos.limitesCategoria = 'Limites entre 0 e 100, o da categoria 1 maior que o da 2.';
+        if (!(l2 > 0 && l2 < l1 && l1 <= 100)) campos.limitesCategoria = 'Limites entre 0 e 100, o da categoria A maior que o da B.';
         if (!Number.isInteger(p.dormentesPorFardoPadrao) || p.dormentesPorFardoPadrao < 1 || p.dormentesPorFardoPadrao > 50) campos.dormentesPorFardoPadrao = 'De 1 a 50.';
         p.niveis.forEach((n, i) => { if (!(n.minimo >= 0 && n.maximo >= n.minimo)) campos[`niveis.${i}`] = 'Mínimo de 0 para cima e máximo maior ou igual ao mínimo.'; });
         if (Object.keys(campos).length) falha(422, 'Confira os parâmetros.', campos);

@@ -340,6 +340,7 @@ a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
 /* ===== v2: componentes da casca (Etapa 1) ===== */
 .mono, .codigo { font-family: var(--fonte-mono); }
 .texto-critico { color: var(--critico); font-weight: 600; }
+.texto-aviso { color: #7a3d00; font-weight: 600; }
 
 /* ID em mono com copiar */
 .id-codigo { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }

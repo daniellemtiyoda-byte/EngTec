@@ -139,7 +139,9 @@ export const SITUACAO_PARCELA: Rotulos<SituacaoParcela> = {
   entregue: ['verde', 'Entregue'],
   entregue_com_atraso: ['laranja', 'Entregue com atraso'],
 };
-export const rotuloCategoria = (c?: number) => (c ? `Categoria ${c}` : 'Categoria a definir');
+/** A categoria é gravada como 1, 2 ou 3; na tela é A, B ou C (1 = A, a melhor). */
+export const letraCategoria = (c?: number) => (c ? ['A', 'B', 'C'][c - 1] ?? String(c) : '');
+export const rotuloCategoria = (c?: number) => (c ? `Categoria ${letraCategoria(c)}` : 'Categoria a definir');
 
 /** Sigla da marca de cada evento na linha do tempo. */
 export const MARCA_EVENTO: Record<TipoEvento, string> = {

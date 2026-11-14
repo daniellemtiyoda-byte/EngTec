@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { avisoSequenciaContrato, gestorSugerido, proximoNumeroContrato } from '../dominio/contratos';
 import { RE_ATA, RE_CONTRATO } from '../dominio/identificacao';
 import { REGRAS_ATA_PADRAO, VIGENCIA_ATA_MESES, dataSP, janelaParcela, somarDias, somarMeses } from '../dominio/parametros';
 import type { Cadastros } from '../hooks/useCadastros';
@@ -46,6 +47,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erroGeral, setErroGeral] = useState<string>();
   const [enviando, setEnviando] = useState(false);
+  const [todosContratos, setTodosContratos] = useState<Contrato[]>();
 
   useEffect(() => {
     if (!aberto) return;
@@ -73,10 +75,27 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
     return i ? i.saldo + (contrato?.itens.find((x) => x.tamanhoId === tamanhoId)?.quantidade ?? 0) : undefined;
   };
 
-  // Ao escolher a ata, o número do contrato já começa com o dela.
+  // Contratos de todas as atas (cancelados inclusive), para sugerir a próxima sequência e o gestor.
   useEffect(() => {
-    if (!editando && numeroAta && (!numeroContrato || !numeroContrato.startsWith(`${numeroAta}-`))) setNumero(`${numeroAta}-`);
-  }, [numeroAta]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!aberto || contrato) return;
+    let ativo = true;
+    servicos.contratos.listar({ pageSize: 1000 }).then((r) => { if (ativo) setTodosContratos(r.items); }).catch(() => { if (ativo) setTodosContratos([]); });
+    return () => { ativo = false; };
+  }, [aberto, contrato]);
+  const contratosDaAta = ata ? (todosContratos ?? []).filter((c) => c.ataId === ata.id) : [];
+
+  // Ao escolher a ata, o número do contrato vem com a próxima sequência e o gestor com o do contrato mais recente
+  // (editáveis). Ata nova ou sem contratos: número só com o prefixo da ata e gestor vazio.
+  useEffect(() => {
+    if (editando) return;
+    if (modoAta === 'existente' && ata && todosContratos) {
+      setNumero(proximoNumeroContrato(ata.numero, contratosDaAta));
+      setGestor(gestorSugerido(contratosDaAta));
+    } else if (numeroAta && (!numeroContrato || !numeroContrato.startsWith(`${numeroAta}-`))) {
+      setNumero(`${numeroAta}-`);
+    }
+  }, [numeroAta, modoAta, todosContratos]); // eslint-disable-line react-hooks/exhaustive-deps
+  const avisoSequencia = editando ? undefined : avisoSequenciaContrato(numeroContrato, numeroAta, contratosDaAta);
 
   const somaParcela = (p: LinhaParcela) => p.itens.reduce((t, i) => t + (paraNumero(i.quantidade, true) || 0), 0);
   const total = parcelas.reduce((t, p) => t + somaParcela(p), 0);
@@ -226,6 +245,7 @@ export function ContratoModal({ aberto, contrato, cad, aoFechar, aoSalvar }: Pro
             <div className="campo">
               <label htmlFor={`${formId}-numero`}>Número do contrato<span className="obrig" aria-hidden="true"> *</span></label>
               <input id={`${formId}-numero`} className="mono" value={numeroContrato} maxLength={10} placeholder="AR00224-01" disabled={editando} onChange={(e) => setNumero(e.target.value)} {...invalido('numero')} />
+              {avisoSequencia && <span className="ajuda texto-aviso" role="status">{avisoSequencia}</span>}
               {erro('numero')}
             </div>
             <div className="campo">

@@ -11,6 +11,7 @@ import { ProgressoPassos } from '../components/Passos';
 import { Relacionados } from '../components/Relacionados';
 import { RodapeAcoes } from '../components/RodapeAcoes';
 import { useToast } from '../components/Toast';
+import { rotuloCategoria } from '../dominio/rotulos';
 import type { ListQuery, Paginado } from '../types/models';
 import { dias, numero } from '../utils/format';
 
@@ -185,7 +186,7 @@ function ExemploObjeto() {
                     <tr key={d.id}>
                       <td><IdCodigo id={d.id} /></td>
                       <td>{d.reprovado ? <Badge tom="vermelho">Reprovado</Badge> : <Badge tom="verde">Em estoque</Badge>}</td>
-                      <td>{d.categoria ? `Categoria ${d.categoria}` : '—'}</td>
+                      <td>{d.categoria ? rotuloCategoria(d.categoria) : '—'}</td>
                       <td className="al-right">{numero(d.comprimentoCm)} cm</td>
                     </tr>
                   ))}

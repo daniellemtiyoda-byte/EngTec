@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { servicos } from '../services';
 import type { Ata, EmpresaInspetora, Especie, Fornecedor, Id, Local, Tamanho, Tratamento } from '../types/models';
 import { useAsync } from './useAsync';
-import { ordinalClasse } from '../dominio/rotulos';
+import { letraCategoria, ordinalClasse } from '../dominio/rotulos';
 import { metros } from '../utils/format';
 
 const TODOS = { pageSize: 1000 };
@@ -48,7 +48,7 @@ export function useCadastros() {
       descreverItem: (i: { tamanhoId: Id; classe?: number }) => `${descreverTamanho(i.tamanhoId)}${i.classe ? ` · ${ordinalClasse(i.classe)} classe` : ''}`,
       /** Item de RME: tamanho e classe, e a categoria mínima e a espécie quando pedidas. */
       descreverItemRme: (i: { tamanhoId: Id; classe: number; categoriaMinima?: number; especieId?: Id }) =>
-        `${descreverTamanho(i.tamanhoId)} · ${ordinalClasse(i.classe)} classe${i.categoriaMinima ? ` · categoria até ${i.categoriaMinima}` : ''}${i.especieId ? ` · ${nomeEspecie(i.especieId)}` : ''}`,
+        `${descreverTamanho(i.tamanhoId)} · ${ordinalClasse(i.classe)} classe${i.categoriaMinima ? ` · categoria até ${letraCategoria(i.categoriaMinima)}` : ''}${i.especieId ? ` · ${nomeEspecie(i.especieId)}` : ''}`,
     };
   }, [r.dados, r.carregando, r.erro]); // eslint-disable-line react-hooks/exhaustive-deps
 }

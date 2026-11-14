@@ -5,6 +5,15 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Alterado
+- 2026-11-14: **Melhorias 3, 4 e 5 e ajuste de usabilidade em NF/DOF e Simulador (só front, sem migração; o banco grava o mesmo).**
+  - **Categoria A, B, C:** continua gravada 1, 2, 3; só o rótulo muda (`letraCategoria`, `rotuloCategoria`, `CATEGORIA_OPCOES`). Telas: inspeção à mão (botões A/B/C), ficha do dormente, página do fardo, cartões da inspeção, Nova RME (categoria mínima "Só a categoria A" / "Até a categoria B"), item de RME (`descreverItemRme`, usado na separação e na RME), Vitrine, e mensagens de validação (RME, parâmetros). Glossário em `CLAUDE.md` e na especificação.
+  - **Gestor sugerido (ContratoModal):** ao escolher a ata, o gestor vem do contrato de assinatura mais recente da ata; editável. Ata nova ou sem contratos: vazio.
+  - **Número do contrato sugerido:** ao escolher a ata, vem a próxima sequência (maior da ata + 1, cancelados contam, ex. AR00224-04); editável. Número que pula a sequência mostra aviso, sem bloquear. O PDF obrigatório do contrato fica para depois (precisa de banco).
+  - **NF/DOF e Simulador:** depois de escolher a parcela, o select de item mostra só os tamanhos dela, com o saldo a emitir; com um tamanho só, já vem selecionado; trocar a parcela (ou o contrato) limpa os itens que não pertencem a ela; a ligação do item pelo XML (`tamanhoDoItemNfe`) vale dentro da parcela. A regra no serviço não mudou.
+  - Funções puras e testes em `src/dominio/contratos.ts` e `contratos.test.ts`.
+  - Arquivos: `rotulos.ts`, `contratos.ts`, `ContratoModal.tsx`, `EntregaAssistente.tsx`, `Simulador.tsx`, `InspecaoFardo.tsx`, `NovaRme.tsx`, `useCadastros.ts`, `Vitrine.tsx`, `styles.css`.
+
 ### Corrigido
 - 2026-11-14: **Importação do XML da NF-e: quantidade lida só no formato da NF-e e item ligado ao tamanho do contrato.**
   - **Quantidade (`qCom`):** conferido com `docs/exemplos/nfe-exemplo.xml` ("98.0000", "28.0000") e com o XML do Simulador ("14.0000", "42.0000"...): o ponto é decimal e `lerXmlNfe` já lia 98, 28, 14, 42; **não consegui reproduzir 21000 a partir de um `qCom` de 21**. Para o erro nunca passar calado, `lerQuantidadeNfe` aceita só dígitos com ponto decimal opcional e recusa vírgula, milhar ("1.050.000"), expoente e vazio com a mensagem "Quantidade inválida no XML" (antes `Number()` aceitava "" como 0 e "1e3" como 1000).

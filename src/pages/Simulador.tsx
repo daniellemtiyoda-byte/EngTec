@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BadgeDe, SeloDemo } from '../components/Badge';
 import { CabecalhoPagina } from '../components/Cabecalhos';
 import { Contador } from '../components/Contador';
+import { tamanhosDaParcela } from '../dominio/contratos';
 import { Aviso } from '../components/Estados';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { Modal } from '../components/Modal';
@@ -57,7 +58,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
   const contrato = contratos.find((c) => c.id === contratoId);
   const daParcela = contrato?.parcelas.find((p) => String(p.numero) === parcela);
   // Só os tamanhos da parcela escolhida.
-  const linhas = (contrato?.itens ?? []).filter((i) => daParcela?.itens.some((x) => x.tamanhoId === i.tamanhoId)).map((i) => {
+  const linhas = tamanhosDaParcela(contrato, parcela).map(({ item: i }) => {
     const q = qtd[i.id] ?? { fardos: '0', porFardo: String(porFardo) };
     const fardos = paraNumero(q.fardos, true) || 0;
     const por = paraNumero(q.porFardo, true) || 0;

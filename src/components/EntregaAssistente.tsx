@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { tamanhosDaParcela } from '../dominio/contratos';
 import { nivelPrazo, prazoDeclaracao } from '../dominio/parametros';
 import { NIVEL_PRAZO } from '../dominio/rotulos';
 import { useAsync } from '../hooks/useAsync';
@@ -72,8 +73,10 @@ export function EntregaAssistente({ aberto, cad, origem = 'cadastro', aoFechar, 
   const contrato = vigentes.find((c) => c.id === nf.contratoId);
   const fornecedor = contrato && cad.fornecedores.get(contrato.fornecedorId);
   const especiesFornecedor = (fornecedor?.especiesIds ?? []).filter((id) => cad.especies.get(id));
-  // Parcela única do contrato já vem escolhida.
-  useEffect(() => { if (contrato && contrato.parcelas.length === 1) setParcela('1'); }, [contrato?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Parcela única do contrato já vem escolhida; ao trocar de contrato, a parcela de outro contrato não vale.
+  useEffect(() => { setParcela(contrato && contrato.parcelas.length === 1 ? '1' : ''); }, [contrato?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Tamanhos da parcela escolhida, com o saldo de cada um: só eles aparecem no select de item. */
+  const itensDaParcela = tamanhosDaParcela(contrato, parcela);
   /** Volume calculado do item (quantidade × volume do tamanho), usado até a pessoa digitar outro. */
   const volumeCalculado = (itemContratoId: string, quantidade: string) => {
     const item = contrato?.itens.find((i) => i.id === itemContratoId);
@@ -112,15 +115,19 @@ export function EntregaAssistente({ aberto, cad, origem = 'cadastro', aoFechar, 
     }
   }
 
-  // Ao escolher o contrato (ou importar), recalcula os volumes automáticos.
-  // Liga o item do XML ao item do contrato de mesmo tamanho (sem sobrescrever o que a pessoa escolheu).
+  // Ao escolher o contrato ou a parcela (ou importar), ajusta os itens aos tamanhos da parcela e recalcula os volumes automáticos:
+  // limpa o item que não pertence à parcela; liga o item do XML ao tamanho igual (sem sobrescrever o que a pessoa escolheu);
+  // com um tamanho só na parcela, já seleciona.
   useEffect(() => {
     setItens((l) => l.map((i0) => {
-      const ligado = i0.itemContratoId || (i0.tamanhoXmlId ? contrato?.itens.find((it) => it.tamanhoId === i0.tamanhoXmlId)?.id ?? '' : '');
+      const daParcela = (id: string) => itensDaParcela.some((x) => x.item.id === id);
+      let ligado = daParcela(i0.itemContratoId) ? i0.itemContratoId : '';
+      if (!ligado && i0.tamanhoXmlId) ligado = itensDaParcela.find((x) => x.item.tamanhoId === i0.tamanhoXmlId)?.item.id ?? '';
+      if (!ligado && itensDaParcela.length === 1) ligado = itensDaParcela[0].item.id;
       const i = { ...i0, itemContratoId: ligado };
       return i.volumeManual ? i : { ...i, volume: volumeCalculado(i.itemContratoId, i.quantidade) };
     }));
-  }, [nf.contratoId, contratos.dados]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [nf.contratoId, parcela, contratos.dados]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function validarNf(): Record<string, string> {
     const e: Record<string, string> = {};
@@ -283,9 +290,9 @@ export function EntregaAssistente({ aberto, cad, origem = 'cadastro', aoFechar, 
                 {i.descricao && <span className="mudo linha-item-descricao">No XML: {i.descricao}</span>}
                 <div className="campo">
                   <label htmlFor={`ent-item-${i.chave}`}>Item do contrato</label>
-                  <select id={`ent-item-${i.chave}`} value={i.itemContratoId} onChange={(e) => mudarItem(i.chave, 'itemContratoId', e.target.value)} disabled={!contrato}>
-                    <option value="">{contrato ? 'Selecione…' : 'Escolha o contrato'}</option>
-                    {contrato?.itens.map((it) => <option key={it.id} value={it.id}>{cad.descreverTamanho(it.tamanhoId)}</option>)}
+                  <select id={`ent-item-${i.chave}`} value={i.itemContratoId} onChange={(e) => mudarItem(i.chave, 'itemContratoId', e.target.value)} disabled={!contrato || !parcela}>
+                    <option value="">{!contrato ? 'Escolha o contrato' : !parcela ? 'Escolha a parcela' : 'Selecione…'}</option>
+                    {itensDaParcela.map(({ item, saldo }) => <option key={item.id} value={item.id}>{cad.descreverTamanho(item.tamanhoId)} · saldo {numero(saldo)}</option>)}
                   </select>
                 </div>
                 <div className="campo">

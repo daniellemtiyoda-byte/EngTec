@@ -11,7 +11,7 @@ export const TOLERANCIA_VOLUME_PCT = 10;
 /** Padrões dos parâmetros editáveis (valores iniciais da demonstração). */
 export const LIMITE_DIAS_ESTOQUE_PADRAO = 120;
 export const ALERTA_DOF_DIAS_PADRAO: [number, number] = [3, 1];
-/** PROVISÓRIO, a confirmar com o time da inspeção: índice ≥ 80 → categoria 1; ≥ 50 → 2; abaixo → 3. */
+/** PROVISÓRIO, a confirmar com o time da inspeção: índice ≥ 80 → categoria 1 (A); ≥ 50 → 2 (B); abaixo → 3 (C). */
 export const LIMITES_CATEGORIA_PADRAO: [number, number] = [80, 50];
 export const DORMENTES_POR_FARDO_PADRAO = 14;
 /** CTF Ibama vencendo em até tantos dias aparece em atenção (o vencido bloqueia o fornecedor). */

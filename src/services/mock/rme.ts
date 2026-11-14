@@ -28,7 +28,7 @@ export function abrirRme(e: Estado, dados: DadosRme, solicitante: Usuario, ctx: 
     const k = chaveItem(i);
     if (!e.tamanhos.some((x) => x.id === i.tamanhoId)) campos[`itens.${n}`] = 'Escolha o tamanho.';
     else if (i.classe !== 1 && i.classe !== 2) campos[`itens.${n}`] = 'Escolha a classe (1ª ou 2ª).';
-    else if (i.categoriaMinima !== undefined && ![1, 2, 3].includes(i.categoriaMinima)) campos[`itens.${n}`] = 'Categoria mínima 1, 2 ou 3 (ou qualquer aprovado).';
+    else if (i.categoriaMinima !== undefined && ![1, 2, 3].includes(i.categoriaMinima)) campos[`itens.${n}`] = 'Categoria mínima A, B ou C (ou qualquer aprovado).';
     else if (i.especieId && !e.especies.some((x) => x.id === i.especieId)) campos[`itens.${n}`] = 'Espécie não encontrada.';
     else if (vistos.has(k)) campos[`itens.${n}`] = 'Tamanho e classe repetidos: some as quantidades numa linha.';
     else if (!Number.isInteger(i.quantidade) || i.quantidade <= 0) campos[`itens.${n}`] = 'Quantidade em unidades, maior que zero.';

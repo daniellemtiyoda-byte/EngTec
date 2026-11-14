@@ -5,7 +5,7 @@ import { servicos } from '../services';
 import { ApiError, mensagemSegura } from '../services/erros';
 import type { Categoria, Classe, Rme, TipoDestino } from '../types/models';
 import { CATEGORIAS, TIPO_DESTINO_OPCOES } from '../dominio/opcoes';
-import { ordinalClasse, USO_TAMANHO } from '../dominio/rotulos';
+import { letraCategoria, ordinalClasse, USO_TAMANHO } from '../dominio/rotulos';
 import { classeInferior, classeSugerida, dataSP, somarDias } from '../dominio/parametros';
 import { numero, paraNumero } from '../utils/format';
 import { Contador } from './Contador';
@@ -134,7 +134,7 @@ export function NovaRme({ aberto, cad, aoFechar, aoCriar }: Props) {
                     <label htmlFor={`rme-cat-${l.chave}`}>Categoria mínima</label>
                     <select id={`rme-cat-${l.chave}`} value={l.categoria} onChange={(e) => mudar(l.chave, 'categoria', e.target.value)}>
                       <option value="">Qualquer aprovado</option>
-                      {CATEGORIAS.map((c) => <option key={c} value={c}>{c === 1 ? 'Só categoria 1' : `Até a categoria ${c}`}</option>)}
+                      {CATEGORIAS.map((c) => <option key={c} value={c}>{c === 1 ? `Só a categoria ${letraCategoria(c)}` : `Até a categoria ${letraCategoria(c)}`}</option>)}
                     </select>
                   </div>
                   <div className="campo">
