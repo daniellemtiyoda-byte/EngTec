@@ -728,13 +728,40 @@ export function regrasDosServicos(montar: Montar, tempoMs?: number) {
       expect([...gestor]).toEqual(expect.arrayContaining(['dof', 'falta', 'parcela', 'laudo', 'reprovados', 'parados', 'nao']));
       como('almoxarife');
       const almox = await prefixos();
-      expect([...almox]).toEqual(expect.arrayContaining(['dof', 'laudo', 'reprovados']));
-      for (const x of ['falta', 'excesso', 'parcela', 'parados', 'nao', 'ctf']) expect(almox.has(x)).toBe(false);
+      expect([...almox]).toEqual(expect.arrayContaining(['dof', 'laudo', 'reprovados', 'parados']));
+      for (const x of ['falta', 'excesso', 'parcela', 'nao', 'ctf']) expect(almox.has(x)).toBe(false);
       como('requisitante');
       expect(await s.dashboard.alertas()).toEqual([]);
       como('administrador');
       // O administrador tem painel:gestao: vê o mesmo que o gestor.
       expect([...(await prefixos())].filter((x) => x !== 'ctf').sort()).toEqual([...gestor].sort()); // o alerta de CTF é só do administrador
+    });
+
+    it('pendências "Minhas RMEs" e "CTF vencendo": o número é o total da lista que o link abre', async () => {
+      const { s, como } = await montar('requisitante');
+      const um = { pageSize: 1 };
+      const minhas = async () => (await s.dashboard.pendencias()).find((p) => p.id === 'minhas-rmes');
+      const antes = (await minhas())?.quantidade ?? 0;
+      const lista = await s.rme.listar({ ...um, filters: { minhas: 'sim' } });
+      expect(lista.total).toBe(antes);
+      expect((await minhas())?.link ?? '/saidas?minhas=sim').toBe('/saidas?minhas=sim');
+      // Só as do usuário logado e só as em andamento: nova RME entra; cancelada sai.
+      const item = (await contrato(s, 'AR00224-01')).itens[0];
+      const r = await s.rme.abrir({ destino: 'Linha 12 · Trecho Teste', tipoDestino: 'principal_pesado', necessidadeEm: '2026-11-30', itens: [{ tamanhoId: item.tamanhoId, classe: 1, quantidade: 1 }] });
+      expect((await s.rme.listar({ ...um, filters: { minhas: 'sim' } })).total).toBe(antes + 1);
+      expect((await minhas())?.quantidade).toBe(antes + 1);
+      await s.rme.cancelar(r.numero, 'teste');
+      expect((await s.rme.listar({ ...um, filters: { minhas: 'sim' } })).total).toBe(antes);
+      como('almoxarife');
+      expect((await s.rme.listar({ ...um, filters: { minhas: 'sim' } })).total).toBe(0); // o almoxarife não abriu nenhuma
+      // CTF: ativos com o CTF vencendo em até DIAS_AVISO_CTF dias, sem os já vencidos.
+      como('administrador');
+      const ctf = (await s.dashboard.pendencias()).find((p) => p.id === 'ctf');
+      const vencendo = await s.fornecedores.listar({ pageSize: 50, filters: { ctf: 'vencendo' } });
+      expect(vencendo.total).toBeGreaterThan(0);
+      expect(ctf?.quantidade).toBe(vencendo.total);
+      expect(ctf?.link).toBe('/cadastros?aba=fornecedores&ctf=vencendo');
+      expect(vencendo.items.every((f) => f.situacao === 'ativo' && !f.bloqueado)).toBe(true);
     });
 
     it('alertas do IBAMA batem com as abas de Relatórios', async () => {

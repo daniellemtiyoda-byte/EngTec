@@ -69,7 +69,7 @@ export default function Fornecedores({ aoAlterar }: { aoAlterar: () => void }) {
         listar={(q) => servicos.fornecedores.listar(q)}
         recarregar={rec}
         colunas={colunas}
-        filtros={[{ chave: 'situacao', rotulo: 'Situação', opcoes: SITUACAO_CADASTRO_OPCOES }, { chave: 'bloqueado', rotulo: 'Bloqueado (CTF)', opcoes: SIM_NAO_OPCOES }]}
+        filtros={[{ chave: 'situacao', rotulo: 'Situação', opcoes: SITUACAO_CADASTRO_OPCOES }, { chave: 'bloqueado', rotulo: 'Bloqueado (CTF)', opcoes: SIM_NAO_OPCOES }, { chave: 'ctf', rotulo: 'CTF', noEndereco: true, opcoes: [{ valor: 'vencendo', rotulo: `Vencendo em até ${DIAS_AVISO_CTF} dias` }] }]}
         acoesLinha={edita ? [
           { rotulo: 'Editar', aoClicar: (f) => setForm({ fornecedor: f }) },
           { rotulo: 'Inativar', visivel: (f) => f.situacao === 'ativo', aoClicar: (f) => setInativar({ nome: f.razaoSocial, efeito: 'O fornecedor não entra em novas atas; os contratos e as NFs já cadastrados continuam com ele.', executar: () => servicos.fornecedores.inativar(f.id) }) },

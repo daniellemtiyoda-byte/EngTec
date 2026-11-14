@@ -72,6 +72,11 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar
     }
     setQtd(sugestao);
   }
+  /** Emitido na parcela (soma dos tamanhos). */
+  const emitidoNaParcela = (n: number) => tamanhosDaParcela(contrato, n).reduce((s, { item }) => s + faltaEmitirNaParcela(contrato, n, item.tamanhoId, emissoes).emitido, 0);
+  // Só as parcelas em que ainda há o que emitir; na reentrega, as que têm tamanho com saldo a emitir (reprovados a repor).
+  const parcelasComSaldo = (contrato?.parcelas ?? []).filter((p) => tamanhosDaParcela(contrato, p.numero).some(({ item }) =>
+    reentrega ? item.saldoAEmitir > 0 : faltaEmitirNaParcela(contrato, p.numero, item.tamanhoId, emissoes).falta > 0));
   const daParcela = contrato?.parcelas.find((p) => String(p.numero) === parcela);
   // Só os tamanhos da parcela escolhida. A divisão sai do total digitado; ajustada à mão, o total passa a ser fardos × por fardo.
   const linhas = tamanhosDaParcela(contrato, parcela).map(({ item: i }) => {
@@ -140,9 +145,10 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar
               <label htmlFor="sim-parcela">Parcela do cronograma<span className="obrig" aria-hidden="true"> *</span></label>
               <select id="sim-parcela" value={parcela} onChange={(e) => escolherParcela(e.target.value)}>
                 <option value="">Selecione…</option>
-                {contrato.parcelas.map((p) => <option key={p.numero} value={p.numero}>{p.numero}ª · {numero(p.recebidos)} de {numero(p.quantidade)} · até {data(p.fim)}</option>)}
+                {parcelasComSaldo.map((p) => <option key={p.numero} value={p.numero}>{p.numero}ª · emitido {numero(emitidoNaParcela(p.numero))} de {numero(p.quantidade)} · até {data(p.fim)}</option>)}
               </select>
-              <label className="caixa"><input type="checkbox" checked={reentrega} onChange={(e) => setReentrega(e.target.checked)} /> Reentrega (reposição de reprovados)</label>
+              {!parcelasComSaldo.length && <span className="ajuda">Nenhuma parcela com saldo a emitir. Para repor reprovados, marque Reentrega.</span>}
+              <label className="caixa"><input type="checkbox" checked={reentrega} onChange={(e) => { setReentrega(e.target.checked); setParcela(''); setQtd({}); }} /> Reentrega (reposição de reprovados)</label>
             </>
           )}
         </div>
@@ -249,7 +255,8 @@ export default function Simulador() {
   const [verDof, setVerDof] = useState<Emissao>();
   const pedido = params.get('contrato') ?? undefined;
   const contratos = todos.dados?.items ?? [];
-  const vigentes = useMemo(() => contratos.filter((c) => c.situacao === 'vigente'), [contratos]);
+  // Só os vigentes com algo a emitir (saldo a emitir = contratado menos emitidos não reprovados).
+  const vigentes = useMemo(() => contratos.filter((c) => c.situacao === 'vigente' && c.itens.some((i) => i.saldoAEmitir > 0)), [contratos]);
   const numeroDe = (id: string) => contratos.find((c) => c.id === id)?.numero ?? '—';
   const ligado = !!parametros.dados?.modoDemonstracao;
 

@@ -94,7 +94,9 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
   const [params, setParams] = useSearchParams();
   const [busca, setBusca] = useState(params.get('q') ?? '');
   // Busca (?q=) e filtros (ex.: ?status=aberta) ficam no endereço: voltar, recarregar e compartilhar mantêm a consulta.
-  const filtrosDaUrl = () => (p.secao ? {} : Object.fromEntries((p.filtros ?? []).flatMap((f) => {
+  const noUrl = (f: Filtro) => !p.secao || !!f.noEndereco;
+  const comUrl = !p.secao || (p.filtros ?? []).some((f) => f.noEndereco);
+  const filtrosDaUrl = () => (Object.fromEntries((p.filtros ?? []).filter(noUrl).flatMap((f) => {
     const v = params.get(f.chave);
     return v && f.opcoes.some((o) => o.valor === v) ? [[f.chave, v]] : [];
   })));
@@ -122,29 +124,31 @@ export function ListPage<T extends { id: string }>(p: Props<T>) {
   // para não sobrescrever o que a pessoa ainda está digitando.
   const escrito = useRef<string | null>(null);
   useEffect(() => {
-    if (p.secao || params.toString() === escrito.current) return;
-    setBusca(params.get('q') ?? '');
+    if (!comUrl || params.toString() === escrito.current) return;
+    if (!p.secao) setBusca(params.get('q') ?? '');
     const f = filtrosDaUrl();
-    setFiltros((atual) => (JSON.stringify(atual) === JSON.stringify(f) ? atual : f));
-    setSituacao(situacaoDaUrl());
-  }, [params, p.secao]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Em lista de seção só os filtros do endereço vêm de lá; os demais ficam como estão.
+    const mantidos = p.secao ? Object.fromEntries(Object.entries(filtros).filter(([k]) => !(p.filtros ?? []).some((x) => x.chave === k && noUrl(x)))) : {};
+    setFiltros((atual) => { const novo = { ...(p.secao ? Object.fromEntries(Object.entries(atual).filter(([k]) => k in mantidos)) : {}), ...f }; return JSON.stringify(atual) === JSON.stringify(novo) ? atual : novo; });
+    if (!p.secao) setSituacao(situacaoDaUrl());
+  }, [params, comUrl]); // eslint-disable-line react-hooks/exhaustive-deps
   // Opções carregadas depois (ex. fornecedores vindos do serviço): o filtro que já estava no endereço passa a valer.
   const assinaturaOpcoes = (p.filtros ?? []).map((f) => f.opcoes.length).join(',');
   useEffect(() => {
-    if (p.secao) return;
+    if (!comUrl) return;
     const f = filtrosDaUrl();
     setFiltros((atual) => (Object.keys(f).every((k) => atual[k] === f[k]) ? atual : { ...atual, ...f }));
   }, [assinaturaOpcoes]); // eslint-disable-line react-hooks/exhaustive-deps
   // Estado → endereço (substitui a entrada do histórico, preservando os outros parâmetros da tela).
   useEffect(() => {
-    if (p.secao) return;
+    if (!comUrl) return;
     const novo = new URLSearchParams(params);
-    novo.delete('q');
-    for (const f of p.filtros ?? []) novo.delete(f.chave);
-    if (abasS) novo.delete(abasS.chave);
-    if (buscaAtraso.trim()) novo.set('q', buscaAtraso.trim());
-    for (const [k, v] of Object.entries(filtros)) if (v) novo.set(k, v);
-    if (abasS && situacao !== abasS.abas[0].valor) novo.set(abasS.chave, situacao);
+    if (!p.secao) novo.delete('q');
+    for (const f of (p.filtros ?? []).filter(noUrl)) novo.delete(f.chave);
+    if (abasS && !p.secao) novo.delete(abasS.chave);
+    if (buscaAtraso.trim() && !p.secao) novo.set('q', buscaAtraso.trim());
+    for (const f of (p.filtros ?? []).filter(noUrl)) if (filtros[f.chave]) novo.set(f.chave, filtros[f.chave]);
+    if (abasS && !p.secao && situacao !== abasS.abas[0].valor) novo.set(abasS.chave, situacao);
     if (novo.toString() !== params.toString()) { escrito.current = novo.toString(); setParams(novo, { replace: true }); }
   }, [buscaAtraso, filtros, situacao]); // eslint-disable-line react-hooks/exhaustive-deps
 

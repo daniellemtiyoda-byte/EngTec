@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BadgeDe } from '../components/Badge';
 import { CodigoLink } from '../components/Codigos';
 import { ListPage, type Coluna } from '../components/ListPage';
@@ -30,6 +30,8 @@ export default function Rmes() {
   const { pode } = useAuth();
   const notificar = useToast();
   const nav = useNavigate();
+  // ?minhas=sim (pendência do Painel): as RMEs em andamento de quem está logado, de todas as situações juntas, sem as abas.
+  const minhas = useSearchParams()[0].get('minhas') === 'sim';
   const cad = useCadastros();
   const totais = useAsync(contar, []);
   const [nova, setNova] = useState(false);
@@ -46,10 +48,12 @@ export default function Rmes() {
   return (
     <>
       <ListPage<Rme>
+        key={minhas ? 'minhas' : 'abas'}
         titulo="Requisições (RME)"
         descricao="Pedidos de dormentes para as obras: o requisitante abre, o almoxarifado separa e entrega."
         acoes={pode('rme:abrir') && <button className="btn btn-pri" onClick={() => setNova(true)}>Nova RME</button>}
-        abasSituacao={{ chave: 'situacao', rotulo: 'Situação da RME', abas: ABAS.map((a, i) => ({ ...a, total: totais.dados?.[i] })) }}
+        abasSituacao={minhas ? undefined : { chave: 'situacao', rotulo: 'Situação da RME', abas: ABAS.map((a, i) => ({ ...a, total: totais.dados?.[i] })) }}
+        filtros={[{ chave: 'minhas', rotulo: 'Minhas RMEs', opcoes: [{ valor: 'sim', rotulo: 'Minhas em andamento' }] }]}
         listar={(q) => servicos.rme.listar(q)}
         colunas={colunas}
         acoesLinha={[

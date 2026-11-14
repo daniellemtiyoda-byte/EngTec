@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 
-export interface Filtro { chave: string; rotulo: string; opcoes: { valor: string; rotulo: string }[] }
+/** `noEndereco`: em lista de seção (`secao`), que não usa o endereço, este filtro vem e vai para o endereço (link do Painel). */
+export interface Filtro { chave: string; rotulo: string; opcoes: { valor: string; rotulo: string }[]; noEndereco?: boolean }
 
 interface Props {
   /** Ausente: sem campo de busca. */

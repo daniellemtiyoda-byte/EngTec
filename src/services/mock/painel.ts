@@ -64,10 +64,10 @@ export function pendencias(e: Estado, u: Usuario, dia: string): Pendencia[] {
     add({ id: 'nao-localizados', titulo: 'Dormentes não localizados', quantidade: e.dormentes.filter((d) => d.situacao === 'nao_localizado').length, nivel: 'critico', link: '/inspecao?aba=nao_localizados', acao: 'Ver dormentes' });
   }
   if (pode('rme:abrir')) {
-    add({ id: 'minhas-rmes', titulo: 'Minhas RMEs em andamento', quantidade: e.rmes.filter((r) => r.solicitanteId === u.id && r.situacao !== 'entregue' && r.situacao !== 'cancelada').length, nivel: 'info', link: '/saidas', acao: 'Acompanhar' });
+    add({ id: 'minhas-rmes', titulo: 'Minhas RMEs em andamento', quantidade: e.rmes.filter((r) => r.solicitanteId === u.id && ['aberta', 'em_separacao', 'pronta'].includes(r.situacao)).length, nivel: 'info', link: '/saidas?minhas=sim', acao: 'Acompanhar' });
   }
   if (pode('admin')) {
-    add({ id: 'ctf', titulo: `Fornecedores com CTF vencido ou vencendo em ${DIAS_AVISO_CTF} dias`, quantidade: e.fornecedores.filter((f) => f.situacao === 'ativo' && diasEntre(dia, f.ctfValidade) <= DIAS_AVISO_CTF).length, nivel: 'atencao', link: '/cadastros?aba=fornecedores', acao: 'Ver fornecedores' });
+    add({ id: 'ctf', titulo: `Fornecedores com CTF vencendo em ${DIAS_AVISO_CTF} dias`, quantidade: e.fornecedores.filter((f) => f.situacao === 'ativo' && f.ctfValidade >= dia && diasEntre(dia, f.ctfValidade) <= DIAS_AVISO_CTF).length, nivel: 'atencao', link: '/cadastros?aba=fornecedores&ctf=vencendo', acao: 'Ver fornecedores' });
   }
   return lista;
 }
@@ -105,7 +105,7 @@ export function alertas(e: Estado, dia: string, u: Usuario): Alerta[] {
   }
   const aRetirar = pode('inspecao:operar', GESTAO) ? e.dormentes.filter((d) => d.situacao === 'reprovado').length : 0;
   if (aRetirar) lista.push({ id: 'reprovados', nivel: 'atencao', titulo: `${aRetirar} reprovado(s) aguardando retirada`, descricao: 'Comunique o fornecedor e registre a retirada na Inspeção.', link: '/inspecao?aba=reprovados' });
-  const parados = pode(GESTAO) ? e.fardos.map((f) => fardoView(e, f, dia)).filter((f) => f.acimaLimiteDias) : [];
+  const parados = pode('estoque:movimentar', GESTAO) ? e.fardos.map((f) => fardoView(e, f, dia)).filter((f) => f.acimaLimiteDias) : [];
   if (parados.length) lista.push({ id: 'parados', nivel: 'atencao', titulo: `${parados.length} fardo(s) acima de ${e.parametros.limiteDiasEstoque} dias em estoque`, descricao: parados.map((f) => f.id).join(', '), link: '/estoque?visao=fardo&acimaLimite=sim' });
   const naoLoc = pode(GESTAO) ? e.dormentes.filter((d) => d.situacao === 'nao_localizado').length : 0;
   if (naoLoc) lista.push({ id: 'nao-localizados', nivel: 'critico', titulo: `${naoLoc} dormente(s) não localizado(s)`, descricao: 'Não lidos na conclusão da inspeção; inspecione se forem encontrados.', link: '/inspecao?aba=nao_localizados' });

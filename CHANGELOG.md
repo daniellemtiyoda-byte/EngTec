@@ -5,7 +5,18 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Corrigido
+- 2026-11-14: **Simulador, Emitir fardos: contratos e parcelas sem saldo a emitir não aparecem mais.** O passo Contrato listava todo contrato vigente e todas as parcelas, mesmo já emitidos por inteiro. Agora o contrato só aparece com algum item com `saldoAEmitir > 0`, e a parcela só quando algum tamanho dela tem falta a emitir (`faltaEmitirNaParcela`); com **Reentrega** marcada, aparecem as parcelas com tamanho com saldo a emitir (reprovados a repor), e marcar ou desmarcar limpa a parcela escolhida. A opção da parcela passa a mostrar "emitido X de Y" (antes mostrava os recebidos, que não diziam se havia saldo). Arquivos: `pages/Simulador.tsx`.
+
 ### Adicionado
+- 2026-11-14: **Etapa 10, revisão: pendências que não batiam com a lista, alertas por perfil e decisão sobre o sino (sem migração).**
+  - **Minhas RMEs em andamento:** a pendência abre `/saidas?minhas=sim`. Filtro novo `minhas=sim` em `rme.listar` (em `montagem.ts`, igual para o mock e o Supabase): RMEs abertas, em separação ou prontas de quem está logado. A tela mostra o chip "Minhas em andamento" e troca as abas de situação pela lista única dessas três situações (limpar o chip volta às abas).
+  - **CTF vencendo:** a pendência abre `/cadastros?aba=fornecedores&ctf=vencendo`. Filtro novo `ctf=vencendo` em `fornecedores.listar`: fornecedor ativo com o CTF vencendo em até `DIAS_AVISO_CTF` dias, **sem os já vencidos** (esses já aparecem bloqueados na lista e nos alertas). O título da pendência deixou de dizer "vencido ou". Em `ListPage`, o filtro pode ter `noEndereco`: numa lista de seção (que não usa o endereço) só ele vai e vem do endereço, com chip.
+  - **Teste:** o número de cada pendência é o total da lista que o link abre (inclui nova RME e RME cancelada, outro usuário e o CTF).
+  - **Alertas por perfil:** o almoxarife passa a ver também "fardos acima do limite de dias" (quem tem `estoque:movimentar` ou `painel:gestao`); o resto não mudou. Teste atualizado.
+  - **Decisão: sem sino de alertas no protótipo.** Os alertas ficam no Painel, que é a primeira tela de todos; um sino repetiria a mesma lista no topo. Sai a menção "o sino entra na Etapa 10" do CLAUDE.md.
+  - **CLAUDE.md:** "Etapa atual" reescrita (Etapas 0 a 10 concluídas) e bloco "Telas da Etapa 10".
+  - Arquivos: `montagem.ts`, `mock/painel.ts`, `ListPage.tsx`, `BarraFiltros.tsx`, `Rmes.tsx`, `Fornecedores.tsx`, `regras.suite.ts`, `CLAUDE.md`.
 - 2026-11-14: **Etapa 10, tela 3: Usuários (versão base, sem migração; usa `usuarios.listar` e `usuarios.atualizar`, que já tinham a função `atualizar_usuario` no banco).**
   - **Tela** `pages/Usuarios.tsx` (rota `/usuarios`, só `admin`; sai de "Em construção"): lista com nome, e-mail, perfil e situação, busca, filtros por perfil e por situação e ordenação; **Editar** abre o perfil e a situação (só esses dois campos). Desativar pede confirmação. Nada é apagado.
   - **Contas novas:** aviso fixo na tela com as instruções (no Supabase: Authentication › Users › Add user; a conta aparece na lista com o perfil Requisitante, que o administrador ajusta aqui). No modo simulado, avisa que só há os quatro usuários de demonstração.
@@ -16,7 +27,7 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ### Fora da Etapa 10 (registrado para os próximos passos)
 - **CSV** dos relatórios do IBAMA (não há utilitário de exportação).
 - **Painel:** taxa de reprovação por empresa inspetora, pontualidade por fornecedor, via corrente × AMV, gráfico de estoque por item com mínimo e máximo, entregas dos contratos (barras de progresso) e "Início de campo" do almoxarife no celular.
-- **Alertas do IBAMA:** os dois que ficaram de fora, "saldo do DOF sem atualização há mais de 30 dias" e "local sem inventário há mais de 90 dias" (provisório); o sino de alertas.
+- **Alertas do IBAMA:** os dois que ficaram de fora, "saldo do DOF sem atualização há mais de 30 dias" e "local sem inventário há mais de 90 dias" (provisório); o sino de alertas (decisão: não entra, os alertas ficam no Painel).
 - **Relatórios:** DOFs a declarar, divergências de volume e movimento anual (3, 4 e 6 do plano); a data do último inventário dentro do Saldo do pátio.
 - **Usuários:** trava no banco para a conta do administrador e convite por e-mail (detalhes na entrada de Usuários).
 - 2026-11-14: **Etapa 10, tela 2: Relatórios › IBAMA (versão base, sem migração; usa só `servicos.ibama`).**

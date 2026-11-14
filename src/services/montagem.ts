@@ -1,4 +1,4 @@
-import { dataSP } from '../dominio/parametros';
+import { DIAS_AVISO_CTF, dataSP, diasEntre } from '../dominio/parametros';
 import { PERFIS, type Permissao } from '../dominio/permissoes';
 import type { Id, ListQuery, Parametros, SaldoItem, Usuario } from '../types/models';
 import type { ArquivosEntrega, Servicos } from './contracts';
@@ -90,7 +90,12 @@ export function montarServicos(m: Motor): Servicos {
     },
 
     fornecedores: {
-      listar: (q) => ler((e) => paginar(e.fornecedores.map((f) => fornecedorView(f, dia())), q)),
+      // ctf = vencendo: fornecedor ativo com o CTF a vencer em até DIAS_AVISO_CTF dias, sem os já vencidos (pendência do Painel).
+      listar: (q) => ler((e) => {
+        const { ctf, ...filters } = q?.filters ?? {};
+        const lista = e.fornecedores.map((f) => fornecedorView(f, dia())).filter((f) => ctf !== 'vencendo' || (f.situacao === 'ativo' && !f.bloqueado && diasEntre(dia(), f.ctfValidade) <= DIAS_AVISO_CTF));
+        return paginar(lista, { ...q, filters });
+      }),
       obter: (k) => ler((e) => fornecedorDe(e, k)),
       criar: (d) => escrever(CADASTROS, op('salvar_fornecedor', { p_id: null, p_dados: d }), (e, ctx) => salvarFornecedor(e, d, ctx).id, fornecedorDe),
       atualizar: (k, d) => escrever(CADASTROS, op('salvar_fornecedor', { p_id: k, p_dados: d }), (e, ctx) => salvarFornecedor(e, d, ctx, k).id, fornecedorDe),
@@ -267,7 +272,12 @@ export function montarServicos(m: Motor): Servicos {
     },
 
     rme: {
-      listar: (q) => ler((e) => paginar(e.rmes, maisRecentes('criadoEm')(q))),
+      // minhas = sim: as RMEs em andamento (abertas, em separação ou prontas) de quem está logado (pendência do Painel).
+      listar: (q) => ler((e, u) => {
+        const { minhas, ...filters } = q?.filters ?? {};
+        const lista = e.rmes.filter((r) => minhas !== 'sim' || (r.solicitanteId === u.id && ['aberta', 'em_separacao', 'pronta'].includes(r.situacao)));
+        return paginar(lista, maisRecentes('criadoEm')({ ...q, filters }));
+      }),
       obter: (numero) => ler((e) => acharRme(e, numero)),
       abrir: (d) => escrever(['rme:abrir'], op('abrir_rme', { p_dados: d }), (e, ctx, u) => abrirRme(e, d, u, ctx).id, rmeDe),
       iniciarSeparacao: (numero) => escrever(['rme:separar'], op('iniciar_separacao', { p_numero: numero }), (e, ctx) => iniciarSeparacao(e, numero, ctx).id, rmeDe),
