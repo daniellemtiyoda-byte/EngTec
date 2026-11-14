@@ -9,6 +9,11 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 - 2026-11-14: **Simulador, Emitir fardos: contratos e parcelas sem saldo a emitir não aparecem mais.** O passo Contrato listava todo contrato vigente e todas as parcelas, mesmo já emitidos por inteiro. Agora o contrato só aparece com algum item com `saldoAEmitir > 0`, e a parcela só quando algum tamanho dela tem falta a emitir (`faltaEmitirNaParcela`); com **Reentrega** marcada, aparecem as parcelas com tamanho com saldo a emitir (reprovados a repor), e marcar ou desmarcar limpa a parcela escolhida. A opção da parcela passa a mostrar "emitido X de Y" (antes mostrava os recebidos, que não diziam se havia saldo). Arquivos: `pages/Simulador.tsx`.
 
 ### Adicionado
+- 2026-11-14: **Usuários: o motivo da ação desabilitada não alarga mais a tabela.**
+  - **Problema:** o texto "Você não edita a própria conta…" ao lado do botão alargava a coluna Ações e empurrava a tabela para a rolagem lateral no computador, cortando o **Editar** das outras linhas.
+  - **Correção em `ListPage`:** na linha do próprio usuário fica só o botão **Editar** desabilitado, com o motivo no `title` e no `aria-describedby` (o texto vai num elemento só para leitor de tela, sem ocupar espaço na tabela). O selo "você" continua identificando a linha. A mudança vale para qualquer ação com `desabilitada`.
+  - **Celular:** o cartão não tem `title` no toque, então ali o motivo aparece escrito abaixo do botão, que continua ocupando a largura do cartão.
+  - Arquivos: `ListPage.tsx`, `styles.css`.
 - 2026-11-14: **Simulador do fornecedor: só o que ainda tem saldo a emitir.**
   - **Contratos:** o assistente "Emitir fardos" lista só os contratos vigentes com saldo a emitir em algum item (contratado menos emitido não reprovado).
   - **Parcelas:** o seletor mostra só as parcelas em que ainda há o que emitir (na Reentrega, as com tamanho de saldo a repor, os reprovados) e o texto passa a ser "emitido X de Y" na parcela, no lugar de "recebidos". Sem nenhuma parcela, aparece a dica para marcar Reentrega.

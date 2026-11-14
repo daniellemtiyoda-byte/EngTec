@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAsync, useDebounced } from '../hooks/useAsync';
 import type { ListQuery, Paginado } from '../types/models';
@@ -76,6 +76,7 @@ const lerColunas = (chave: string): string[] => {
 const gravarColunas = (chave: string, v: string[]) => { try { localStorage.setItem(chave, JSON.stringify(v)); } catch { /* navegador sem armazenamento: só não lembra a escolha */ } };
 
 function AcoesDaLinha<T>({ acoes, linha }: { acoes: AcaoLinha<T>[]; linha: T }) {
+  const idMotivo = useId();
   const visiveis = acoes.filter((a) => !a.visivel || a.visivel(linha)).sort((a, b) => Number(!!b.principal) - Number(!!a.principal));
   if (!visiveis.length) return null;
   const [primeira, ...resto] = visiveis;
@@ -83,8 +84,9 @@ function AcoesDaLinha<T>({ acoes, linha }: { acoes: AcaoLinha<T>[]; linha: T }) 
   const noMenu = resto.filter((a) => !a.desabilitada?.(linha));
   return (
     <div className="acoes-linha">
-      <button className={`btn ${primeira.principal ? 'btn-acao' : 'btn-sec'} btn-peq`} disabled={!!motivo} title={motivo} onClick={() => primeira.aoClicar(linha)}>{primeira.rotulo}</button>
-      {motivo && <span className="detalhe-linha">{motivo}</span>}
+      <button className={`btn ${primeira.principal ? 'btn-acao' : 'btn-sec'} btn-peq`} disabled={!!motivo} title={motivo} aria-describedby={motivo ? idMotivo : undefined} onClick={() => primeira.aoClicar(linha)}>{primeira.rotulo}</button>
+      {/* Na tabela o motivo fica só no title e para leitor de tela (não alarga a coluna); no cartão do celular, que não tem title, aparece escrito. */}
+      {motivo && <span id={idMotivo} className="detalhe-linha motivo-linha">{motivo}</span>}
       {noMenu.length > 0 && <MenuAcoes itens={noMenu.map((a) => ({ rotulo: a.rotulo, aoClicar: () => a.aoClicar(linha) }))} />}
     </div>
   );

@@ -262,7 +262,10 @@ a.codigo:hover, a.codigo:focus-visible { text-decoration: underline; }
 .cartao-linha-titulo { font-size: 16px; font-weight: 700; }
 .cartao-linha dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 14px; }
 .cartao-linha dt { color: var(--texto-2); } .cartao-linha dd { margin: 0; }
-.cartao-linha .acoes-linha { justify-content: stretch; }
+.cartao-linha .acoes-linha { justify-content: stretch; flex-wrap: wrap; }
+.cartao-linha .motivo-linha { flex-basis: 100%; white-space: normal; }
+/* Na tabela, o motivo da ação desabilitada não ocupa espaço: fica no title do botão e no aria-describedby. */
+.tabela .motivo-linha { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .cartao-linha .acoes-linha > .btn:first-child { flex: 1; padding: 10px; font-size: 15px; }
 .cartao-linha .btn-menu { padding: 10px 14px; }
 @media (max-width: 760px) {
