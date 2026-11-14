@@ -20,6 +20,7 @@ import { emitirLaudo, previaRecebimento, receber } from './mock/recebimento';
 import { abrirRme, acharRme, cancelarRme, entregarRme, iniciarSeparacao, separarRme, sugerirSeparacao } from './mock/rme';
 import { emitir, xmlDaNf } from './mock/simulador';
 import { paginar } from './mock/util';
+import { cartoesDoPainel } from './cartoes';
 
 /**
  * Montagem dos serviços sobre um "motor" de dados. As leituras e os campos calculados são os mesmos para todas as
@@ -80,11 +81,12 @@ export function montarServicos(m: Motor): Servicos {
     };
   }
 
-  return {
+  const svc: Servicos = {
     dashboard: {
       indicadores: () => ler((e) => indicadores(e, dia())),
+      cartoes: async () => cartoesDoPainel(svc, (await ler((_e, u) => u)).permissoes),
       pendencias: () => ler((e, u) => pendencias(e, u, dia())),
-      alertas: () => ler((e) => alertas(e, dia())),
+      alertas: () => ler((e, u) => alertas(e, dia(), u)),
     },
 
     fornecedores: {
@@ -169,8 +171,10 @@ export function montarServicos(m: Motor): Servicos {
         (e, k) => entregaView(e, achar(e.entregas, (x) => x.id === k, 'Entrega'), dia())),
       listarEntregas: (q = {}) => ler((e) => {
         // etapa = com_ocorrencia é a aba "Com ocorrência" de Recebimentos (as demais são a etapa calculada).
-        const { etapa, ...filters } = q.filters ?? {};
-        const lista = e.entregas.map((x) => entregaView(e, x, dia())).filter((x) => !etapa || (etapa === 'com_ocorrencia' ? x.comOcorrencia : x.etapa === etapa));
+        // laudo = a_vencer: o prazo do Laudo Técnico está perto de vencer ou já venceu (cartão do Painel).
+        const { etapa, laudo, ...filters } = q.filters ?? {};
+        const lista = e.entregas.map((x) => entregaView(e, x, dia())).filter((x) => (!etapa || (etapa === 'com_ocorrencia' ? x.comOcorrencia : x.etapa === etapa))
+          && (laudo !== 'a_vencer' || (!!x.nivelPrazoLaudo && x.nivelPrazoLaudo !== 'ok')));
         return paginar(lista, maisRecentes('criadoEm')({ ...q, filters }));
       }),
       listarNfs: (q) => ler((e) => paginar(e.nfs, maisRecentes('emissao')(q))),
@@ -329,4 +333,5 @@ export function montarServicos(m: Motor): Servicos {
       reiniciarDemonstracao: () => m.reiniciarDemonstracao(),
     },
   };
+  return svc;
 }

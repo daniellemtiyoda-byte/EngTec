@@ -5,6 +5,19 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-11-14: **Etapa 10, tela 1: Painel (versão base, sem migração; leituras no TypeScript sobre o estado já exportado).**
+  - **Tela** `pages/Painel.tsx` (rota `/`, sai de "Em construção"): cartões de indicadores, "Para fazer agora" (pendências) e alertas, conforme o perfil. Serviço novo `dashboard.cartoes()` (`services/cartoes.ts`): o valor de cada cartão é o `total` da MESMA consulta da lista que o link abre (mesmo serviço, mesmo filtro), então número e lista não se separam.
+  - **Cartões:** dormentes em estoque, fardos a inspecionar, itens abaixo do mínimo, itens acima do máximo, fardos acima do limite, DOFs a declarar, **RMEs abertas** e **RMEs em separação** (um cartão por aba, com o número e o link da aba), contratos com parcela atrasada (detalhe: nº de parcelas), laudos perto do prazo ou vencidos, fardos com reprovados a retirar (detalhe: nº de dormentes) e dormentes não localizados. Cada cartão só vai a quem tem uma das permissões que agem sobre ele; o requisitante não recebe cartões (só "Para fazer agora").
+  - **Links corrigidos:** fardos acima do limite agora usam `acimaLimite=sim` (o filtro real da tela; antes `acimaLimiteDias=true` não filtrava), no alerta e na pendência.
+  - **Pendências:** "RMEs a separar" (aberta + em separação, mas o link abria só "abertas") virou duas, "RMEs abertas a separar" e "RMEs em separação"; "Itens em falta ou excesso" (link sem filtro) virou "Itens abaixo do mínimo" (`?situacao=falta`) e "Itens acima do máximo" (`?situacao=excesso`).
+  - **Recebimentos:** novo filtro "Laudo Técnico: prazo perto de vencer ou vencido" (`laudo=a_vencer`, também no serviço `listarEntregas`), para o cartão de laudos abrir a lista que ele conta.
+  - **Alertas por perfil:** `dashboard.alertas()` filtra por permissão (DOF e laudos: quem declara DOF ou inspeciona; falta, excesso, parcelas, fardos parados e não localizados: gestão; CTF: administrador; requisitante: nenhum).
+  - **Três alertas do IBAMA** (calculados com as mesmas funções do serviço `ibama`; para quem declara DOF ou é gestão): saldo do pátio acima de 10% do informado (`/relatorios?aba=saldo`), destinações finais a lançar (`?aba=destinacoes`) e perdas a comunicar (`?aba=perdas`). As abas entram na tela de Relatórios (passo seguinte).
+  - **Limitações conhecidas (números que ainda não são o total da lista):** "Dormentes em estoque" (não há lista de dormentes; vale a soma do saldo por item, em cura inclusive); as pendências "Minhas RMEs em andamento" (a lista não filtra por solicitante) e "Fornecedores com CTF vencido ou vencendo" (a lista de fornecedores não filtra por CTF).
+  - **Fica fora desta etapa (próximos passos):** taxa de reprovação por empresa inspetora, pontualidade por fornecedor, via corrente × AMV, gráfico de estoque por item com mínimo e máximo, entregas dos contratos, "Início de campo" do almoxarife no celular, os alertas do IBAMA "saldo do DOF sem atualização há mais de 30 dias" e "local sem inventário há mais de 90 dias", CSV dos relatórios, trava no banco para a conta do administrador e convite de usuário por e-mail.
+  - Testes em `regras.suite.ts` (cartões × listas, RMEs, alertas por perfil, alertas do IBAMA). Arquivos: `Painel.tsx`, `cartoes.ts`, `mock/painel.ts`, `montagem.ts`, `contracts.ts`, `models.ts`, `Recebimentos.tsx`, `rotas.tsx`, `styles.css`.
+
 ### Corrigido
 - 2026-11-14: **Melhoria 2: câmera do LeitorQr cortada no Safari do iPhone (só apresentação).**
   - **Causa principal:** a altura do contêiner vem do `aspect-ratio` e o `<video>` usava `height: 100%`; no WebKit essa porcentagem não resolve e o vídeo assume o tamanho do fluxo (retrato 3:4), estourando o contêiner e sendo cortado pelo `overflow: hidden`. Agora o vídeo é absoluto (`inset: 0`), igual ao tamanho do contêiner (no computador e no Chrome o resultado visual é o mesmo).
@@ -13,6 +26,14 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
   - Arquivos: `src/styles.css`, `src/components/LeitorQr.tsx`.
 
 ### Alterado
+- 2026-11-14: **Melhoria 7, passo "Fardos e dormentes": a pessoa informa o total e a divisão sai pronta (só front).**
+  - **Campo principal "Dormentes a enviar"** por tamanho (`Contador`, digitável, lido com `paraNumero`), já preenchido com o menor valor entre a falta da parcela e uma carga (`CARGA_PADRAO_FARDOS` × padrão do tamanho). Embaixo, a divisão em texto ("3 fardos de 14"), calculada por `sugerirDivisao(total, padrão)`; parcela, emitido e falta aparecem junto, e o saldo do contrato fica como informação secundária.
+  - **Total que não divide em fardos iguais** (melhor divisor abaixo da metade do padrão) ou **maior que uma carga**: fardos cheios do padrão e aviso ("Vão 28 dormentes em 2 fardos de 14. Os outros 13 ficam para a próxima emissão."). O total enviado é sempre o da divisão (fardos × por fardo), nunca o digitado.
+  - **"Ajustar divisão"** abre os contadores de fardos e de dormentes por fardo (saíram da tela principal); mexer neles atualiza o "Dormentes a enviar". **"Usar sugestão"** volta ao cálculo automático, com o total sugerido da parcela. Digitar o total também volta ao automático.
+  - Validações iguais às anteriores (limites por fardo e por item, saldo a emitir). Revisão: "3 fardos de 14 (42 dormentes)".
+  - `sugerirDivisao` passou a receber o **total** (antes, a falta) e o texto do aviso mudou; novo `textoDivisao`. `DadosEmissao`, o mock e `emitir_fardos` não mudaram.
+  - **Divisão desigual** (ex.: 41 → 2 fardos de 14 e 1 de 13, ou 40 em fardos de tamanhos diferentes) **continua para a versão com banco**: hoje todo fardo de uma emissão tem o mesmo número de dormentes.
+  - Testes em `parametros.test.ts` (42, 40, 41, 3.000 limitado à carga, total menor que o padrão, zero). Arquivos: `Simulador.tsx`, `parametros.ts`, `styles.css`.
 - 2026-11-14: **Melhoria 7, revisão: a sugestão é de uma carga, sem fardos de 1 e com o emitido lido da parcela gravada (só front).**
   - **Carga:** `CARGA_PADRAO_FARDOS` (`parametros.ts`, **provisório: 3, a CPTM vai confirmar**). Falta maior que 3 fardos do padrão → 3 × 14 com "Entrega parcial da parcela: faltam N" (ex.: AR00224-01 com 3.000 a emitir → 3 × 14, faltam 2.958). Falta que cabe em uma carga: divisão exata (40 → 4 × 10, pode passar de 3 fardos porque o limite é em dormentes).
   - **Sem divisor bom** (abaixo da metade do padrão): fardos cheios do padrão e "Sobram N dormentes para a próxima emissão" (41 → 2 × 14, sobram 13), no lugar de N × 1.
@@ -26,14 +47,6 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
   - Cada item mostra a quantidade da parcela, o já emitido nela e o que falta; o saldo do contrato fica como informação secundária.
   - Padrão por tamanho em `DORMENTES_POR_FARDO_POR_CODIGO` (`parametros.ts`), **provisório: 14 para todos, a CPTM vai confirmar**; tamanho fora da tabela usa o parâmetro das Configurações.
   - O emitido por parcela não é guardado no contrato: `faltaEmitirNaParcela` supõe que as emissões líquidas preenchem as parcelas em ordem e limita ao saldo a emitir.
-- 2026-11-14: **Melhoria 7, passo "Fardos e dormentes": a pessoa informa o total e a divisão sai pronta (só front).**
-  - **Campo principal "Dormentes a enviar"** por tamanho (`Contador`, digitável, lido com `paraNumero`), já preenchido com o menor valor entre a falta da parcela e uma carga (`CARGA_PADRAO_FARDOS` × padrão do tamanho). Embaixo, a divisão em texto ("3 fardos de 14"), calculada por `sugerirDivisao(total, padrão)`; parcela, emitido e falta aparecem junto, e o saldo do contrato fica como informação secundária.
-  - **Total que não divide em fardos iguais** (melhor divisor abaixo da metade do padrão) ou **maior que uma carga**: fardos cheios do padrão e aviso ("Vão 28 dormentes em 2 fardos de 14. Os outros 13 ficam para a próxima emissão."). O total enviado é sempre o da divisão (fardos × por fardo), nunca o digitado.
-  - **"Ajustar divisão"** abre os contadores de fardos e de dormentes por fardo (saíram da tela principal); mexer neles atualiza o "Dormentes a enviar". **"Usar sugestão"** volta ao cálculo automático, com o total sugerido da parcela. Digitar o total também volta ao automático.
-  - Validações iguais às anteriores (limites por fardo e por item, saldo a emitir). Revisão: "3 fardos de 14 (42 dormentes)".
-  - `sugerirDivisao` passou a receber o **total** (antes, a falta) e o texto do aviso mudou; novo `textoDivisao`. `DadosEmissao`, o mock e `emitir_fardos` não mudaram.
-  - **Divisão desigual** (ex.: 41 → 2 fardos de 14 e 1 de 13, ou 40 em fardos de tamanhos diferentes) **continua para a versão com banco**: hoje todo fardo de uma emissão tem o mesmo número de dormentes.
-  - Testes em `parametros.test.ts` (42, 40, 41, 3.000 limitado à carga, total menor que o padrão, zero). Arquivos: `Simulador.tsx`, `parametros.ts`, `styles.css`.
   - **Fica para a versão com banco:** divisão desigual (ex. 14, 14 e 12 em vez de 4 × 10), porque exige mudar `DadosEmissao` e `emitir_fardos` (hoje um item = N fardos iguais) e uma migração.
   - Testes em `parametros.test.ts` e `contratos.test.ts`. Arquivos: `parametros.ts`, `contratos.ts`, `Simulador.tsx`, `styles.css`.
 

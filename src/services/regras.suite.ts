@@ -710,7 +710,7 @@ export function regrasDosServicos(montar: Montar, tempoMs?: number) {
       como('requisitante');
       expect((await s.dashboard.pendencias()).map((p) => p.id)).toEqual(['minhas-rmes']);
       como('gestor');
-      expect((await s.dashboard.pendencias()).map((p) => p.id)).toEqual(expect.arrayContaining(['falta-excesso', 'parados', 'nao-localizados']));
+      expect((await s.dashboard.pendencias()).map((p) => p.id)).toEqual(expect.arrayContaining(['falta', 'excesso', 'parados', 'nao-localizados']));
       const ind = await s.dashboard.indicadores();
       expect([ind.itensAbaixoMinimo, ind.itensAcimaMaximo, ind.fardosAcimaLimite, ind.naoLocalizados, ind.rmesAbertas]).toEqual([1, 1, 2, 3, 1]);
       expect([ind.parcelasAtrasadas, ind.reprovadosAguardandoRetirada, ind.laudosAVencer]).toEqual([1, 4, 1]);
@@ -719,6 +719,76 @@ export function regrasDosServicos(montar: Montar, tempoMs?: number) {
       expect(falta.descricao).toContain('Saldo na ata vigente');
       expect(falta.link).toBe('/contratos?novo=1');
       expect((await s.dashboard.alertas()).some((a) => a.nivel === 'critico' && a.titulo.startsWith('DOF'))).toBe(true);
+    });
+
+    it('alertas só para quem pode agir: cada perfil vê o seu', async () => {
+      const { s, como } = await montar('gestor');
+      const prefixos = async () => new Set((await s.dashboard.alertas()).map((a) => a.id.replace(/-.*/, '')));
+      const gestor = await prefixos();
+      expect([...gestor]).toEqual(expect.arrayContaining(['dof', 'falta', 'parcela', 'laudo', 'reprovados', 'parados', 'nao']));
+      como('almoxarife');
+      const almox = await prefixos();
+      expect([...almox]).toEqual(expect.arrayContaining(['dof', 'laudo', 'reprovados']));
+      for (const x of ['falta', 'excesso', 'parcela', 'parados', 'nao', 'ctf']) expect(almox.has(x)).toBe(false);
+      como('requisitante');
+      expect(await s.dashboard.alertas()).toEqual([]);
+      como('administrador');
+      // O administrador tem painel:gestao: vê o mesmo que o gestor.
+      expect([...(await prefixos())].filter((x) => x !== 'ctf').sort()).toEqual([...gestor].sort()); // o alerta de CTF é só do administrador
+    });
+
+    it('alertas do IBAMA batem com as abas de Relatórios', async () => {
+      const { s, como } = await montar('gestor');
+      const alertas = await s.dashboard.alertas();
+      const achar = (id: string) => alertas.find((a) => a.id === id);
+      const aLancar = (await s.ibama.destinacoes({ pageSize: 1, filters: { lancado: 'nao' } })).total;
+      expect(aLancar).toBeGreaterThan(0);
+      expect(achar('ibama-destinacao')?.titulo).toContain(`${aLancar} destinação`);
+      expect(achar('ibama-destinacao')?.link).toBe('/relatorios?aba=destinacoes');
+      const aComunicar = (await s.ibama.perdas({ pageSize: 1, filters: { comunicado: 'nao' } })).total;
+      expect(!!achar('ibama-perdas')).toBe(aComunicar > 0);
+      if (aComunicar) expect(achar('ibama-perdas')?.titulo).toContain(`${aComunicar} perda`);
+      const fora = (await s.ibama.saldoPatio()).filter((x) => x.acimaTolerancia).length;
+      expect(!!achar('ibama-saldo')).toBe(fora > 0);
+      if (fora) expect(achar('ibama-saldo')?.link).toBe('/relatorios?aba=saldo');
+      // Lançada a destinação, o alerta acompanha (o almoxarife declara DOF).
+      como('almoxarife');
+      expect((await s.dashboard.alertas()).some((a) => a.id === 'ibama-destinacao')).toBe(true);
+      const d = (await s.ibama.destinacoes({ pageSize: 50, filters: { lancado: 'nao' } })).items;
+      for (const x of d) await s.ibama.marcarLancado(x.id);
+      expect((await s.dashboard.alertas()).some((a) => a.id === 'ibama-destinacao')).toBe(false);
+    });
+
+    it('cartões do Painel: cada número é o total da lista que o link abre', async () => {
+      const { s, como } = await montar('gestor');
+      const cartoes = await s.dashboard.cartoes();
+      const c = (id: string) => cartoes.find((x) => x.id === id)!;
+      const um = { pageSize: 1 };
+      expect(c('falta').valor).toBe((await s.estoque.porItem({ ...um, filters: { situacao: 'falta' } })).total);
+      expect(c('excesso').valor).toBe((await s.estoque.porItem({ ...um, filters: { situacao: 'excesso' } })).total);
+      expect(c('parados').valor).toBe((await s.estoque.porFardo({ ...um, filters: { acimaLimite: 'sim' } })).total);
+      expect(c('dofs').valor).toBe((await s.documentos.listarDofs({ ...um, filters: { situacaoDeclaracao: 'a_declarar' } })).total);
+      expect(c('inspecionar').valor).toBe((await s.inspecao.fila(um)).total);
+      expect(c('reprovados').valor).toBe((await s.inspecao.reprovados(um)).total);
+      expect(c('nao-localizados').valor).toBe((await s.inspecao.naoLocalizados(um)).total);
+      expect(c('atrasadas').valor).toBe((await s.contratos.listar({ ...um, filters: { situacao: 'vigente', atrasada: 'sim' } })).total);
+      expect(c('laudos').valor).toBe((await s.documentos.listarEntregas({ ...um, filters: { etapa: 'aguardando_laudo', laudo: 'a_vencer' } })).total);
+      // RMEs: um cartão por aba, cada um com o número da sua aba e o link para ela.
+      const ind = await s.dashboard.indicadores();
+      expect(c('rmes-abertas')).toMatchObject({ valor: (await s.rme.listar({ ...um, filters: { situacao: 'aberta' } })).total, link: '/saidas' });
+      expect(c('rmes-abertas').valor).toBe(ind.rmesAbertas);
+      expect(c('rmes-em-separacao')).toMatchObject({ valor: (await s.rme.listar({ ...um, filters: { situacao: 'em_separacao' } })).total, link: '/saidas?situacao=em_separacao' });
+      expect(c('rmes-em-separacao').valor).toBe(ind.rmesEmSeparacao);
+      // Links corrigidos: o filtro de fardos acima do limite é acimaLimite=sim.
+      expect(c('parados').link).toBe('/estoque?visao=fardo&acimaLimite=sim');
+      expect((await s.dashboard.pendencias()).find((p) => p.id === 'parados')?.link).toBe(c('parados').link);
+      // Perfis: o almoxarife não recebe cartões de gestão; o requisitante não recebe nenhum.
+      como('almoxarife');
+      const almox = (await s.dashboard.cartoes()).map((x) => x.id);
+      expect(almox).toEqual(expect.arrayContaining(['inspecionar', 'dofs', 'rmes-abertas', 'rmes-em-separacao', 'laudos', 'reprovados']));
+      for (const x of ['falta', 'excesso', 'parados', 'atrasadas', 'nao-localizados']) expect(almox).not.toContain(x);
+      como('requisitante');
+      expect(await s.dashboard.cartoes()).toEqual([]);
     });
   });
 

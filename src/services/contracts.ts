@@ -1,5 +1,5 @@
 import type {
-  Alerta, Ata, Categoria, DestinacaoFinal, Evento, Inventario, InventarioDoLocal, MotivoPerda, Perda, ResultadoInventario, RetornoLeituraInventario, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
+  Alerta, Ata, CartaoPainel, Categoria, DestinacaoFinal, Evento, Inventario, InventarioDoLocal, MotivoPerda, Perda, ResultadoInventario, RetornoLeituraInventario, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros, RegrasAta, TipoDestino, UsoTamanho,
   Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
@@ -89,6 +89,8 @@ export interface DadosSeparacao { fardoId: Id; dormentesIds: Id[]; justificativa
 export interface Servicos {
   dashboard: {
     indicadores(): Promise<Indicadores>;
+    /** Cartões do Painel conforme as permissões; cada valor é o total da lista que o link abre. */
+    cartoes(): Promise<CartaoPainel[]>;
     /** "Para fazer agora" do usuário, conforme as permissões. */
     pendencias(): Promise<Pendencia[]>;
     alertas(): Promise<Alerta[]>;

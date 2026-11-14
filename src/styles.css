@@ -717,3 +717,8 @@ span.codigo { font-weight: 600; color: var(--texto); }
   .leitor { gap: var(--esp-3); }
   .leitor-camera { margin-top: var(--esp-3); }
 }
+
+/* ===== Etapa 10: Painel ===== */
+.lista-painel { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
+.lista-painel li { display: flex; align-items: center; gap: var(--esp-3); padding: var(--esp-3) var(--esp-4); background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); flex-wrap: wrap; }
+.lista-painel-texto { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }

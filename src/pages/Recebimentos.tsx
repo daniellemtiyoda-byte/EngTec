@@ -54,6 +54,7 @@ export default function Recebimentos() {
         descricao="Escolha a entrega que chegou, leia os QR dos fardos e confira. NF e DOF são cadastradas antes, em NF e DOF."
         acoes={pode('recebimento:registrar') && <button className="btn btn-pri" onClick={() => setAssistente({})}>Receber</button>}
         abasSituacao={{ chave: 'etapa', rotulo: 'Etapa do recebimento', abas: ABAS.map((a, i) => ({ ...a, total: totais.dados?.[i] })) }}
+        filtros={[{ chave: 'laudo', rotulo: 'Laudo Técnico', opcoes: [{ valor: 'a_vencer', rotulo: 'Prazo perto de vencer ou vencido' }] }]}
         listar={(q) => servicos.documentos.listarEntregas(q)}
         recarregar={rec}
         colunas={colunas}

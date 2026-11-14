@@ -768,6 +768,7 @@ export interface Indicadores {
   fardosAcimaLimite: number;
   dofsADeclarar: number;
   rmesAbertas: number;
+  rmesEmSeparacao: number;
   naoLocalizados: number;
   parcelasAtrasadas: number;
   laudosAVencer: number;
@@ -777,6 +778,8 @@ export interface Indicadores {
 export type NivelAlerta = 'info' | 'atencao' | 'critico';
 /** "Para fazer agora": tarefa do perfil, com a quantidade e o link para agir. */
 export interface Pendencia { id: Id; titulo: string; quantidade: number; nivel: NivelAlerta; link: string; acao: string }
+/** Cartão de indicador do Painel: o número é o total da lista que o `link` abre (mesmo serviço, mesmo filtro). */
+export interface CartaoPainel { id: Id; rotulo: string; valor: number; detalhe?: string; tom: 'azul' | 'verde' | 'laranja' | 'vermelho' | 'cinza'; link: string }
 export interface Alerta { id: Id; nivel: Exclude<NivelAlerta, 'info'>; titulo: string; descricao: string; link: string }
 
 // ---------- Visões montadas para as páginas de objeto ----------
