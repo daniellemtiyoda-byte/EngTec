@@ -18,6 +18,7 @@ do modo simulado e valem no banco: o front esconder botões é só UX.
 | `supabase/migrations/0006_inventario.sql` | inventário físico por leitura de QR: abrir, ler, prévia e fechar |
 | `supabase/migrations/0007_demonstracao.sql` | modelo da demonstração, `deslocar_datas`, `carregar_demonstracao` (datas do dia em que roda) e `reiniciar_demonstracao` (só administrador) |
 | `supabase/migrations/0008_privilegios.sql` | privilégios explícitos, segunda camada além da RLS (ideia do banco do Erik): `anon` sem nada; `authenticated` só com `select` nas tabelas e views e `execute` só nas funções que o app chama e nas auxiliares de leitura das views e das políticas; objetos criados depois não ficam abertos a `anon` |
+| `supabase/migrations/0009_safeupdate.sql` | WHERE em todo UPDATE e DELETE das funções (o PostgREST do Supabase usa o `pg_safeupdate`, ver abaixo): `recalcular_chaves` (usada pelo reiniciar), `separar_rme` e `atualizar_parametros`, com os mesmos privilégios |
 | `supabase/seed.sql` | **gerado** por `npm run seed`: o modelo da história de demonstração (a mesma do modo simulado, mesmos IDs), a ligação das contas `<perfil>@example.com` aos perfis e a carga |
 | `supabase/seed_1.sql`, `seed_2.sql` | plano B, o mesmo conteúdo do `seed.sql` em duas partes, para o editor SQL que recusar os ~530 KB do arquivo inteiro |
 
@@ -46,7 +47,7 @@ No projeto do Supabase (o mesmo da v1), nesta ordem:
    ```
 
    Ele apaga as tabelas, o gatilho e as políticas de Storage da v1. As contas do Auth e os buckets antigos ficam.
-3. **Migrações:** no SQL Editor, um arquivo por vez, em ordem: `0001_tabelas.sql` a `0008_privilegios.sql`. Cada
+3. **Migrações:** no SQL Editor, um arquivo por vez, em ordem: `0001_tabelas.sql` a `0009_safeupdate.sql`. Cada
    um deve terminar sem erro. A `0002` já cria o perfil (requisitante) das contas que existiam no Auth.
 4. **Contas de demonstração:** Authentication › Users › **Add user › Create new user**, com **Auto Confirm User**
    marcado: `administrador@example.com`, `almoxarife@example.com`, `gestor@example.com`, `requisitante@example.com`
@@ -113,7 +114,14 @@ ficha sem novo login) e "Sair" a apaga. Sem `VITE_FONTE_DADOS`, o app volta ao m
   (o padrão do Supabase abre função nova a `authenticated`). O teste `privilegios.test.ts` confere a lista contra o
   código do app.
 - **Erros de regra:** código `P0<status>` com DETAIL `{ status, campos }`, convertido em `ApiError` (mesma mensagem e
-  mesmos campos do modo simulado).
+  mesmos campos do modo simulado). Qualquer outro erro vira a mensagem genérica com o código, sem a mensagem técnica:
+  "Não foi possível concluir a operação (código 21000). Tente novamente." (a mensagem inteira fica no console).
+- **`pg_safeupdate`: todo UPDATE e DELETE tem WHERE.** O PostgREST do Supabase carrega essa extensão, que recusa
+  UPDATE e DELETE sem WHERE em qualquer comando da requisição, inclusive dentro de funções `security definer`, de
+  gatilhos e de SQL dinâmico (`execute`): erro `21000` "UPDATE requires a WHERE clause". O SQL Editor não passa pelo
+  PostgREST (por isso o `seed.sql` roda e o mesmo `carregar_demonstracao` falhava pelo app) e o PGlite dos testes não
+  tem a extensão. Comando que é mesmo para todas as linhas leva `where true`. `TRUNCATE` não é barrado. O teste
+  `safeupdate.test.ts` lê o código final de cada função do banco e falha se achar um sem WHERE.
 - **Arquivos:** enviados antes ao bucket `anexos` (`<pasta>/<uuid>/<arquivo>`); a função recebe `{ nome, tipo,
   caminho }`. Para abrir, o app pede um link temporário de 1 h.
 
@@ -123,6 +131,8 @@ ficha sem novo login) e "Sair" a apaga. Sem `VITE_FONTE_DADOS`, o app volta ao m
 regras do modo simulado contra as funções do banco, as views × as consultas do app, o mapa ida e volta e a carga:
 os privilégios (anon sem nada, authenticated só leitura, funções liberadas = as do app), o seed em dia com a história, o banco igual ao que o modo simulado geraria em cada um de 15 dias seguidos, as contas
 que já existiam antes das migrações, a parada quando falta uma conta de demonstração e o plano B em duas partes.
+Como o PGlite não tem o `pg_safeupdate`, `safeupdate.test.ts` confere estaticamente o código final de cada função
+(`pg_proc.prosrc`, depois de todas as migrações): nenhum UPDATE ou DELETE sem WHERE, inclusive em SQL dinâmico.
 
 ## Pendências
 

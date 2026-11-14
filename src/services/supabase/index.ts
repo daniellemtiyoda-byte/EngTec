@@ -29,7 +29,8 @@ export interface OpcoesSupabase {
 
 /**
  * Erro do banco → ApiError. As funções levantam o erro de regra com o código P0<status> e o DETAIL em JSON
- * ({ status, campos }) (`falhar` em 0002); o resto (falha de rede, restrição inesperada) vira mensagem genérica.
+ * ({ status, campos }) (`falhar` em 0002); o resto (falha de rede, restrição inesperada) vira mensagem genérica,
+ * com o código do erro quando há um (ex. "código 21000"), sem a mensagem técnica.
  */
 export function erroDoBanco(e: { code?: string; message?: string; details?: string | null; detail?: string | null }): ApiError {
   const m = /^P0(\d{3})$/.exec(e.code ?? '');
@@ -44,7 +45,9 @@ export function erroDoBanco(e: { code?: string; message?: string; details?: stri
     return new ApiError(401, 'Sessão expirada ou não autenticada. Entre novamente.');
   }
   console.error('Erro do banco:', e);
-  return new ApiError(500, 'Não foi possível concluir a operação. Tente novamente.');
+  // Só o código (ex. 21000, 23505, PGRST202), para o diagnóstico não depender do console; a mensagem técnica fica de fora.
+  const codigo = /^[A-Z0-9]{2,12}$/i.test(e.code ?? '') ? ` (código ${e.code})` : '';
+  return new ApiError(500, `Não foi possível concluir a operação${codigo}. Tente novamente.`);
 }
 
 const tipoDoAnexo = (f: File) => (f.type === 'application/pdf' ? 'pdf' : /xml/.test(f.type) || f.name.toLowerCase().endsWith('.xml') ? 'xml' : 'imagem');

@@ -5,6 +5,14 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Corrigido
+- 2026-11-14: **Etapa 9: "Reiniciar dados de demonstração" falhava no Supabase com `21000 UPDATE requires a WHERE clause` (`0009_safeupdate.sql`).**
+  - **Por quê:** o PostgREST do Supabase carrega o `pg_safeupdate`, que recusa UPDATE e DELETE sem WHERE em qualquer comando da requisição, mesmo dentro de funções `security definer`. O PGlite dos testes não tem a extensão e o `seed.sql` roda pelo SQL Editor, fora do PostgREST, por isso nada acusou antes.
+  - Revisão de todas as funções (`0001` a `0008`, incluindo gatilhos e SQL dinâmico): quatro comandos sem WHERE. `recalcular_chaves` (chamada por `carregar_demonstracao`, a causa do erro no reiniciar): update de `emissoes`, agora com o WHERE real (só quando a chave muda, como já era o de `nfs`). `separar_rme`: `delete from _sugestao` (tabela temporária), que faria **toda separação de RME** falhar no Supabase. `atualizar_parametros`: `delete` de `niveis_estoque` e de `feriados` (ainda sem tela; Etapa 11). Os três com `create or replace` na `0009`, iguais aos anteriores salvo o WHERE, com os mesmos privilégios.
+  - Teste `safeupdate.test.ts`: aplica as migrações e analisa o código final de cada função (`pg_proc.prosrc`), inclusive o SQL dentro de textos executados (`execute format(...)`); falha em UPDATE ou DELETE sem WHERE no mesmo nível do comando (o WHERE de uma subconsulta não conta). Simular o `pg_safeupdate` no PGlite não é possível (é uma extensão em C, que o PGlite não carrega).
+  - Erro que não é de regra (não é `P0xxx`): a mensagem genérica passa a mostrar o código, "Não foi possível concluir a operação (código 21000). Tente novamente.", sem a mensagem técnica, para o diagnóstico não depender do console.
+  - Arquivos: `supabase/migrations/0009_safeupdate.sql`, `src/services/supabase/{index,safeupdate,safeupdate.test,erroDoBanco.test}.ts`, `docs/BANCO-DE-DADOS.md`, `CLAUDE.md`.
+
 ### Adicionado
 - 2026-11-08: **Etapa 9: privilégios explícitos como segunda camada, além da RLS (`0008_privilegios.sql`).**
   - **Por quê:** a ideia veio do banco da v1, feito pelo **Erik** (migração `20261107000004_seguranca.sql` do `main`; nada do `main` foi trazido): mesmo que uma política RLS falte ou falhe, os papéis da API não têm o privilégio de fazer o que não devem.
