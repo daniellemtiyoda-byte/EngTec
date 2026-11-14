@@ -261,7 +261,11 @@ export default function Simulador() {
   const ligado = !!parametros.dados?.modoDemonstracao;
 
   // Vindo da página do contrato (?contrato=AR00224-01): o assistente já abre com ele.
-  useEffect(() => { if (pedido && ligado && contratos.length) setAberto(true); }, [pedido, ligado, contratos.length]);
+  // Se o contrato pedido não está entre os vigentes com saldo a emitir, não abre o assistente: mostra o motivo.
+  const pedidoNaLista = !!pedido && vigentes.some((c) => c.numero === pedido);
+  const pedidoSemSaldo = !!pedido && !!contratos.length && !pedidoNaLista;
+  const pedidoContrato = contratos.find((c) => c.numero === pedido);
+  useEffect(() => { if (pedidoNaLista && ligado) setAberto(true); }, [pedidoNaLista, ligado]);
 
   const colunas: Coluna<Emissao>[] = [
     { chave: 'nf', titulo: 'NF', render: (em) => `NF ${em.nf.numero}` },
@@ -280,6 +284,14 @@ export default function Simulador() {
         acoes={ligado && pode('simulador:usar') && <button className="btn btn-pri" onClick={() => setAberto(true)}>Emitir fardos</button>}
       />
       <Aviso tom="alerta"><strong>Demonstração.</strong> Na operação real, o fornecedor grava o QR na plaquinha seguindo o padrão do contrato.</Aviso>
+      {pedidoSemSaldo && (
+        <Aviso tom="info">
+          {!pedidoContrato ? <>Não há contrato <span className="mono">{pedido}</span>.</>
+            : pedidoContrato.situacao !== 'vigente' ? <>O contrato <span className="mono">{pedido}</span> não está vigente.</>
+              : <>Este contrato não tem saldo a emitir (<span className="mono">{pedido}</span>): tudo o que foi contratado já foi emitido. Para repor reprovados, escolha outro contrato ou use a reentrega quando houver reprovados.</>}
+          {' '}<button className="btn btn-sec btn-peq" onClick={() => setParams({}, { replace: true })}>Fechar aviso</button>
+        </Aviso>
+      )}
       {parametros.dados && !ligado && <Aviso tom="critico">O modo demonstração está desligado em Configurações: o simulador não emite fardos.</Aviso>}
       <ListPage<Emissao>
         titulo="Emissões" subnivel
