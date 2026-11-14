@@ -6,6 +6,9 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Alterado
+- 2026-11-14: **Categoria A, B, C também no texto dos eventos, só na exibição.** `textoDoEvento` (`rotulos.ts`) troca "categoria 1/2/3" pela letra em `linhaDoEvento` (`LinhaTempo.tsx`); o evento gravado e o seed não mudam. Teste em `rotulos.test.ts`.
+
+### Alterado
 - 2026-11-14: **Melhorias 3, 4 e 5 e ajuste de usabilidade em NF/DOF e Simulador (só front, sem migração; o banco grava o mesmo).**
   - **Categoria A, B, C:** continua gravada 1, 2, 3; só o rótulo muda (`letraCategoria`, `rotuloCategoria`, `CATEGORIA_OPCOES`). Telas: inspeção à mão (botões A/B/C), ficha do dormente, página do fardo, cartões da inspeção, Nova RME (categoria mínima "Só a categoria A" / "Até a categoria B"), item de RME (`descreverItemRme`, usado na separação e na RME), Vitrine, e mensagens de validação (RME, parâmetros). Glossário em `CLAUDE.md` e na especificação.
   - **Gestor sugerido (ContratoModal):** ao escolher a ata, o gestor vem do contrato de assinatura mais recente da ata; editável. Ata nova ou sem contratos: vazio.

@@ -143,6 +143,9 @@ export const SITUACAO_PARCELA: Rotulos<SituacaoParcela> = {
 export const letraCategoria = (c?: number) => (c ? ['A', 'B', 'C'][c - 1] ?? String(c) : '');
 export const rotuloCategoria = (c?: number) => (c ? `Categoria ${letraCategoria(c)}` : 'Categoria a definir');
 
+/** Texto de evento para exibição: "categoria 1/2/3" vira a letra (o evento gravado não muda). */
+export const textoDoEvento = (descricao: string) => descricao.replace(/\b([Cc]ategoria) ([123])\b/g, (_, p: string, n: string) => `${p} ${letraCategoria(Number(n))}`);
+
 /** Sigla da marca de cada evento na linha do tempo. */
 export const MARCA_EVENTO: Record<TipoEvento, string> = {
   emitido: 'EMI', recebido: 'REC', inspecionado: 'INS', guardado: 'GUA', transferido: 'TRF', reservado: 'RES',
