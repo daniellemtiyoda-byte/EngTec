@@ -31,7 +31,11 @@ export type Coluna<T> = ColunaBase<T> & (
   | { chave: string; ordenavel?: false }
 );
 /** `principal`: a próxima ação do fluxo; aparece como botão e as demais vão para o menu "⋯". */
-export interface AcaoLinha<T> { rotulo: string; aoClicar: (l: T) => void; visivel?: (l: T) => boolean; principal?: boolean }
+export interface AcaoLinha<T> {
+  rotulo: string; aoClicar: (l: T) => void; visivel?: (l: T) => boolean; principal?: boolean;
+  /** Devolve o motivo quando a ação não vale para esta linha: o botão fica desabilitado e o motivo aparece ao lado. */
+  desabilitada?: (l: T) => string | undefined;
+}
 
 interface Props<T> {
   titulo: string;
@@ -75,10 +79,13 @@ function AcoesDaLinha<T>({ acoes, linha }: { acoes: AcaoLinha<T>[]; linha: T }) 
   const visiveis = acoes.filter((a) => !a.visivel || a.visivel(linha)).sort((a, b) => Number(!!b.principal) - Number(!!a.principal));
   if (!visiveis.length) return null;
   const [primeira, ...resto] = visiveis;
+  const motivo = primeira.desabilitada?.(linha);
+  const noMenu = resto.filter((a) => !a.desabilitada?.(linha));
   return (
     <div className="acoes-linha">
-      <button className={`btn ${primeira.principal ? 'btn-acao' : 'btn-sec'} btn-peq`} onClick={() => primeira.aoClicar(linha)}>{primeira.rotulo}</button>
-      {resto.length > 0 && <MenuAcoes itens={resto.map((a) => ({ rotulo: a.rotulo, aoClicar: () => a.aoClicar(linha) }))} />}
+      <button className={`btn ${primeira.principal ? 'btn-acao' : 'btn-sec'} btn-peq`} disabled={!!motivo} title={motivo} onClick={() => primeira.aoClicar(linha)}>{primeira.rotulo}</button>
+      {motivo && <span className="detalhe-linha">{motivo}</span>}
+      {noMenu.length > 0 && <MenuAcoes itens={noMenu.map((a) => ({ rotulo: a.rotulo, aoClicar: () => a.aoClicar(linha) }))} />}
     </div>
   );
 }

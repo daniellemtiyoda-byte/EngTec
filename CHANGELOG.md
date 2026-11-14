@@ -6,6 +6,19 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 ## [Não publicado]
 
 ### Adicionado
+- 2026-11-14: **Etapa 10, tela 3: Usuários (versão base, sem migração; usa `usuarios.listar` e `usuarios.atualizar`, que já tinham a função `atualizar_usuario` no banco).**
+  - **Tela** `pages/Usuarios.tsx` (rota `/usuarios`, só `admin`; sai de "Em construção"): lista com nome, e-mail, perfil e situação, busca, filtros por perfil e por situação e ordenação; **Editar** abre o perfil e a situação (só esses dois campos). Desativar pede confirmação. Nada é apagado.
+  - **Contas novas:** aviso fixo na tela com as instruções (no Supabase: Authentication › Users › Add user; a conta aparece na lista com o perfil Requisitante, que o administrador ajusta aqui). No modo simulado, avisa que só há os quatro usuários de demonstração.
+  - **Trava só na tela:** o administrador não edita a própria conta (botão **Editar** desabilitado com o motivo ao lado e no `title`), para não ficar sem administrador. `ListPage` ganhou `AcaoLinha.desabilitada` (devolve o motivo; ação desabilitada não vai para o menu "⋯").
+  - **Próximo passo (precisa de migração):** a mesma trava no banco, em `atualizar_usuario`, que hoje aceita o administrador mudando o próprio perfil ou a própria situação (e nada impede deixar o sistema sem administrador por outra conta). Também fora: editar nome e e-mail, e convite por e-mail (precisa de `service_role`, fora do front).
+  - Arquivos: `Usuarios.tsx`, `ListPage.tsx`, `rotas.tsx`.
+
+### Fora da Etapa 10 (registrado para os próximos passos)
+- **CSV** dos relatórios do IBAMA (não há utilitário de exportação).
+- **Painel:** taxa de reprovação por empresa inspetora, pontualidade por fornecedor, via corrente × AMV, gráfico de estoque por item com mínimo e máximo, entregas dos contratos (barras de progresso) e "Início de campo" do almoxarife no celular.
+- **Alertas do IBAMA:** os dois que ficaram de fora, "saldo do DOF sem atualização há mais de 30 dias" e "local sem inventário há mais de 90 dias" (provisório); o sino de alertas.
+- **Relatórios:** DOFs a declarar, divergências de volume e movimento anual (3, 4 e 6 do plano); a data do último inventário dentro do Saldo do pátio.
+- **Usuários:** trava no banco para a conta do administrador e convite por e-mail (detalhes na entrada de Usuários).
 - 2026-11-14: **Etapa 10, tela 2: Relatórios › IBAMA (versão base, sem migração; usa só `servicos.ibama`).**
   - **Tela** `pages/Relatorios.tsx`, rota `/relatorios` (grupo Início, depois do Painel; `operacao:consultar`: administrador, almoxarife e gestor). Quatro abas no endereço (`?aba=`): **Destinações a lançar** (`destinacoes`), **Saldo do pátio** (`saldo`), **Perdas** (`perdas`) e **Inventário por local** (`inventario`). É para onde apontam os três alertas do IBAMA do Painel.
   - **Período** (`?de=&ate=`) nas abas Destinações e Perdas (filtros `de`/`ate` do serviço); Saldo e Inventário mostram a situação de agora. A situação (A lançar / Lançadas / Todas; A comunicar / Comunicadas / Todas) fica em `?situacao=`, a primeira é a padrão.
