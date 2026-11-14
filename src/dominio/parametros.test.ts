@@ -77,28 +77,35 @@ describe('dias úteis com feriados', () => {
   });
 });
 
-describe('sugerirDivisao (uma carga de até 3 fardos do padrão)', () => {
-  it('divisão exata no padrão', () => {
+describe('sugerirDivisao (divisão do total a enviar, uma carga de até 3 fardos do padrão)', () => {
+  it('42 → 3 × 14, sem aviso', () => {
     expect(sugerirDivisao(42, 14)).toEqual({ fardos: 3, dormentesPorFardo: 14 });
     expect(sugerirDivisao(14, 14)).toEqual({ fardos: 1, dormentesPorFardo: 14 });
   });
-  it('40 com padrão 14 → 4 × 10, sem aviso', () => {
+  it('40 → 4 × 10, sem aviso', () => {
     expect(sugerirDivisao(40, 14)).toEqual({ fardos: 4, dormentesPorFardo: 10 });
   });
-  it('sem divisor bom: fardos cheios do padrão e sobra para a próxima emissão', () => {
-    expect(sugerirDivisao(43, 14, 10)).toEqual({ fardos: 3, dormentesPorFardo: 14, aviso: 'Sobram 1 dormente para a próxima emissão.' });
-    expect(sugerirDivisao(41, 14)).toEqual({ fardos: 2, dormentesPorFardo: 14, aviso: 'Sobram 13 dormentes para a próxima emissão.' });
+  it('41 (sem divisor bom) → 2 × 14 e os outros 13 ficam para a próxima emissão', () => {
+    expect(sugerirDivisao(41, 14)).toEqual({
+      fardos: 2, dormentesPorFardo: 14, aviso: 'Vão 28 dormentes em 2 fardos de 14. Os outros 13 ficam para a próxima emissão.',
+    });
+  });
+  it('3.000 é limitado à carga: 3 × 14 e os outros 2.958 ficam', () => {
+    expect(sugerirDivisao(3000, 14)).toEqual({
+      fardos: 3, dormentesPorFardo: 14, aviso: 'Vão 42 dormentes em 3 fardos de 14. Os outros 2.958 ficam para a próxima emissão.',
+    });
+    expect(sugerirDivisao(43, 14).aviso).toContain('Os outros 1 ficam');
   });
   it('divisor na metade do padrão não avisa; abaixo dela, sim', () => {
     expect(sugerirDivisao(26, 14).aviso).toBeUndefined(); // 13 × 2
     expect(sugerirDivisao(38, 14).aviso).toBeDefined();
   });
-  it('total menor que o padrão vira um fardo só; zero não gera fardos', () => {
+  it('total menor que o padrão vira um fardo só; zero ou inválido não gera fardos', () => {
     expect(sugerirDivisao(9, 14)).toEqual({ fardos: 1, dormentesPorFardo: 9 });
     expect(sugerirDivisao(0, 14).fardos).toBe(0);
+    expect(sugerirDivisao(NaN, 14).fardos).toBe(0);
   });
-  it('falta maior que uma carga: entrega parcial de 3 × 14 e quanto falta', () => {
-    expect(sugerirDivisao(3000, 14)).toEqual({ fardos: 3, dormentesPorFardo: 14, aviso: 'Entrega parcial da parcela: faltam 2958.' });
-    expect(sugerirDivisao(43, 14).aviso).toBe('Entrega parcial da parcela: faltam 1.');
+  it('o total enviado (fardos × por fardo) nunca passa do total pedido', () => {
+    for (let n = 1; n <= 100; n++) { const d = sugerirDivisao(n, 14); expect(d.fardos * d.dormentesPorFardo).toBeLessThanOrEqual(n); }
   });
 });

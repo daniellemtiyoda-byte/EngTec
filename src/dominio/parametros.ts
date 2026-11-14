@@ -238,25 +238,30 @@ export const CARGA_PADRAO_FARDOS = 3;
 
 export interface DivisaoEmFardos { fardos: number; dormentesPorFardo: number; aviso?: string }
 
+/** Texto "28 dormentes em 2 fardos de 14" (singular quando for um fardo só). */
+export const textoDivisao = (fardos: number, porFardo: number) => `${fardos} ${fardos === 1 ? 'fardo' : 'fardos'} de ${porFardo}`;
+
 /**
- * Sugere a divisão de `falta` dormentes (o que falta emitir) em fardos iguais, para uma carga:
- * - falta maior que uma carga (`carga` fardos do `padrao`): entrega parcial, `carga` fardos do padrão e aviso com o que falta;
- * - falta que cabe em uma carga: o maior número por fardo, até o padrão, que divide a falta exatamente (40 com padrão 14 →
+ * Divide `total` dormentes (o que a pessoa quer enviar) em fardos iguais, para uma carga. O total enviado é sempre
+ * fardos × dormentesPorFardo, nunca o digitado:
+ * - total maior que uma carga (`carga` fardos do `padrao`): `carga` fardos do padrão, o resto fica para a próxima emissão;
+ * - total que cabe em uma carga: o maior número por fardo, até o padrão, que divide o total exatamente (40 com padrão 14 →
  *   4 × 10; 42 → 3 × 14); menor que o padrão, um fardo só; se o melhor divisor ficar abaixo da metade do padrão (ex.
- *   total primo), fardos cheios do padrão e aviso com a sobra para a próxima emissão (41 → 2 × 14, sobram 13).
- * Falta 0: sem fardos.
+ *   total primo), fardos cheios do padrão e aviso com a sobra (41 → 2 × 14, os outros 13 ficam para a próxima emissão).
+ * Total 0 (ou inválido): sem fardos.
  */
-export function sugerirDivisao(falta: number, padrao: number, carga: number = CARGA_PADRAO_FARDOS): DivisaoEmFardos {
+export function sugerirDivisao(total: number, padrao: number, carga: number = CARGA_PADRAO_FARDOS): DivisaoEmFardos {
   const p = Math.max(1, Math.floor(padrao) || 1);
-  if (!Number.isInteger(falta) || falta <= 0) return { fardos: 0, dormentesPorFardo: p };
+  if (!Number.isInteger(total) || total <= 0) return { fardos: 0, dormentesPorFardo: p };
   const fardosDaCarga = Math.max(1, Math.floor(carga) || 1);
-  if (falta > fardosDaCarga * p) {
-    return { fardos: fardosDaCarga, dormentesPorFardo: p, aviso: `Entrega parcial da parcela: faltam ${falta - fardosDaCarga * p}.` };
-  }
-  if (falta <= p) return { fardos: 1, dormentesPorFardo: falta };
+  const comSobra = (fardos: number) => ({
+    fardos, dormentesPorFardo: p,
+    aviso: `Vão ${fardos * p} dormentes em ${textoDivisao(fardos, p)}. Os outros ${(total - fardos * p).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')} ficam para a próxima emissão.`,
+  });
+  if (total > fardosDaCarga * p) return comSobra(fardosDaCarga);
+  if (total <= p) return { fardos: 1, dormentesPorFardo: total };
   let d = p;
-  while (falta % d !== 0) d--;
-  if (d >= p / 2) return { fardos: falta / d, dormentesPorFardo: d };
-  const sobra = falta % p;
-  return { fardos: Math.floor(falta / p), dormentesPorFardo: p, aviso: `Sobram ${sobra} ${sobra === 1 ? 'dormente' : 'dormentes'} para a próxima emissão.` };
+  while (total % d !== 0) d--;
+  if (d >= p / 2) return { fardos: total / d, dormentesPorFardo: d };
+  return comSobra(Math.floor(total / p));
 }

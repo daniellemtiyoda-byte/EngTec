@@ -26,6 +26,14 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
   - Cada item mostra a quantidade da parcela, o já emitido nela e o que falta; o saldo do contrato fica como informação secundária.
   - Padrão por tamanho em `DORMENTES_POR_FARDO_POR_CODIGO` (`parametros.ts`), **provisório: 14 para todos, a CPTM vai confirmar**; tamanho fora da tabela usa o parâmetro das Configurações.
   - O emitido por parcela não é guardado no contrato: `faltaEmitirNaParcela` supõe que as emissões líquidas preenchem as parcelas em ordem e limita ao saldo a emitir.
+- 2026-11-14: **Melhoria 7, passo "Fardos e dormentes": a pessoa informa o total e a divisão sai pronta (só front).**
+  - **Campo principal "Dormentes a enviar"** por tamanho (`Contador`, digitável, lido com `paraNumero`), já preenchido com o menor valor entre a falta da parcela e uma carga (`CARGA_PADRAO_FARDOS` × padrão do tamanho). Embaixo, a divisão em texto ("3 fardos de 14"), calculada por `sugerirDivisao(total, padrão)`; parcela, emitido e falta aparecem junto, e o saldo do contrato fica como informação secundária.
+  - **Total que não divide em fardos iguais** (melhor divisor abaixo da metade do padrão) ou **maior que uma carga**: fardos cheios do padrão e aviso ("Vão 28 dormentes em 2 fardos de 14. Os outros 13 ficam para a próxima emissão."). O total enviado é sempre o da divisão (fardos × por fardo), nunca o digitado.
+  - **"Ajustar divisão"** abre os contadores de fardos e de dormentes por fardo (saíram da tela principal); mexer neles atualiza o "Dormentes a enviar". **"Usar sugestão"** volta ao cálculo automático, com o total sugerido da parcela. Digitar o total também volta ao automático.
+  - Validações iguais às anteriores (limites por fardo e por item, saldo a emitir). Revisão: "3 fardos de 14 (42 dormentes)".
+  - `sugerirDivisao` passou a receber o **total** (antes, a falta) e o texto do aviso mudou; novo `textoDivisao`. `DadosEmissao`, o mock e `emitir_fardos` não mudaram.
+  - **Divisão desigual** (ex.: 41 → 2 fardos de 14 e 1 de 13, ou 40 em fardos de tamanhos diferentes) **continua para a versão com banco**: hoje todo fardo de uma emissão tem o mesmo número de dormentes.
+  - Testes em `parametros.test.ts` (42, 40, 41, 3.000 limitado à carga, total menor que o padrão, zero). Arquivos: `Simulador.tsx`, `parametros.ts`, `styles.css`.
   - **Fica para a versão com banco:** divisão desigual (ex. 14, 14 e 12 em vez de 4 × 10), porque exige mudar `DadosEmissao` e `emitir_fardos` (hoje um item = N fardos iguais) e uma migração.
   - Testes em `parametros.test.ts` e `contratos.test.ts`. Arquivos: `parametros.ts`, `contratos.ts`, `Simulador.tsx`, `styles.css`.
 

@@ -4,7 +4,7 @@ import { BadgeDe, SeloDemo } from '../components/Badge';
 import { CabecalhoPagina } from '../components/Cabecalhos';
 import { Contador } from '../components/Contador';
 import { faltaEmitirNaParcela, tamanhosDaParcela } from '../dominio/contratos';
-import { DORMENTES_POR_FARDO_POR_CODIGO, MAX_DORMENTES_POR_FARDO, MAX_FARDOS_POR_ITEM, sugerirDivisao } from '../dominio/parametros';
+import { CARGA_PADRAO_FARDOS, DORMENTES_POR_FARDO_POR_CODIGO, MAX_DORMENTES_POR_FARDO, MAX_FARDOS_POR_ITEM, sugerirDivisao, textoDivisao } from '../dominio/parametros';
 import { Aviso } from '../components/Estados';
 import { ListPage, type Coluna } from '../components/ListPage';
 import { Modal } from '../components/Modal';
@@ -43,7 +43,8 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar
   const cad = useCadastros();
   const [passo, setPasso] = useState(0);
   const [contratoId, setContratoId] = useState('');
-  const [qtd, setQtd] = useState<Record<string, { fardos: string; porFardo: string; aviso?: string }>>({});
+  // total = "Dormentes a enviar"; fardos/porFardo só existem quando a pessoa ajustou a divisão à mão ("Ajustar divisão").
+  const [qtd, setQtd] = useState<Record<string, { total: string; fardos?: string; porFardo?: string; ajustando?: boolean }>>({});
   const [comDocumentos, setComDocumentos] = useState(true);
   const [parcela, setParcela] = useState('');
   const [reentrega, setReentrega] = useState(false);
@@ -59,24 +60,29 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar
   const contrato = contratos.find((c) => c.id === contratoId);
   const padraoDoTamanho = (tamanhoId: string) => DORMENTES_POR_FARDO_POR_CODIGO[cad.codigoTamanho(tamanhoId)] ?? porFardo;
 
-  /** Ao escolher a parcela, cada item já vem com a divisão sugerida do que falta emitir nela (editável). */
+  /** Sugestão de partida: o menor entre o que falta na parcela e uma carga (fardos do padrão). */
+  const totalSugerido = (falta: number, tamanhoId: string) => Math.min(falta, CARGA_PADRAO_FARDOS * padraoDoTamanho(tamanhoId));
+
+  /** Ao escolher a parcela, cada tamanho já vem com os "Dormentes a enviar" sugeridos (editável). */
   function escolherParcela(numeroParcela: string) {
     setParcela(numeroParcela);
     const sugestao: typeof qtd = {};
     for (const { item } of tamanhosDaParcela(contrato, numeroParcela)) {
-      const falta = faltaEmitirNaParcela(contrato, numeroParcela, item.tamanhoId, emissoes).falta;
-      const d = sugerirDivisao(falta, padraoDoTamanho(item.tamanhoId));
-      sugestao[item.id] = { fardos: String(d.fardos), porFardo: String(d.dormentesPorFardo), aviso: d.aviso };
+      sugestao[item.id] = { total: String(totalSugerido(faltaEmitirNaParcela(contrato, numeroParcela, item.tamanhoId, emissoes).falta, item.tamanhoId)) };
     }
     setQtd(sugestao);
   }
   const daParcela = contrato?.parcelas.find((p) => String(p.numero) === parcela);
-  // Só os tamanhos da parcela escolhida.
+  // Só os tamanhos da parcela escolhida. A divisão sai do total digitado; ajustada à mão, o total passa a ser fardos × por fardo.
   const linhas = tamanhosDaParcela(contrato, parcela).map(({ item: i }) => {
-    const q = qtd[i.id] ?? { fardos: '0', porFardo: String(padraoDoTamanho(i.tamanhoId)) };
-    const fardos = paraNumero(q.fardos, true) || 0;
-    const por = paraNumero(q.porFardo, true) || 0;
-    return { item: i, q, fardos, por, parcela: faltaEmitirNaParcela(contrato, parcela, i.tamanhoId, emissoes), total: fardos * por, passou: fardos * por > i.saldoAEmitir };
+    const padrao = padraoDoTamanho(i.tamanhoId);
+    const q = qtd[i.id] ?? { total: '0' };
+    const manual = q.fardos !== undefined && q.porFardo !== undefined;
+    const auto = sugerirDivisao(paraNumero(q.total, true) || 0, padrao);
+    const fardos = manual ? paraNumero(q.fardos!, true) || 0 : auto.fardos;
+    const por = manual ? paraNumero(q.porFardo!, true) || 0 : auto.dormentesPorFardo;
+    const total = fardos * por;
+    return { item: i, q, manual, padrao, aviso: manual ? undefined : auto.aviso, fardos, por, parcela: faltaEmitirNaParcela(contrato, parcela, i.tamanhoId, emissoes), total, passou: total > i.saldoAEmitir };
   });
   const totalFardos = linhas.reduce((s, l) => s + l.fardos, 0);
   const totalDormentes = linhas.reduce((s, l) => s + l.total, 0);
@@ -147,17 +153,37 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar
             <li key={l.item.id} className={l.passou ? 'invalido' : undefined}>
               <div>
                 <strong>{cad.descreverTamanho(l.item.tamanhoId)}</strong>
-                <span className="mudo">Parcela: {numero(l.parcela.quantidade)} · já emitido {numero(l.parcela.emitido)} · falta {numero(l.parcela.falta)}</span>
-                <span className="mudo">Contrato: saldo a emitir {numero(l.item.saldoAEmitir)} de {numero(l.item.quantidade)}</span>
+                <span className="mudo">Parcela {numero(l.parcela.quantidade)} · emitido {numero(l.parcela.emitido)} · falta {numero(l.parcela.falta)}</span>
               </div>
-              <label className="campo-contador"><span>Fardos</span>
-                <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: fardos`} valor={l.q.fardos} min={0} max={MAX_FARDOS_POR_ITEM} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, fardos: v, aviso: undefined } }))} />
+              <label className="campo-contador"><span>Dormentes a enviar</span>
+                <Contador
+                  rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: dormentes a enviar`} min={0} invalido={l.passou}
+                  valor={l.manual ? String(l.total) : l.q.total}
+                  aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { total: v, ajustando: l.q.ajustando } }))}
+                />
               </label>
-              <label className="campo-contador"><span>Dormentes por fardo</span>
-                <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: dormentes por fardo`} valor={l.q.porFardo} min={1} max={MAX_DORMENTES_POR_FARDO} invalido={l.passou} aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, porFardo: v, aviso: undefined } }))} />
-              </label>
-              <span className={l.passou ? 'texto-critico' : 'mudo'}>{numero(l.total)} dormentes{l.passou && ' · passa do saldo a emitir'}</span>
-              {l.q.aviso && <span className="mudo aviso-divisao">{l.q.aviso}</span>}
+              <span className={l.passou ? 'texto-critico' : 'divisao-texto'}>
+                {l.fardos > 0 ? `${textoDivisao(l.fardos, l.por)}${l.manual ? ` (${numero(l.total)} dormentes)` : ''}` : 'Nenhum fardo'}
+                {l.passou && ' · passa do saldo a emitir'}
+              </span>
+              {l.aviso && <span className="mudo aviso-divisao">{l.aviso}</span>}
+              <span className="mudo secundario">Saldo do contrato: {numero(l.item.saldoAEmitir)} de {numero(l.item.quantidade)}</span>
+              <div className="ajuste-divisao">
+                <button type="button" className="btn-link" aria-expanded={!!l.q.ajustando} onClick={() => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, ajustando: !l.q.ajustando } }))}>Ajustar divisão</button>
+                {l.q.ajustando && (
+                  <>
+                    <label className="campo-contador"><span>Fardos</span>
+                      <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: fardos`} valor={String(l.fardos)} min={0} max={MAX_FARDOS_POR_ITEM} invalido={l.passou}
+                        aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, total: String(l.total), fardos: v, porFardo: String(l.por || l.padrao) } }))} />
+                    </label>
+                    <label className="campo-contador"><span>Dormentes por fardo</span>
+                      <Contador rotulo={`${cad.descreverTamanho(l.item.tamanhoId)}: dormentes por fardo`} valor={String(l.por)} min={1} max={MAX_DORMENTES_POR_FARDO} invalido={l.passou}
+                        aoMudar={(v) => setQtd((s) => ({ ...s, [l.item.id]: { ...l.q, total: String(l.total), fardos: String(l.fardos), porFardo: v } }))} />
+                    </label>
+                    <button type="button" className="btn-link" onClick={() => setQtd((s) => ({ ...s, [l.item.id]: { total: String(totalSugerido(l.parcela.falta, l.item.tamanhoId)), ajustando: true } }))}>Usar sugestão</button>
+                  </>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -166,7 +192,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar
         <div className="resumo-revisao">
           <p>Contrato <span className="mono">{contrato.numero}</span> · {cad.nomeFornecedor(contrato.fornecedorId)} · {parcela}ª parcela{reentrega && ' · reentrega'}</p>
           <ul>
-            {linhas.filter((l) => l.fardos > 0).map((l) => <li key={l.item.id}>{cad.descreverTamanho(l.item.tamanhoId)}: {l.fardos} fardo(s) × {l.por} = {numero(l.total)} dormentes</li>)}
+            {linhas.filter((l) => l.fardos > 0).map((l) => <li key={l.item.id}>{cad.descreverTamanho(l.item.tamanhoId)}: {textoDivisao(l.fardos, l.por)} ({numero(l.total)} dormentes)</li>)}
           </ul>
           <p><strong>{numero(totalFardos)} fardos e {numero(totalDormentes)} dormentes</strong>, com IDs sequenciais do contrato, em trânsito.</p>
           <fieldset className="opcoes-radio">
