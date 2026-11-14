@@ -12,6 +12,7 @@ import {
 import { cadastrarEntrega, declararDof } from './mock/documentos';
 import { achar, falha, registrar, type Ctx, type Estado } from './mock/estado';
 import { transferirFardo } from './mock/estoque';
+import { destinacaoDetalhada, balancoPorEspecie, recebimentosDof } from './mock/relatorioIbama';
 import { informarSaldoDof, marcarDestinacaoLancada, marcarPerdaComunicada, registrarPerda, saldoPatio } from './mock/ibama';
 import { concluirInspecao, registrarComunicacao, registrarInspecao, registrarRetirada, simularFardo } from './mock/inspecao';
 import { abrirInventario, analisarInventario, fecharInventario, inventarioPorLocal, lerNoInventario } from './mock/inventario';
@@ -307,7 +308,7 @@ export function montarServicos(m: Motor): Servicos {
       destinacoes: (q = {}) => ler((e) => {
         const { lancado, de, ate, ...filters } = q.filters ?? {};
         const lista = e.destinacoes.filter((d) => (!lancado || (lancado === 'sim') === !!d.lancadoEm) && (!de || d.entregueEm.slice(0, 10) >= de) && (!ate || d.entregueEm.slice(0, 10) <= ate));
-        return paginar(lista, maisRecentes('entregueEm')({ ...q, filters }));
+        return paginar(lista.map((d) => destinacaoDetalhada(e, d, dia())), maisRecentes('entregueEm')({ ...q, filters }));
       }),
       marcarLancado: (k) => escrever(['dof:declarar'], op('marcar_destinacao_lancada', { p_id: k }), (e, ctx) => marcarDestinacaoLancada(e, k, ctx).id, daLista((e) => e.destinacoes, 'Destinação final')),
       saldosInformados: (q = {}) => ler((e) => paginar(e.saldosDof, q.sortBy || q.sort ? q : { ...q, sort: [{ campo: 'data', dir: 'desc' }, { campo: 'quando', dir: 'desc' }] })),
@@ -320,6 +321,8 @@ export function montarServicos(m: Motor): Servicos {
         return paginar(lista, maisRecentes('quando')({ ...q, filters }));
       }),
       inventarioPorLocal: () => ler((e) => inventarioPorLocal(e)),
+      recebimentosDof: (f = {}) => ler((e) => recebimentosDof(e, dia(), f.de, f.ate)),
+      balanco: (f = {}) => ler((e) => balancoPorEspecie(e, dia(), f.de, f.ate)),
       marcarPerdaComunicada: (k) => escrever(['painel:gestao', 'dof:declarar'], op('marcar_perda_comunicada', { p_id: k }), (e, ctx) => marcarPerdaComunicada(e, k, ctx).id, daLista((e) => e.perdas, 'Perda')),
     },
 

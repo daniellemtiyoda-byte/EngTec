@@ -8,6 +8,24 @@ import type { Categoria, Classe, Feriado, NivelPrazo, RegrasAta, ResultadoInspec
 /** Divergência de volume acima disto (por espécie) gera alerta: regra da IN Ibama, não editável. */
 export const TOLERANCIA_VOLUME_PCT = 10;
 
+/**
+ * dados fictícios do pátio, art. 40 (IN Ibama 21/2014): identificação do pátio da CPTM que sai no cabeçalho dos
+ * relatórios do IBAMA. A CPTM informa os dados reais; até lá, estes são de demonstração.
+ */
+export const PATIO_CPTM = {
+  nome: 'Pátio de Dormentes CPTM (demonstração)',
+  cnpj: '00000000000191',
+  ctf: '0000000',
+  endereco: 'Rua Exemplo, 100 - Brás, São Paulo/SP - CEP 01000-000',
+} as const;
+
+/**
+ * Balanço por espécie (art. 41): diferença aceita entre o saldo final calculado e o físico, em m³. Os volumes gravados
+ * (destinações, perdas) são arredondados a 3 casas, então somas longas podem diferir uns milésimos sem erro real.
+ * Em peças a diferença tem de ser zero.
+ */
+export const TOLERANCIA_FECHAMENTO_M3 = 0.01;
+
 /** Padrões dos parâmetros editáveis (valores iniciais da demonstração). */
 export const LIMITE_DIAS_ESTOQUE_PADRAO = 120;
 export const ALERTA_DOF_DIAS_PADRAO: [number, number] = [3, 1];
@@ -96,6 +114,12 @@ export function diferencaVolumePct(documentalM3: number, calculadoM3: number): n
 }
 
 export const foraDaTolerancia = (pct: number) => pct > TOLERANCIA_VOLUME_PCT;
+
+/**
+ * Aviso do art. 53 da IN Ibama 21/2014 para a divergência de volume acima da tolerância. É só aviso: a regra no serviço
+ * (não bloqueia, exige justificativa) não mudou. PENDENTE de confirmar com a CPTM se a carga deve mesmo ser recusada.
+ */
+export const AVISO_ARTIGO_53 = 'Pela IN Ibama 21/2014, art. 53, acima de 10% a carga deve ser recusada e o órgão ambiental comunicado; abaixo, pede-se ajuste administrativo.';
 
 /**
  * Justificativa preenchida pelo sistema quando a divergência de volume vem só dos fardos que faltaram no

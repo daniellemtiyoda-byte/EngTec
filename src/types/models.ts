@@ -583,6 +583,13 @@ export interface DestinacaoFinal {
   entregueEm: string;
   lancadoEm?: string;
   lancadoPor?: string;
+  // calculados (relatório do IBAMA, art. 56; nada disto é gravado):
+  /** Tamanhos das peças da RME desta espécie. */
+  tamanhosIds?: Id[];
+  /** Até o dia seguinte à entrega da RME. */
+  prazoLancamento?: string;
+  /** Dias de atraso: do prazo até o lançamento ou, se ainda a lançar, até hoje. */
+  diasAtraso?: number;
 }
 
 /** Saldo informado do DOF: o saldo por espécie que aparece no sistema DOF numa data (registro periódico). */
@@ -885,4 +892,64 @@ export interface EtiquetasEmissao {
   emissao: Emissao;
   contrato: Contrato;
   fardos: { fardo: Fardo; item: ItemDescrito; dormentesIds: Id[] }[];
+}
+
+// ---------- Relatórios do IBAMA: leituras calculadas (sem gravação) ----------
+
+/** Situação da DOF quanto à declaração no Sinaflor (art. 51): no prazo, declarada com atraso, pendente ou vencida. */
+export type SituacaoRecebimentoDof = 'no_prazo' | 'declarada_atraso' | 'pendente' | 'vencida';
+
+/** Uma linha por DOF e espécie: o que a DOF trouxe, o que chegou e a declaração. */
+export interface RecebimentoDof {
+  /** `<dofId>|<especieId>` */
+  id: string;
+  dofId: Id;
+  dofNumero: string;
+  nfId: Id;
+  nfNumero: string;
+  entregaId: Id;
+  fornecedorId: Id;
+  especieId: Id;
+  /** Tamanhos dos fardos desta espécie na entrega. */
+  tamanhosIds: Id[];
+  /** Peças recebidas da espécie (descontada a falta declarada). */
+  quantidade: number;
+  documentalM3: number;
+  /** Medido, ou nominal enquanto a inspeção não terminou. Sem nenhum fardo recebido, não existe. */
+  recebidoM3?: number;
+  base?: 'nominal' | 'medido';
+  divergenciaPct?: number;
+  acimaTolerancia: boolean;
+  validade: string;
+  prazoDeclaracao: string;
+  recebidoEm?: string;
+  declaradoEm?: string;
+  declaradoPor?: string;
+  situacao: SituacaoRecebimentoDof;
+  /** Dias de atraso da declaração (declarada fora do prazo) ou do prazo vencido até hoje (pendente vencida). */
+  diasAtraso?: number;
+}
+
+/** Balanço de uma espécie no período (art. 41): saldo inicial + entradas − destinações − perdas − retiradas = saldo final. */
+export interface BalancoEspecie {
+  especieId: Id;
+  inicialM3: number; inicialPecas: number;
+  entradasM3: number; entradasPecas: number;
+  destinacoesM3: number; destinacoesPecas: number;
+  perdasM3: number; perdasPecas: number;
+  /** Reprovados retirados pelo fornecedor: também saem do pátio, e sem elas o balanço não fecha. */
+  retiradasM3: number; retiradasPecas: number;
+  finalM3: number; finalPecas: number;
+  /** Físico de agora (só existe quando o período termina hoje ou depois). */
+  fisicoM3?: number; fisicoPecas?: number;
+  diferencaM3?: number; diferencaPecas?: number;
+  fecha?: boolean;
+}
+
+export interface BalancoIbama {
+  de?: string;
+  ate: string;
+  /** O período termina hoje: só então o físico (que é o de agora) pode ser comparado com o final calculado. */
+  comparaFisico: boolean;
+  especies: BalancoEspecie[];
 }

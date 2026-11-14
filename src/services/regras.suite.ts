@@ -909,6 +909,107 @@ export function regrasDosServicos(montar: Montar, tempoMs?: number) {
     });
   });
 
+  describe('IBAMA: balanço por espécie e recebimentos de DOF (relatórios, só leitura)', () => {
+    const soma = (xs: number[]) => xs.reduce((t, x) => t + x, 0);
+
+    it('o balanço fecha com a história de demonstração: inicial + entradas − destinações − perdas − retiradas = final = físico', async () => {
+      const { s, invariantes } = await montar('gestor');
+      const b = await s.ibama.balanco();
+      expect(b.comparaFisico).toBe(true);
+      expect(b.especies.length).toBeGreaterThan(0);
+      for (const x of b.especies) {
+        expect(x.inicialPecas).toBe(0);
+        expect(x.entradasPecas - x.destinacoesPecas - x.perdasPecas - x.retiradasPecas).toBe(x.finalPecas);
+        expect(Math.abs(x.entradasM3 - x.destinacoesM3 - x.perdasM3 - x.retiradasM3 - x.finalM3)).toBeLessThan(0.005);
+        expect([x.fecha, x.diferencaPecas]).toEqual([true, 0]);
+      }
+      // O que o balanço soma é o que as outras abas mostram.
+      const saldo = await s.ibama.saldoPatio();
+      expect(soma(b.especies.map((x) => x.fisicoPecas ?? 0))).toBe(soma(saldo.map((x) => x.quantidade)));
+      expect(soma(b.especies.map((x) => x.destinacoesPecas))).toBe(soma((await s.ibama.destinacoes({ pageSize: 1000 })).items.map((d) => d.quantidade)));
+      expect(soma(b.especies.map((x) => x.perdasPecas))).toBe((await s.ibama.perdas({ pageSize: 1000 })).total);
+      expect(soma(b.especies.map((x) => x.perdasPecas))).toBeGreaterThan(0);
+      expect(soma(b.especies.map((x) => x.retiradasPecas))).toBeGreaterThan(0);
+      expect(await invariantes()).toEqual([]);
+    });
+    it('com o período aberto no meio da história, o saldo inicial carrega o que veio antes e o final não muda', async () => {
+      const { s } = await montar('gestor');
+      const tudo = await s.ibama.balanco();
+      const meio = await s.ibama.balanco({ de: '2026-10-20' });
+      expect(meio.especies.map((x) => [x.especieId, x.finalPecas])).toEqual(tudo.especies.map((x) => [x.especieId, x.finalPecas]));
+      for (const x of meio.especies) {
+        expect(x.inicialPecas + x.entradasPecas - x.destinacoesPecas - x.perdasPecas - x.retiradasPecas).toBe(x.finalPecas);
+        expect(x.fecha).toBe(true);
+      }
+      expect(soma(meio.especies.map((x) => x.inicialPecas))).toBeGreaterThan(0);
+      // Período que termina no passado: calcula o final, mas não compara com o físico de agora.
+      const passado = await s.ibama.balanco({ ate: '2026-10-20' });
+      expect(passado.comparaFisico).toBe(false);
+      expect(passado.especies.every((x) => x.fisicoPecas === undefined && x.fecha === undefined)).toBe(true);
+    });
+    it('uma perda nova entra no balanço do período e ele continua fechando', async () => {
+      const { s } = await montar('gestor');
+      const d = (await s.inspecao.naoLocalizados({ pageSize: 50 })).items[0];
+      const antes = (await s.ibama.balanco()).especies.find((x) => x.especieId === d.especieId)!;
+      await s.ibama.registrarPerda(d.id, { motivo: 'extravio' });
+      const depois = (await s.ibama.balanco()).especies.find((x) => x.especieId === d.especieId)!;
+      expect([depois.perdasPecas, depois.finalPecas, depois.fecha]).toEqual([antes.perdasPecas + 1, antes.finalPecas - 1, true]);
+    });
+    it('destinações trazem tamanho, prazo (dia seguinte à entrega, art. 56) e atraso', async () => {
+      const { s } = await montar('almoxarife');
+      const lista = (await s.ibama.destinacoes({ pageSize: 1000 })).items;
+      expect(lista.length).toBeGreaterThan(0);
+      for (const d of lista) {
+        expect(d.tamanhosIds?.length).toBeGreaterThan(0);
+        const entrega = new Date(`${d.entregueEm.slice(0, 10)}T00:00:00Z`).getTime();
+        expect(new Date(`${d.prazoLancamento}T00:00:00Z`).getTime() - entrega).toBe(86_400_000);
+        if (d.lancadoEm && d.lancadoEm.slice(0, 10) <= d.prazoLancamento!) expect(d.diasAtraso).toBe(0);
+      }
+      expect(lista.some((d) => !d.lancadoEm && (d.diasAtraso ?? 0) > 0)).toBe(true);
+    });
+    it('recebimentos de DOF: situação pelo prazo e pela declaração, vencidas e pendentes primeiro', async () => {
+      const { s } = await montar('almoxarife');
+      const dofs = (await s.documentos.listarDofs({ pageSize: 1000 })).items;
+      const linhas = await s.ibama.recebimentosDof();
+      expect(new Set(linhas.map((l) => l.dofId))).toEqual(new Set(dofs.map((d) => d.id)));
+      for (const l of linhas) {
+        const dof = dofs.find((d) => d.id === l.dofId)!;
+        expect(l.prazoDeclaracao).toBe(dof.prazoDeclaracao);
+        const declarada = dof.situacaoDeclaracao === 'declarado';
+        if (!declarada) expect(l.situacao).toBe(dof.nivelPrazo === 'vencido' ? 'vencida' : 'pendente');
+        else expect(['no_prazo', 'declarada_atraso']).toContain(l.situacao);
+        expect(l.declaradoEm !== undefined).toBe(declarada);
+        if (l.recebidoM3 !== undefined) expect(l.quantidade).toBeGreaterThan(0);
+      }
+      const ordem = linhas.map((l) => ['vencida', 'pendente'].includes(l.situacao));
+      expect(ordem.indexOf(false)).toBe(ordem.lastIndexOf(true) + 1);
+      expect(linhas.some((l) => l.situacao === 'vencida')).toBe(true);
+      expect(linhas.some((l) => l.situacao === 'pendente')).toBe(true);
+      expect(linhas.some((l) => l.situacao === 'no_prazo')).toBe(true);
+    });
+    it('declarar a DOF vencida a leva a "declarada com atraso"; a pendente, a "no prazo"', async () => {
+      const { s } = await montar('almoxarife');
+      const antes = await s.ibama.recebimentosDof();
+      const dofs = (await s.documentos.listarDofs({ pageSize: 1000 })).items;
+      const declaravel = (situacao: string) => antes.find((l) => l.situacao === situacao && dofs.find((d) => d.id === l.dofId)!.podeDeclarar);
+      const vencida = declaravel('vencida');
+      const pendente = declaravel('pendente');
+      expect(vencida).toBeDefined();
+      expect(pendente).toBeDefined();
+      await s.documentos.declararDof(vencida!.dofId);
+      const l = (await s.ibama.recebimentosDof()).find((x) => x.id === vencida!.id)!;
+      expect([l.situacao, (l.diasAtraso ?? 0) > 0]).toEqual(['declarada_atraso', true]);
+      await s.documentos.declararDof(pendente!.dofId);
+      expect((await s.ibama.recebimentosDof()).find((x) => x.id === pendente!.id)!.situacao).toBe('no_prazo');
+    });
+    it('recebimentos de DOF: período pela data do recebimento', async () => {
+      const { s } = await montar('almoxarife');
+      const todas = await s.ibama.recebimentosDof();
+      expect((await s.ibama.recebimentosDof({ de: '2099-01-01' })).length).toBe(0);
+      expect((await s.ibama.recebimentosDof({ ate: '2099-01-01' })).length).toBe(todas.length);
+    });
+  });
+
   describe('IBAMA: perdas e não localizados no saldo do pátio', () => {
     it('os não localizados ficam no saldo físico, mostrados à parte', async () => {
       const { s } = await montar('gestor');

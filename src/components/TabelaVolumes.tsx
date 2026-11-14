@@ -1,7 +1,9 @@
+import { AVISO_ARTIGO_53 } from '../dominio/parametros';
 import { useCadastros } from '../hooks/useCadastros';
 import type { DivergenciaVolume } from '../types/models';
 import { m3, numero, pct } from '../utils/format';
 import { Badge } from './Badge';
+import { Aviso } from './Estados';
 
 /**
  * Volume por espécie (tabela no computador, cartões no celular): DOF × volume nominal (recebidos × volume do tamanho,
@@ -13,6 +15,7 @@ export function TabelaVolumes({ volumes, legenda }: { volumes: DivergenciaVolume
   const provisoria = volumes.some((d) => d.base === 'nominal');
   return (
     <>
+      {volumes.some((d) => d.acimaTolerancia) && <Aviso tom="alerta">{AVISO_ARTIGO_53}</Aviso>}
       <div className="tabela-wrap">
         <table className="tabela tabela-cartoes">
           <caption className="sr-only">{legenda}</caption>

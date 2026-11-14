@@ -30,8 +30,8 @@ export default function Usuarios() {
   const supabase = env.FONTE_DADOS === 'supabase';
 
   const colunas: Coluna<Usuario>[] = [
-    { chave: 'nome', titulo: 'Nome', ordenavel: true, render: (u) => <>{u.nome}{u.id === eu?.id && <> <Badge tom="azul">você</Badge></>}</> },
-    { chave: 'email', titulo: 'E-mail', ordenavel: true, render: (u) => u.email },
+    { chave: 'nome', titulo: 'Nome', ordenavel: true, quebrar: true, render: (u) => <>{u.nome}{u.id === eu?.id && <> <Badge tom="azul">você</Badge></>}</> },
+    { chave: 'email', titulo: 'E-mail', ordenavel: true, quebrar: true, render: (u) => u.email },
     { chave: 'perfil', titulo: 'Perfil', ordenavel: true, render: (u) => PERFIS[u.perfil]?.rotulo ?? u.perfil },
     { chave: 'ativo', titulo: 'Situação', render: (u) => (u.ativo ? <Badge tom="verde">Ativo</Badge> : <Badge tom="cinza">Inativo</Badge>) },
   ];

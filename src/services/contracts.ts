@@ -1,5 +1,5 @@
 import type {
-  Alerta, Ata, CartaoPainel, Categoria, DestinacaoFinal, Evento, Inventario, InventarioDoLocal, MotivoPerda, Perda, ResultadoInventario, RetornoLeituraInventario, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
+  Alerta, Ata, BalancoIbama, RecebimentoDof, CartaoPainel, Categoria, DestinacaoFinal, Evento, Inventario, InventarioDoLocal, MotivoPerda, Perda, ResultadoInventario, RetornoLeituraInventario, SaldoDofInformado, SaldoPatioEspecie, Contrato, Dof, Dormente, Emissao, EmpresaInspetora, Entrega, EtiquetasEmissao, Fardo, FardoDetalhe, FichaDormente, Fornecedor, FornecedorResumo,
   Id, Indicadores, InspecaoFardo, ItemRme, ListQuery, Local, Medidas, Movimentacao, NotaFiscal, Paginado, Parametros, RegrasAta, TipoDestino, UsoTamanho,
   Pendencia, PreviaRecebimento, Recebimento, Rme, SaldoItem, SugestaoSeparacao, Tamanho, Tratamento, Especie, TipoOcorrencia, Usuario,
   VereditoInspector, ResultadoInspecao,
@@ -236,6 +236,10 @@ export interface Servicos {
     marcarPerdaComunicada(id: Id): Promise<Perda>;
     /** Último inventário fechado de cada local ativo: data, percentual conferido e diferenças. */
     inventarioPorLocal(): Promise<InventarioDoLocal[]>;
+    /** Recebimentos de DOF (art. 51), uma linha por DOF e espécie, vencidas e pendentes primeiro. Período `de`/`ate` pela data do recebimento. Cálculo sobre o estado, sem gravar. */
+    recebimentosDof(filtro?: { de?: string; ate?: string }): Promise<RecebimentoDof[]>;
+    /** Balanço por espécie no período (art. 41): inicial + entradas − destinações − perdas − retiradas = final, comparado com o físico quando o período termina hoje. */
+    balanco(filtro?: { de?: string; ate?: string }): Promise<BalancoIbama>;
   };
 
   parametros: {
