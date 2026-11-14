@@ -5,7 +5,7 @@ import { BadgeDe } from '../components/Badge';
 import { CabecalhoPagina } from '../components/Cabecalhos';
 import { EntregaAssistente } from '../components/EntregaAssistente';
 import { ListPage, type Coluna } from '../components/ListPage';
-import { ConfirmModal } from '../components/Modal';
+import { ConfirmModal, Modal } from '../components/Modal';
 import { PrazoDof } from '../components/PrazoDof';
 import { RecebimentoAssistente } from '../components/RecebimentoAssistente';
 import { useToast } from '../components/Toast';
@@ -19,6 +19,50 @@ import { mensagemSegura } from '../services/erros';
 import type { Dof, Entrega, NotaFiscal } from '../types/models';
 import { data, dataHora, numero } from '../utils/format';
 import { BotaoAnexo } from '../components/BotaoAnexo';
+
+function ModalDocumentosEntrega({ entregaId, numeroContrato, aoFechar }: {
+  entregaId: string;
+  numeroContrato: (id: string) => string;
+  aoFechar: () => void;
+}) {
+  const entrega = useAsync(
+    () => servicos.documentos.listarEntregas({ pageSize: 1, filters: { id: entregaId } }).then((r) => r.items[0]),
+    [entregaId],
+  );
+  const nf = useAsync(
+    () => servicos.documentos.listarNfs({ pageSize: 1, filters: { entregaId } }).then((r) => r.items[0]),
+    [entregaId],
+  );
+  const dof = useAsync(
+    () => servicos.documentos.listarDofs({ pageSize: 1, filters: { entregaId } }).then((r) => r.items[0]),
+    [entregaId],
+  );
+  const en = entrega.dados;
+  const carregando = entrega.carregando || nf.carregando || dof.carregando;
+  const erro = entrega.erro ?? nf.erro ?? dof.erro;
+  return (
+    <Modal titulo="Documentos da entrega" aberto largo aoFechar={aoFechar}>
+      {carregando && <p>Carregando…</p>}
+      {erro && <p className="aviso-erro">{erro.message}</p>}
+      {!carregando && !erro && (
+        <>
+          <dl className="detalhes">
+            <dt>NF</dt><dd>{en ? `NF ${en.nfNumero}` : '—'}</dd>
+            <dt>DOF</dt><dd>{dof.dados?.numero ?? '—'}</dd>
+            <dt>Contrato</dt><dd>{en ? <span className="mono">{numeroContrato(en.contratoId)}</span> : '—'}</dd>
+            <dt>Parcela</dt><dd>{en ? String(en.parcela) : '—'}</dd>
+          </dl>
+          <dl className="detalhes">
+            <dt>XML da NF</dt><dd>{nf.dados?.xml ? <BotaoAnexo anexo={nf.dados.xml} /> : '—'}</dd>
+            <dt>PDF da DOF</dt><dd>{dof.dados?.pdf ? <BotaoAnexo anexo={dof.dados.pdf} /> : '—'}</dd>
+            <dt>Boletim de Inspeção</dt><dd>{en?.boletim?.arquivo ? <BotaoAnexo anexo={en.boletim.arquivo} /> : '—'}</dd>
+            <dt>Relatório Técnico</dt><dd>{en?.relatorioTecnico?.arquivo ? <BotaoAnexo anexo={en.relatorioTecnico.arquivo} /> : '—'}</dd>
+          </dl>
+        </>
+      )}
+    </Modal>
+  );
+}
 
 type AbaDoc = 'a_caminho' | 'dofs' | 'declarados' | 'nfs';
 const ABAS: AbaDoc[] = ['a_caminho', 'dofs', 'declarados', 'nfs'];
@@ -48,6 +92,7 @@ export default function Documentos() {
   const [declarar, setDeclarar] = useState<Dof | null>(null);
   const [declarando, setDeclarando] = useState(false);
   const [rec, setRec] = useState(0);
+  const [verDocs, setVerDocs] = useState<string | null>(null);
   const alterou = () => { setRec((x) => x + 1); totais.recarregar(); };
   const numeroContrato = (id: string) => contratos.dados?.items.find((c) => c.id === id)?.numero ?? '—';
 
@@ -90,7 +135,7 @@ export default function Documentos() {
     { chave: 'emissao', titulo: 'Emissão', ordenavel: true, render: (n) => data(n.emissao) },
     { chave: 'itens', titulo: 'Dormentes', alinhar: 'right', render: (n) => numero(n.itens.reduce((s, i) => s + i.quantidade, 0)) },
     { chave: 'chaveAcesso', titulo: 'Chave de acesso', opcional: true, render: (n) => <span className="mono">{n.chaveAcesso}</span> },
-    { chave: 'xml', titulo: 'XML', opcional: true, render: (n) => n.xml ? <BotaoAnexo anexo={n.xml} /> : '—' },
+    { chave: 'xml', titulo: 'XML', opcional: true, render: (n) => n.xml?.nome ?? '—' },
   ];
 
   async function confirmarDeclaracao() {
@@ -115,7 +160,10 @@ export default function Documentos() {
           <ListPage<Entrega>
             key="a_caminho" titulo="Entregas a caminho" subnivel colunas={colunasEntrega} recarregar={rec}
             listar={(q) => servicos.documentos.listarEntregas({ ...q, filters: { ...q.filters, etapa: 'a_caminho' } })}
-            acoesLinha={pode('recebimento:registrar') ? [{ rotulo: 'Receber', principal: true, aoClicar: (en) => setReceber(en.id) }] : undefined}
+            acoesLinha={[
+              ...(pode('recebimento:registrar') ? [{ rotulo: 'Receber', principal: true, aoClicar: (en: Entrega) => setReceber(en.id) }] : []),
+              { rotulo: 'Ver documentos', aoClicar: (en: Entrega) => setVerDocs(en.id) },
+            ]}
           />
         )}
         {aba === 'dofs' && (
@@ -124,17 +172,22 @@ export default function Documentos() {
             colunas={colunasDof(false)} recarregar={rec}
             filtros={[{ chave: 'nivelPrazo', rotulo: 'Nível', opcoes: NIVEL_PRAZO_OPCOES }]}
             listar={(q) => servicos.documentos.listarDofs({ ...q, filters: { ...q.filters, situacaoDeclaracao: 'a_declarar' } })}
-            acoesLinha={pode('dof:declarar') ? [{ rotulo: 'Declarar', principal: true, visivel: (d) => d.podeDeclarar, aoClicar: setDeclarar }] : undefined}
+            acoesLinha={[
+              ...(pode('dof:declarar') ? [{ rotulo: 'Declarar', principal: true, visivel: (d: Dof) => d.podeDeclarar, aoClicar: setDeclarar }] : []),
+              { rotulo: 'Ver documentos', aoClicar: (d: Dof) => setVerDocs(d.entregaId) },
+            ]}
           />
         )}
         {aba === 'declarados' && (
           <ListPage<Dof>
             key="declarados" titulo="DOFs declaradas" subnivel colunas={colunasDof(true)} recarregar={rec}
             listar={(q) => servicos.documentos.listarDofs({ ...q, filters: { ...q.filters, situacaoDeclaracao: 'declarado' } })}
+            acoesLinha={[{ rotulo: 'Ver documentos', aoClicar: (d: Dof) => setVerDocs(d.entregaId) }]}
           />
         )}
         {aba === 'nfs' && (
-          <ListPage<NotaFiscal> key="nfs" titulo="Notas fiscais" subnivel colunas={colunasNf} recarregar={rec} listar={(q) => servicos.documentos.listarNfs(q)} />
+          <ListPage<NotaFiscal> key="nfs" titulo="Notas fiscais" subnivel colunas={colunasNf} recarregar={rec} listar={(q) => servicos.documentos.listarNfs(q)}
+            acoesLinha={[{ rotulo: 'Ver documentos', aoClicar: (n: NotaFiscal) => setVerDocs(n.entregaId) }]} />
         )}
       </AbasSecao>
 
@@ -146,6 +199,7 @@ export default function Documentos() {
         aberto={!!receber} cad={cad} entregaId={receber} aoFechar={() => setReceber(undefined)}
         aoReceber={(r) => { setReceber(undefined); notificar('sucesso', `Recebimento registrado: ${r.fardosLidos.length} fardo(s) aguardando inspeção.`); nav(`/recebimentos/${r.id}`); }}
       />
+      {verDocs && <ModalDocumentosEntrega entregaId={verDocs} numeroContrato={numeroContrato} aoFechar={() => setVerDocs(null)} />}
       <ConfirmModal
         titulo="Declarar a DOF no Sinaflor" aberto={!!declarar} carregando={declarando} rotuloConfirmar="Marcar como declarada"
         mensagem={declarar ? `Confirma que a DOF ${declarar.numero} (NF ${declarar.nfNumero}) foi declarada no Sinaflor? Fica registrado quem marcou e quando.` : ''}

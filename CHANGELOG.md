@@ -5,6 +5,12 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Adicionado
+- 2026-11-14: **NF e DOF: ação "Ver documentos" em todas as abas, abrindo modal com os anexos da entrega.**
+  - Em todas as quatro abas (A caminho, DOFs a declarar, Declarados, Todas as NFs), qualquer perfil com acesso à tela tem a ação "Ver documentos" na linha. O modal (largo, rola no celular com a correção iOS) busca a entrega, a NF e a DOF associadas ao `entregaId` da linha e exibe: dados básicos (NF, DOF, contrato, parcela) e os quatro arquivos com `BotaoAnexo` — XML da NF, PDF da DOF, boletim de inspeção e relatório técnico (ausentes aparecem como "—").
+  - A coluna XML de "Todas as NFs" voltou a exibir só o nome (sem botão "Abrir"); o acesso ao arquivo vai pelo modal.
+  - Arquivos: `src/pages/Documentos.tsx`.
+
 ### Corrigido
 - 2026-11-14: **Modal largo no celular (iPhone Safari): conteúdo não rolava e o botão de confirmar ficava fora da tela.**
   - **Por quê:** três camadas combinadas: (1) `.modal-fundo` usava `display: grid; place-items: center`, que não repassa altura ao filho — trocado por `display: flex; align-items: stretch`; (2) `height: 100%` no `.modal-largo` resolvia para a altura do conteúdo em vez da viewport — corrigido para `100dvh` (encolhe com a chrome do Safari) com `100vh` como fallback; (3) `.modal-corpo` como filho flex sem `min-height: 0` bloqueava o `overflow-y: auto` — adicionado `min-height: 0` tanto na regra base quanto no bloco mobile. `overscroll-behavior: contain` e `-webkit-overflow-scrolling: touch` para rolagem nativa no iOS. Rodapé com `flex-shrink: 0` para ficar fixo. O resultado esperado (descrito no CLAUDE.md) — conteúdo rola, botões fixos no rodapé — passa a valer em iOS Safari.
