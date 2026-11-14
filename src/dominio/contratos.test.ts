@@ -61,6 +61,15 @@ describe('faltaEmitirNaParcela', () => {
     expect(faltaEmitirNaParcela(contrato, 1, 't1')).toEqual({ quantidade: 60, emitido: 30, falta: 30 });
     expect(faltaEmitirNaParcela(contrato, 2, 't1')).toEqual({ quantidade: 40, emitido: 0, falta: 40 });
   });
+  it('com as emissões, usa a parcela gravada em cada uma (inclusive fora de ordem)', () => {
+    const emissoes = [
+      { contratoId: 'c', parcela: 2, nf: { itens: [{ itemContratoId: 'i1', quantidade: 10 }] } },
+      { contratoId: 'c', parcela: 1, nf: { itens: [{ itemContratoId: 'i1', quantidade: 5 }, { itemContratoId: 'outro', quantidade: 9 }] } },
+    ];
+    expect(faltaEmitirNaParcela({ ...contrato, id: 'c' }, 1, 't1', emissoes)).toEqual({ quantidade: 60, emitido: 5, falta: 55 });
+    expect(faltaEmitirNaParcela({ ...contrato, id: 'c' }, 2, 't1', emissoes)).toEqual({ quantidade: 40, emitido: 10, falta: 30 });
+    expect(faltaEmitirNaParcela({ ...contrato, id: 'c' }, 2, 't1', [])).toEqual({ quantidade: 40, emitido: 0, falta: 40 });
+  });
   it('tamanho fora da parcela: zero', () => {
     expect(faltaEmitirNaParcela(contrato, 1, 'x')).toEqual({ quantidade: 0, emitido: 0, falta: 0 });
   });

@@ -227,26 +227,36 @@ export function situacaoSaldo(disponivel: number, minimo: number, maximo: number
   return 'ok';
 }
 
-/** Máximo de dormentes por fardo e de fardos por item aceitos na emissão. */
+/** Limites da emissão (iguais aos do serviço e do banco): dormentes por fardo e fardos por item. Valem só para validar. */
 export const MAX_DORMENTES_POR_FARDO = 50;
 export const MAX_FARDOS_POR_ITEM = 50;
+/**
+ * PROVISÓRIO, a CPTM vai confirmar: quantos fardos cheios (do padrão) formam uma carga. A sugestão do Simulador é de uma
+ * carga, não da parcela inteira.
+ */
+export const CARGA_PADRAO_FARDOS = 3;
 
 export interface DivisaoEmFardos { fardos: number; dormentesPorFardo: number; aviso?: string }
 
 /**
- * Sugere a divisão de `total` dormentes em fardos iguais: o maior número de dormentes por fardo, até `padrao`, que divide
- * o total exatamente (40 com padrão 14 → 4 × 10; 42 → 3 × 14). Total menor que o padrão: um fardo só. Se o melhor divisor
- * ficar abaixo da metade do padrão (ex. total primo), devolve também um aviso para a tela. Total 0: sem fardos.
+ * Sugere a divisão de `falta` dormentes (o que falta emitir) em fardos iguais, para uma carga:
+ * - falta maior que uma carga (`carga` fardos do `padrao`): entrega parcial, `carga` fardos do padrão e aviso com o que falta;
+ * - falta que cabe em uma carga: o maior número por fardo, até o padrão, que divide a falta exatamente (40 com padrão 14 →
+ *   4 × 10; 42 → 3 × 14); menor que o padrão, um fardo só; se o melhor divisor ficar abaixo da metade do padrão (ex.
+ *   total primo), fardos cheios do padrão e aviso com a sobra para a próxima emissão (41 → 2 × 14, sobram 13).
+ * Falta 0: sem fardos.
  */
-export function sugerirDivisao(total: number, padrao: number): DivisaoEmFardos {
-  if (!Number.isInteger(total) || total <= 0) return { fardos: 0, dormentesPorFardo: Math.max(1, Math.floor(padrao) || 1) };
+export function sugerirDivisao(falta: number, padrao: number, carga: number = CARGA_PADRAO_FARDOS): DivisaoEmFardos {
   const p = Math.max(1, Math.floor(padrao) || 1);
-  if (total <= p) return { fardos: 1, dormentesPorFardo: total };
+  if (!Number.isInteger(falta) || falta <= 0) return { fardos: 0, dormentesPorFardo: p };
+  const fardosDaCarga = Math.max(1, Math.floor(carga) || 1);
+  if (falta > fardosDaCarga * p) {
+    return { fardos: fardosDaCarga, dormentesPorFardo: p, aviso: `Entrega parcial da parcela: faltam ${falta - fardosDaCarga * p}.` };
+  }
+  if (falta <= p) return { fardos: 1, dormentesPorFardo: falta };
   let d = p;
-  while (total % d !== 0) d--;
-  const fardos = total / d;
-  const avisos: string[] = [];
-  if (d < p / 2) avisos.push(`${total} dormentes só se dividem em fardos iguais de ${d}; ajuste o total ou o número por fardo se preferir.`);
-  if (fardos > MAX_FARDOS_POR_ITEM) avisos.push(`Dá ${fardos} fardos, acima do máximo de ${MAX_FARDOS_POR_ITEM} por item.`);
-  return { fardos, dormentesPorFardo: d, ...(avisos.length ? { aviso: avisos.join(' ') } : {}) };
+  while (falta % d !== 0) d--;
+  if (d >= p / 2) return { fardos: falta / d, dormentesPorFardo: d };
+  const sobra = falta % p;
+  return { fardos: Math.floor(falta / p), dormentesPorFardo: p, aviso: `Sobram ${sobra} ${sobra === 1 ? 'dormente' : 'dormentes'} para a próxima emissão.` };
 }

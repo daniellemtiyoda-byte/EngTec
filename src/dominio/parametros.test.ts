@@ -77,7 +77,7 @@ describe('dias úteis com feriados', () => {
   });
 });
 
-describe('sugerirDivisao', () => {
+describe('sugerirDivisao (uma carga de até 3 fardos do padrão)', () => {
   it('divisão exata no padrão', () => {
     expect(sugerirDivisao(42, 14)).toEqual({ fardos: 3, dormentesPorFardo: 14 });
     expect(sugerirDivisao(14, 14)).toEqual({ fardos: 1, dormentesPorFardo: 14 });
@@ -85,21 +85,20 @@ describe('sugerirDivisao', () => {
   it('40 com padrão 14 → 4 × 10, sem aviso', () => {
     expect(sugerirDivisao(40, 14)).toEqual({ fardos: 4, dormentesPorFardo: 10 });
   });
-  it('total primo cai em fardos de 1 e traz aviso', () => {
-    const d = sugerirDivisao(43, 14);
-    expect(d.fardos).toBe(43);
-    expect(d.dormentesPorFardo).toBe(1);
-    expect(d.aviso).toMatch(/43 dormentes/);
+  it('sem divisor bom: fardos cheios do padrão e sobra para a próxima emissão', () => {
+    expect(sugerirDivisao(43, 14, 10)).toEqual({ fardos: 3, dormentesPorFardo: 14, aviso: 'Sobram 1 dormente para a próxima emissão.' });
+    expect(sugerirDivisao(41, 14)).toEqual({ fardos: 2, dormentesPorFardo: 14, aviso: 'Sobram 13 dormentes para a próxima emissão.' });
   });
-  it('divisor abaixo da metade do padrão avisa; na metade, não', () => {
+  it('divisor na metade do padrão não avisa; abaixo dela, sim', () => {
     expect(sugerirDivisao(26, 14).aviso).toBeUndefined(); // 13 × 2
-    expect(sugerirDivisao(38, 14).aviso).toBeDefined(); // 19 × 2 → d = 2
+    expect(sugerirDivisao(38, 14).aviso).toBeDefined();
   });
   it('total menor que o padrão vira um fardo só; zero não gera fardos', () => {
     expect(sugerirDivisao(9, 14)).toEqual({ fardos: 1, dormentesPorFardo: 9 });
     expect(sugerirDivisao(0, 14).fardos).toBe(0);
   });
-  it('avisa quando passa de 50 fardos', () => {
-    expect(sugerirDivisao(1400, 14).aviso).toMatch(/máximo de 50/);
+  it('falta maior que uma carga: entrega parcial de 3 × 14 e quanto falta', () => {
+    expect(sugerirDivisao(3000, 14)).toEqual({ fardos: 3, dormentesPorFardo: 14, aviso: 'Entrega parcial da parcela: faltam 2958.' });
+    expect(sugerirDivisao(43, 14).aviso).toBe('Entrega parcial da parcela: faltam 1.');
   });
 });

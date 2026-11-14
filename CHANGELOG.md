@@ -5,6 +5,14 @@ Formato: data (AAAA-MM-DD), o que mudou, por quê e arquivos principais. Categor
 
 ## [Não publicado]
 
+### Alterado
+- 2026-11-14: **Melhoria 7, revisão: a sugestão é de uma carga, sem fardos de 1 e com o emitido lido da parcela gravada (só front).**
+  - **Carga:** `CARGA_PADRAO_FARDOS` (`parametros.ts`, **provisório: 3, a CPTM vai confirmar**). Falta maior que 3 fardos do padrão → 3 × 14 com "Entrega parcial da parcela: faltam N" (ex.: AR00224-01 com 3.000 a emitir → 3 × 14, faltam 2.958). Falta que cabe em uma carga: divisão exata (40 → 4 × 10, pode passar de 3 fardos porque o limite é em dormentes).
+  - **Sem divisor bom** (abaixo da metade do padrão): fardos cheios do padrão e "Sobram N dormentes para a próxima emissão" (41 → 2 × 14, sobram 13), no lugar de N × 1.
+  - **Emitido da parcela:** `faltaEmitirNaParcela` agora soma as emissões do contrato (cada `Emissao` guarda a `parcela` e a quantidade por item na NF); a ordem das parcelas fica como plano B, só quando as emissões não são passadas. Não precisou mudar o banco nem o formato gravado. Limitação: conta o emitido bruto (inclui reposição de reprovados); o saldo a emitir do item continua limitando.
+  - **Limites:** `MAX_FARDOS_POR_ITEM` e `MAX_DORMENTES_POR_FARDO` (50) são iguais aos do serviço e do banco e só validam; o aviso de ">50 fardos" saiu da sugestão. Nada que o serviço aceita é bloqueado a mais.
+  - Testes atualizados em `parametros.test.ts` e `contratos.test.ts`. Arquivos: `parametros.ts`, `contratos.ts`, `Simulador.tsx`.
+
 ### Adicionado
 - 2026-11-14: **Melhoria 7 (base), Simulador › Emitir fardos: divisão sugerida em fardos iguais (só front; `DadosEmissao` e `emitir_fardos` não mudam).**
   - Ao escolher a parcela, cada tamanho vem com fardos × dormentes por fardo sugeridos pelo que falta emitir na parcela (`sugerirDivisao`: maior número por fardo ≤ padrão que divide o total exatamente; 40 com padrão 14 → 4 × 10; 42 → 3 × 14). Campos continuam editáveis; aviso curto quando o divisor fica abaixo da metade do padrão (ex. total primo) ou passa de 50 fardos.

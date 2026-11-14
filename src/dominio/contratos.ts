@@ -1,4 +1,4 @@
-import type { Contrato, ItemContrato } from '../types/models';
+import type { Contrato, Emissao, ItemContrato } from '../types/models';
 
 type ContratoDaAta = Pick<Contrato, 'numero' | 'dataAssinatura' | 'gestor'>;
 
@@ -42,18 +42,30 @@ export function tamanhosDaParcela(contrato: Pick<Contrato, 'itens' | 'parcelas'>
   return contrato.itens.filter((i) => p.itens.some((x) => x.tamanhoId === i.tamanhoId)).map((item) => ({ item, saldo: item.saldoAEmitir }));
 }
 
+type EmissaoDaParcela = Pick<Emissao, 'contratoId' | 'parcela'> & { nf: { itens: { itemContratoId: string; quantidade: number }[] } };
+
 /**
- * Quanto falta emitir de um tamanho na parcela. O contrato não guarda o emitido por parcela, então se supõe que as
- * emissões líquidas (quantidade − saldo a emitir) preenchem as parcelas em ordem; o resultado nunca passa do saldo a emitir.
+ * Quanto falta emitir de um tamanho na parcela. Com as emissões do contrato (cada uma guarda a parcela e a quantidade por
+ * item na NF), o emitido da parcela é a soma delas. Sem emissões, plano B: supõe que as emissões líquidas (quantidade −
+ * saldo a emitir) preenchem as parcelas em ordem. O que falta nunca passa do saldo a emitir do item.
  */
-export function faltaEmitirNaParcela(contrato: Pick<Contrato, 'itens' | 'parcelas'> | undefined, numeroParcela: number | string | undefined, tamanhoId: string): { quantidade: number; emitido: number; falta: number } {
+export function faltaEmitirNaParcela(
+  contrato: (Pick<Contrato, 'itens' | 'parcelas'> & { id?: string }) | undefined, numeroParcela: number | string | undefined, tamanhoId: string, emissoes?: EmissaoDaParcela[],
+): { quantidade: number; emitido: number; falta: number } {
   const item = contrato?.itens.find((i) => i.tamanhoId === tamanhoId);
   const parcelas = [...(contrato?.parcelas ?? [])].sort((a, b) => a.numero - b.numero);
   const alvo = parcelas.find((p) => String(p.numero) === String(numeroParcela));
   if (!item || !alvo) return { quantidade: 0, emitido: 0, falta: 0 };
   const quantidade = alvo.itens.find((x) => x.tamanhoId === tamanhoId)?.quantidade ?? 0;
-  const liquido = Math.max(0, item.quantidade - item.saldoAEmitir);
-  const antes = parcelas.filter((p) => p.numero < alvo.numero).reduce((s, p) => s + (p.itens.find((x) => x.tamanhoId === tamanhoId)?.quantidade ?? 0), 0);
-  const emitido = Math.min(quantidade, Math.max(0, liquido - antes));
+  let emitido: number;
+  if (emissoes) {
+    emitido = emissoes.filter((m) => m.parcela === alvo.numero && (!contrato?.id || m.contratoId === contrato.id))
+      .reduce((s, m) => s + m.nf.itens.filter((i) => i.itemContratoId === item.id).reduce((t, i) => t + i.quantidade, 0), 0);
+  } else {
+    const liquido = Math.max(0, item.quantidade - item.saldoAEmitir);
+    const antes = parcelas.filter((p) => p.numero < alvo.numero).reduce((s, p) => s + (p.itens.find((x) => x.tamanhoId === tamanhoId)?.quantidade ?? 0), 0);
+    emitido = Math.max(0, liquido - antes);
+  }
+  emitido = Math.min(quantidade, emitido);
   return { quantidade, emitido, falta: Math.max(0, Math.min(quantidade - emitido, item.saldoAEmitir)) };
 }

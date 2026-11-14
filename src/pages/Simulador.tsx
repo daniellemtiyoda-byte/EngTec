@@ -32,14 +32,14 @@ async function baixarXml(em: Emissao) {
   URL.revokeObjectURL(url);
 }
 
-interface PropsAssistente { aberto: boolean; contratos: Contrato[]; inicial?: string; porFardo: number; aoFechar: () => void; aoGerar: (em: Emissao) => void }
+interface PropsAssistente { aberto: boolean; contratos: Contrato[]; inicial?: string; porFardo: number; emissoes: Emissao[]; aoFechar: () => void; aoGerar: (em: Emissao) => void }
 
 /**
  * Assistente "Emitir fardos" (seção 9.5 do plano): contrato, fardos e dormentes por item (sem passar do saldo a emitir)
  * e revisão, onde se escolhe se NF e DOF já entram cadastradas ou se a emissão gera só os fardos (a CPTM cadastra
  * NF e DOF depois, pelo XML baixado aqui). O serviço emite fardos e dormentes com IDs sequenciais do contrato.
  */
-function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar }: PropsAssistente) {
+function EmitirFardos({ aberto, contratos, inicial, porFardo, emissoes, aoFechar, aoGerar }: PropsAssistente) {
   const cad = useCadastros();
   const [passo, setPasso] = useState(0);
   const [contratoId, setContratoId] = useState('');
@@ -64,7 +64,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
     setParcela(numeroParcela);
     const sugestao: typeof qtd = {};
     for (const { item } of tamanhosDaParcela(contrato, numeroParcela)) {
-      const falta = faltaEmitirNaParcela(contrato, numeroParcela, item.tamanhoId).falta;
+      const falta = faltaEmitirNaParcela(contrato, numeroParcela, item.tamanhoId, emissoes).falta;
       const d = sugerirDivisao(falta, padraoDoTamanho(item.tamanhoId));
       sugestao[item.id] = { fardos: String(d.fardos), porFardo: String(d.dormentesPorFardo), aviso: d.aviso };
     }
@@ -76,7 +76,7 @@ function EmitirFardos({ aberto, contratos, inicial, porFardo, aoFechar, aoGerar 
     const q = qtd[i.id] ?? { fardos: '0', porFardo: String(padraoDoTamanho(i.tamanhoId)) };
     const fardos = paraNumero(q.fardos, true) || 0;
     const por = paraNumero(q.porFardo, true) || 0;
-    return { item: i, q, fardos, por, parcela: faltaEmitirNaParcela(contrato, parcela, i.tamanhoId), total: fardos * por, passou: fardos * por > i.saldoAEmitir };
+    return { item: i, q, fardos, por, parcela: faltaEmitirNaParcela(contrato, parcela, i.tamanhoId, emissoes), total: fardos * por, passou: fardos * por > i.saldoAEmitir };
   });
   const totalFardos = linhas.reduce((s, l) => s + l.fardos, 0);
   const totalDormentes = linhas.reduce((s, l) => s + l.total, 0);
@@ -219,6 +219,7 @@ export default function Simulador() {
   const todos = useAsync(() => servicos.contratos.listar({ pageSize: 500 }), []);
   const [aberto, setAberto] = useState(false);
   const [rec, setRec] = useState(0);
+  const emissoes = useAsync(() => servicos.simulador.listar({ pageSize: 500 }), [rec]);
   const [verDof, setVerDof] = useState<Emissao>();
   const pedido = params.get('contrato') ?? undefined;
   const contratos = todos.dados?.items ?? [];
@@ -260,7 +261,7 @@ export default function Simulador() {
       />
       <VerDof emissao={verDof} aoFechar={() => setVerDof(undefined)} />
       <EmitirFardos
-        aberto={aberto} contratos={vigentes} inicial={pedido} porFardo={parametros.dados?.dormentesPorFardoPadrao ?? 14}
+        aberto={aberto} contratos={vigentes} inicial={pedido} porFardo={parametros.dados?.dormentesPorFardoPadrao ?? 14} emissoes={emissoes.dados?.items ?? []}
         aoFechar={() => { setAberto(false); if (pedido) setParams({}, { replace: true }); }}
         aoGerar={(em) => {
           setAberto(false);
